@@ -298,6 +298,12 @@ export class Summarizer {
       this.state = "idle";
       return true;
     } catch (e) {
+      if (e instanceof Error && e.name === "AbortError") {
+        this.state = "stopped";
+        this.error = "aborted";
+        this.notice({ key: "notice.stopped" });
+        return false;
+      }
       this.state = "failed";
       this.error = e instanceof Error ? e.message : String(e);
       this.notice({ key: this.error.startsWith("OutOfMemory") ? "notice.probe_failed" : "error.model_download" });
@@ -342,9 +348,36 @@ export class Summarizer {
     this.post({ type: "abort", runId });
     this.pending?.resolve({ tokens: 0, ms: 0, aborted: true });
     this.pending = null;
+    // A Stop during the download must settle ensureLoaded()'s waiters too (Codex review, PR #16).
+    const err = new Error("aborted");
+    err.name = "AbortError";
+    for (const [k, w] of this.waiters) {
+      if (k.endsWith(`:${runId}`) && !k.startsWith("aborted:")) {
+        this.waiters.delete(k);
+        w.reject(err);
+      }
+    }
   }
 
-  async summarize(text: string, level: Level, opts: SummarizeOptions = {}): Promise<RunStats> {
+  private inFlight: Promise<RunStats> | null = null;
+
+  /** Runs are serialized: a second call waits for the previous one to settle (Codex review, PR #16). */
+  summarize(text: string, level: Level, opts: SummarizeOptions = {}): Promise<RunStats> {
+    const prev = this.inFlight ?? Promise.resolve();
+    const run = prev.then(() => this.summarizeNow(text, level, opts), () => this.summarizeNow(text, level, opts));
+    this.inFlight = run;
+    run.then(
+      () => {
+        if (this.inFlight === run) this.inFlight = null;
+      },
+      () => {
+        if (this.inFlight === run) this.inFlight = null;
+      },
+    );
+    return run;
+  }
+
+  private async summarizeNow(text: string, level: Level, opts: SummarizeOptions = {}): Promise<RunStats> {
     if (!(await this.ensureLoaded({ signal: opts.signal }))) return this.stats();
     const runId = ++this.runId;
     const started = performance.now();
@@ -414,7 +447,7 @@ export class Summarizer {
           this.runStats.bullets_cut++;
         }
       };
-      const r = await this.generate(runId, chunk.index, prompt.replace("{{text}}", chunk.text), level, chunk.text, cfg.max_new_tokens, (t) => {
+      const r = await this.generate(runId, chunk.index, prompt.replace("{{text}}", () => chunk.text), level, chunk.text, cfg.max_new_tokens, (t) => {
         opts.onToken?.(t);
         for (const b of parser.push(t)) handle(b);
       });
@@ -450,7 +483,7 @@ export class Summarizer {
       if (runId !== this.runId || this.state === "stopped") return false;
       const parser = new BulletParser({ max_bullets_per_chunk: 1, max_words_per_bullet: cfg.max_words_per_bullet });
       const lines: string[] = [];
-      const r = await this.generate(runId, chunk.index, prompt.replace("{{text}}", chunk.text), "oneline", chunk.text, cfg.max_new_tokens, (t) => {
+      const r = await this.generate(runId, chunk.index, prompt.replace("{{text}}", () => chunk.text), "oneline", chunk.text, cfg.max_new_tokens, (t) => {
         opts.onToken?.(t);
         for (const b of parser.push(t)) lines.push(b.text);
       });
@@ -487,7 +520,7 @@ export class Summarizer {
         const parser = new BulletParser({ max_bullets_per_chunk: 1, max_words_per_bullet: cfg.max_words_per_bullet });
         const out: string[] = [];
         this.runStats.reduce_calls++;
-        const r = await this.generate(runId, 1000 + depth * 100 + i, PROMPTS["prompts/reduce-oneline.md"].replace("{{lines}}", source), "oneline", source, cfg.max_new_tokens, (t) => {
+        const r = await this.generate(runId, 1000 + depth * 100 + i, PROMPTS["prompts/reduce-oneline.md"].replace("{{lines}}", () => source), "oneline", source, cfg.max_new_tokens, (t) => {
           opts.onToken?.(t);
           for (const b of parser.push(t)) out.push(b.text);
         });

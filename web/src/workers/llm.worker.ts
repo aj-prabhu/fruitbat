@@ -33,7 +33,11 @@ function isMemoryError(e: unknown): boolean {
   return /out of memory|outofmemory|allocation|alloc failed|memory/i.test(s);
 }
 
+let loadAbort: AbortController | null = null;
+
 async function loadTier(spec: PinnedModel & { role: string }, runId: number): Promise<void> {
+  loadAbort = new AbortController();
+  const signal = loadAbort.signal;
   if (inject === "oom" && spec.role !== "low-end" && !oomFired) {
     oomFired = true;
     const e = new Error("simulated allocation failure (inject=oom)");
@@ -44,7 +48,7 @@ async function loadTier(spec: PinnedModel & { role: string }, runId: number): Pr
     const q = p as { status: string; file?: string; loaded?: number; total?: number };
     post({ type: "progress", runId, status: q.status, file: q.file, loaded: q.loaded, total: q.total });
   };
-  tokenizer = await load(spec, (id, o) => AutoTokenizer.from_pretrained(id, { revision: o.revision, progress_callback: o.progress_callback }), progress);
+  tokenizer = await load(spec, (id, o) => AutoTokenizer.from_pretrained(id, { revision: o.revision, progress_callback: o.progress_callback }), progress, signal);
   model = await load(
     spec,
     (id, o) =>
@@ -55,6 +59,7 @@ async function loadTier(spec: PinnedModel & { role: string }, runId: number): Pr
         progress_callback: o.progress_callback,
       }),
     progress,
+    signal,
   );
   loadedRole = spec.role;
 }
@@ -66,6 +71,11 @@ async function onLoad(msg: Extract<MainToWorker, { type: "load" }>): Promise<voi
     await loadTier(msg.model, msg.runId);
     post({ type: "loaded", runId: msg.runId, modelId: msg.model.id, role: loadedRole, downgraded: false, ms: Math.round(performance.now() - t0) });
   } catch (e) {
+    if (aborted.has(msg.runId) || (e instanceof Error && e.name === "AbortError")) {
+      // Stop during the download: in-flight requests cancelled by the loader's signal (Codex review, PR #16)
+      post({ type: "aborted", runId: msg.runId });
+      return;
+    }
     if (!isMemoryError(e)) {
       post({ type: "error", runId: msg.runId, name: e instanceof Error ? e.name : "Error", message: e instanceof Error ? e.message : String(e) });
       return;
@@ -170,6 +180,7 @@ self.onmessage = (e: MessageEvent<MainToWorker>) => {
       break;
     case "abort":
       aborted.add(msg.runId);
+      loadAbort?.abort();
       if (generating === msg.runId && stopper) stopper.interrupt();
       else post({ type: "aborted", runId: msg.runId });
       break;
