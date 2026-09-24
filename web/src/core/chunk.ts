@@ -63,6 +63,7 @@ export async function chunkSentences(segments: Segment[], countTokens: CountToke
   const chunks: Chunk[] = [];
   let curSegs: Segment[] = [];
   let curTokens = 0;
+  let curText = "";
 
   const flush = async (): Promise<void> => {
     if (curSegs.length === 0) return;
@@ -73,15 +74,23 @@ export async function chunkSentences(segments: Segment[], countTokens: CountToke
     chunks.push({ index: chunks.length, start, end, text, segments: curSegs, tokens });
     curSegs = [];
     curTokens = 0;
+    curText = "";
   };
 
+  // Token counts are not additive across sentences joined with a space, so the candidate chunk
+  // is measured as one string before a sentence is accepted (Codex review, PR #14).
   for (const piece of pieces) {
-    const t = await measure(piece.text);
-    if (curSegs.length > 0 && curTokens + t > budget.chunk_input_tokens) {
+    const candidate = curText ? `${curText} ${piece.text}` : piece.text;
+    const t = await measure(candidate);
+    if (curSegs.length > 0 && t > budget.chunk_input_tokens) {
       await flush();
+      curText = piece.text;
+      curTokens = await measure(curText);
+    } else {
+      curText = candidate;
+      curTokens = t;
     }
     curSegs.push(piece);
-    curTokens += t;
   }
   await flush();
 

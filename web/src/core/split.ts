@@ -88,7 +88,9 @@ export async function splitByMeasure(seg: Segment, measure: Measure, target: num
 // Clause punctuation per spec/chunking.md: comma, semicolon, colon, em/en dash anywhere, and a
 // bare hyphen only when it stands alone between whitespace (a spaced dash used as punctuation,
 // e.g. "wrap up - then go"), so a compound word like "well-known" is not shredded mid-word.
-const CLAUSE_PUNCTUATION = /[,;:]|[—–]|(?<=\s)-(?=\s)/g;
+// A comma or colon glued to digits (1,400 or 12:30) is not a clause boundary: require whitespace
+// after the mark (Codex review, PR #14).
+const CLAUSE_PUNCTUATION = /[,;:](?=\s)|[—–]|(?<=\s)-(?=\s)/g;
 
 /** Split `seg` right after every clause-punctuation match. Contiguous: parts tile `seg` exactly. */
 function splitAtClausePunctuation(seg: Segment): Segment[] {

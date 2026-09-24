@@ -179,12 +179,12 @@ function stripSurroundingPunctuation(token: string): string {
 }
 
 function isAllCapsShort(token: string): boolean {
-  return token.length >= 2 && token.length <= 5 && /^[A-Z]+$/.test(token);
+  return token.length >= 2 && token.length <= 5 && /^\p{Lu}+$/u.test(token);
 }
 
 function isNameCandidateToken(stripped: string, sentenceInitial: boolean, commonWords: Set<string>): boolean {
   if (stripped.length === 0) return false;
-  if (!/[A-Z]/.test(stripped[0])) return false;
+  if (!/\p{Lu}/u.test(stripped[0])) return false; // any uppercase letter, not only ASCII (Codex review, PR #14)
 
   // All-caps 2-5 letter tokens (USA, NPS) are candidates unless their lowercase form is a common
   // word (OK, TV are not) -- this exclusion applies regardless of sentence position.
