@@ -7,7 +7,7 @@
 #
 # Fails on: WebSocket, RTCPeerConnection, sendBeacon, EventSource,
 # XMLHttpRequest anywhere; navigator.serviceWorker.register outside
-# web/src/main.ts*; raw fetch( anywhere except web/src/engine/net.ts and
+# web/src/main.ts*; raw fetch( (any whitespace before the paren) anywhere except web/src/engine/net.ts and
 # mac/Sources/FruitbatCore/NetworkPolicy.swift; on Mac, also URLSession.shared
 # and URLSession(configuration outside NetworkPolicy.swift.
 set -euo pipefail
@@ -67,7 +67,7 @@ for f in "${FILES[@]}"; do
         trimmed="$(sed -e 's/^[[:space:]]*//' <<<"$content")"
         echo "$f:$lineno: raw fetch() outside web/src/engine/net.ts: $trimmed"
         FAIL=1
-      done < <(grep -nE 'fetch\(' "$f" || true)
+      done < <(grep -nE 'fetch[[:space:]]*\(' "$f" || true)
       ;;
   esac
 

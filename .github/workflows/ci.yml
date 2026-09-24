@@ -2,10 +2,25 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   push:
     branches: [main]
 
 jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      has_web: ${{ steps.probe.outputs.has_web }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: probe
+        run: |
+          if [ -f web/package.json ]; then
+            echo "has_web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_web=false" >> "$GITHUB_OUTPUT"
+          fi
+
   check-logs:
     runs-on: ubuntu-latest
     steps:
@@ -51,7 +66,8 @@ jobs:
 
   web-lint-unit:
     runs-on: ubuntu-latest
-    if: hashFiles('web/package.json') != ''
+    needs: detect
+    if: needs.detect.outputs.has_web == 'true'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,7 +92,8 @@ jobs:
 
   wasm-ci:
     runs-on: ubuntu-latest
-    if: hashFiles('web/package.json') != ''
+    needs: detect
+    if: needs.detect.outputs.has_web == 'true'
     steps:
       - uses: actions/checkout@v4
         with:

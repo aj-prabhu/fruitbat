@@ -5,7 +5,7 @@
 # Excludes: test files, the logger modules themselves, web/src/vendor/.
 #
 # Fails on: console.log/info/debug/warn/error(, print(, debugPrint(, NSLog(,
-# and os_log()/Logger() calls whose argument uses Swift string interpolation \(.
+# and any os_log()/Logger() call in Swift outside the logger module.
 set -euo pipefail
 
 SCAN_DIRS=()
@@ -48,15 +48,17 @@ for f in "${FILES[@]}"; do
     FAIL=1
   done < <(grep -nE "$SIMPLE_PATTERN" "$f" || true)
 
-  # os_log() / Logger() calls that use Swift string interpolation (\() are
-  # a leak risk: the interpolated value could be source text.
-  while IFS=: read -r lineno content; do
-    if grep -qF '\(' <<<"$content"; then
-      trimmed="$(sed -e 's/^[[:space:]]*//' <<<"$content")"
-      echo "$f:$lineno: forbidden logging call with string interpolation: $trimmed"
-      FAIL=1
-    fi
-  done < <(grep -nE 'os_log\(|Logger\(' "$f" || true)
+  # Any os_log() / Logger() call outside the logger module fails, interpolated
+  # or not: os_log("%{public}@", sourceText) leaks just as much as "\(sourceText)".
+  case "$f" in
+    *.swift)
+      while IFS=: read -r lineno content; do
+        trimmed="$(sed -e 's/^[[:space:]]*//' <<<"$content")"
+        echo "$f:$lineno: forbidden os_log/Logger call outside Log.swift: $trimmed"
+        FAIL=1
+      done < <(grep -nE 'os_log\(|Logger\(' "$f" || true)
+      ;;
+  esac
 done
 
 if [ "$FAIL" -eq 1 ]; then
