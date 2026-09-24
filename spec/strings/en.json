@@ -135,6 +135,7 @@
     "mac.license.licensed": "Licensed. Thank you.",
     "mac.license.nag": "Couldn't check the license in a while. Fruitbat keeps working.",
     "mac.license.sign_out": "Sign out of this Mac",
-    "mac.license.invalid": "That key didn't work. Check it and try again."
+    "mac.license.invalid": "That key didn't work. Check it and try again.",
+    "intake.read_button": "Read this"
   }
 }

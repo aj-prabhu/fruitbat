@@ -9,10 +9,21 @@ import { App } from "../app";
 
 const STRINGS = stringsFile.strings as Record<string, string>;
 
+// Tracked so each mount() properly unmounts the previous one first (render(null, ...) runs
+// ReadChip's effect cleanup, which removes its document-level mouseup/keyup/keydown listeners --
+// S1-02 added those; without this, listeners from earlier tests in this file would pile up on
+// `document` and outlive the container the global afterEach below merely detaches).
+let mounted: HTMLDivElement | null = null;
+
 function mount(): HTMLDivElement {
+  if (mounted) {
+    render(null, mounted);
+    mounted.remove();
+  }
   const container = document.createElement("div");
   document.body.appendChild(container);
   render(<App />, container);
+  mounted = container;
   return container;
 }
 
