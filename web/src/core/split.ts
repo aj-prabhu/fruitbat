@@ -79,7 +79,28 @@ export async function splitByMeasure(seg: Segment, measure: Measure, target: num
   }
   const clauseParts = splitAtClausePunctuation(seg);
   if (clauseParts.length > 1) {
-    for (const part of clauseParts) await splitByMeasure(part, measure, target, limit, out);
+    // Pack adjacent clauses back up to `target` so a comma-heavy sentence does not shatter into
+    // three-word pieces (S1-04: prosody and the additivity proof both need pieces near the
+    // target). A clause that alone exceeds `target` falls through to the word-boundary split.
+    let cur: Segment | null = null;
+    const flush = async (): Promise<void> => {
+      if (cur) await splitByMeasure(cur, measure, target, limit, out);
+      cur = null;
+    };
+    for (const part of clauseParts) {
+      if (!cur) {
+        cur = part;
+        continue;
+      }
+      const merged: Segment = { text: seg.text.slice(cur.start - seg.start, part.end - seg.start), start: cur.start, end: part.end };
+      if ((await measure(merged.text)) <= target) {
+        cur = merged;
+      } else {
+        await flush();
+        cur = part;
+      }
+    }
+    await flush();
     return;
   }
   await splitByWordBoundary(seg, measure, target, limit, out);
