@@ -30,12 +30,12 @@ cp -R /tmp/mlx-swift-lm/skills/mlx-swift-lm ~/.codex/skills/mlx-swift-lm
 Then smoke-test on the Codex bench, read-only, to confirm the skill loads:
 
 ```bash
-echo "Name this skill's purpose in one line." > prompt.txt
+echo "Read the skill at ~/.codex/skills/mlx-swift-lm/SKILL.md and name its purpose in one line. Do not modify any file." > prompt.txt
 codex exec -s read-only -o /tmp/out.txt - < prompt.txt
 cat /tmp/out.txt
 ```
 
-Repeat the same prompt check on the Claude bench once its skill is in place.
+The output must mention MLX. Repeat on the Claude bench with the `~/.claude/skills/mlx-swift-lm/SKILL.md` path once its copy is in place.
 
 ## Proof (packet S2-00, run 2026-09-23)
 
