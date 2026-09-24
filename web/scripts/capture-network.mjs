@@ -1,6 +1,7 @@
 // S1-00b: record every request URL and redirect host from a cold load + one summary on a
 // deployed URL. Output feeds spec/network.json (web.redirect_hosts) and docs/qa/.
 //   BASE_URL=https://2shay-fruitbat-dev.static.hf.space node scripts/capture-network.mjs out.json
+// Drives the walking skeleton at /skeleton.html (window.__skeleton), not the app shell at /.
 import { chromium } from "@playwright/test";
 import { writeFile } from "node:fs/promises";
 
@@ -17,7 +18,7 @@ page.on("response", async (res) => {
   const req = res.request();
   requests.push({ method: req.method(), url: req.url(), status: res.status(), from: req.redirectedFrom()?.url() ?? null, type: req.resourceType() });
 });
-await page.goto(base + "/");
+await page.goto(base + "/skeleton.html"); // the skeleton lives at /skeleton.html since S1-01 (Codex review, PR #9)
 for (let i = 0; i < 3; i++) {
   try { await page.waitForFunction(() => crossOriginIsolated === true, null, { timeout: 15000 }); break; } catch { await page.waitForLoadState("load"); }
 }
