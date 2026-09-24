@@ -4,9 +4,11 @@
 // component tree of their own, so a module-scoped value plus a subscribe list is the smallest
 // thing that lets app.tsx's <Dial> stay the single source of truth while intake reads it
 // synchronously (no re-render needed to answer "what level is selected right now").
+import dialSpec from "../../../spec/dial.json";
 import type { Level } from "../types";
 
-const DEFAULT_LEVEL: Level = "short";
+// The default comes from the spec, never from code (docs/PLAN.md rule 7).
+const DEFAULT_LEVEL: Level = (dialSpec.default as Level) ?? "short";
 
 let current: Level = DEFAULT_LEVEL;
 const listeners = new Set<(level: Level) => void>();
