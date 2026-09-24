@@ -1,8 +1,8 @@
 /*
  * Vendored from kokoro-js 1.2.1 (https://github.com/hexgrad/kokoro, kokoro.js/src/voices.js).
  * Copyright 2025 Hexgrad and contributors. Apache License 2.0 (see ./LICENSE).
- * Fruitbat changes (S1-00a, 2026-09-23): browser-only; no Node fs/path imports; the Hub URL and
- * the fetch() are gone. Voice data comes from an injected loader (web/src/engine/net.ts is the
+ * Fruitbat changes (S1-00a, 2026-09-23): browser-only; no Node fs/path imports; the Hub URL is gone and
+ * no network call remains here. Voice data comes from an injected loader (web/src/engine/net.ts is the
  * only fetch site, docs/PLAN.md rule 1) and is served same-origin from public/models/kokoro-voices/
  * at the pinned revision recorded in spec/models.json. Only voices we ship are listed.
  */
