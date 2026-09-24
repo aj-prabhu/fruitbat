@@ -231,11 +231,28 @@ def _ttfa_floor_ms(target, level, cache_state):
     return 8000 if target == "web" else 4000
 
 
+# Measurements a row must carry for its level; a blank one is not "not applicable", it is
+# a missing measurement and fails the gate (Codex review, PR #15).
+REQUIRED_METRICS = {
+    "readall": ["ttfa_ms", "rtf", "stop_ms", "coverage", "tts_overlimit"],
+    "short": ["ttfa_ms", "gen_ms", "tok_s", "stop_ms", "bullets_total", "bullets_cut", "cut_rate",
+              "facts_token_hit", "halluc_flags", "forbidden_hits"],
+    "caveman": ["ttfa_ms", "gen_ms", "tok_s", "stop_ms", "bullets_total", "bullets_cut", "cut_rate",
+                "facts_token_hit", "halluc_flags", "forbidden_hits"],
+    "oneline": ["ttfa_ms", "gen_ms", "tok_s", "stop_ms", "bullets_total", "bullets_cut", "cut_rate",
+                "facts_token_hit", "halluc_flags", "forbidden_hits", "oneline_keyword_hit"],
+}
+
+
 def evaluate_floors(target, level, cache_state, m):
     """Absolute product-requirement checks from the Stage 1 acceptance table. These
     apply regardless of baseline / baseline-reset — a release can't ship below them
     just because the environment "legitimately changed"."""
     fails = []
+
+    for field in REQUIRED_METRICS.get(level, []):
+        if m.get(field) is None:
+            fails.append(f"{field} missing: required for level {level}")
 
     ttfa_floor = _ttfa_floor_ms(target, level, cache_state)
     if ttfa_floor is not None and m.get("ttfa_ms") is not None and m["ttfa_ms"] > ttfa_floor:
@@ -291,7 +308,7 @@ def evaluate_deltas(target, m, b):
 
     if m.get("facts_token_hit") is not None and b.get("facts_token_hit") is not None:
         drop = b["facts_token_hit"] - m["facts_token_hit"]
-        if drop >= FACTS_TOKEN_HIT_DELTA_PTS:
+        if drop >= FACTS_TOKEN_HIT_DELTA_PTS - 1e-9:  # 0.95 - 0.90 is 0.04999...; inclusive threshold (Codex review, PR #15)
             fails.append(f"facts_token_hit dropped {b['facts_token_hit']} -> {m['facts_token_hit']} (>= 5 pts)")
 
     if m.get("halluc_flags") is not None and b.get("halluc_flags") is not None:
@@ -405,7 +422,8 @@ def cmd_pr_head(args):
     valid_rows = [r for r in rows if is_valid_row(r.get("commit"), args.head, repo_root)]
     labels = read_labels(args.labels)
     baselines = load_baselines(repo_root / "bench" / "baselines.json")
-    exit_code, lines, updates = pr_head_logic(valid_rows, baselines, labels, args.allow_baseline_reset, args.head)
+    allow_reset = bool(args.allow_baseline_reset) or ("baseline-reset" in labels)  # label or flag (Codex review, PR #15)
+    exit_code, lines, updates = pr_head_logic(valid_rows, baselines, labels, allow_reset, args.head)
     print("\n".join(lines))
     if updates:
         save_baselines(repo_root / "bench" / "baselines.json", baselines)
@@ -497,7 +515,16 @@ def test_floor_breach():
     medians = _good_medians(tok_s=10)  # identical to baseline: no regression, but floor breach
     passed, reasons, _ = gate_identity(WEB_SHORT_IDENTITY, medians, baseline, allow_reset=False)
     ok = (not passed) and any("tok_s" in r and "floor" in r for r in reasons)
-    return ok, f"passed={passed} reasons={reasons}"
+    # A row with every metric blank must fail too, not slide past every skip (Codex review, PR #15).
+    blank = {k: None for k in _good_medians()}
+    passed_blank, reasons_blank, _ = gate_identity(WEB_SHORT_IDENTITY, blank, baseline, allow_reset=False)
+    ok = ok and (not passed_blank) and any("missing" in r for r in reasons_blank)
+    # Inclusive five-point threshold survives float rounding.
+    passed_rt, reasons_rt, _ = gate_identity(
+        WEB_SHORT_IDENTITY, _good_medians(facts_token_hit=0.90),
+        {**WEB_SHORT_IDENTITY._asdict(), **_good_medians(facts_token_hit=0.95)}, allow_reset=False)
+    ok = ok and (not passed_rt) and any("facts_token_hit dropped" in r for r in reasons_rt)
+    return ok, f"passed={passed} blank={passed_blank} rounding={passed_rt} reasons={reasons}"
 
 
 def test_nullable_readall_skips_llm_gates():
