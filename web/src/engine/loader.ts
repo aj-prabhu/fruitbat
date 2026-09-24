@@ -74,20 +74,24 @@ export async function load<T>(
     onAbort = () => reject(abortError());
     signal.addEventListener("abort", onAbort, { once: true });
   });
-  try {
-    const work = factory(spec.id, {
-      revision: spec.revision,
-      dtype: spec.dtype,
-      device: spec.device,
-      progress_callback: (p: LoadProgress) => onProgress?.(p),
-    });
-    return await (signal ? Promise.race([work, aborted]) : work);
-  } finally {
+  const work = factory(spec.id, {
+    revision: spec.revision,
+    dtype: spec.dtype,
+    device: spec.device,
+    progress_callback: (p: LoadProgress) => onProgress?.(p),
+  });
+  // The signal stays bound until the factory itself settles, not just until the race does:
+  // a cancelled load may still be in a cache lookup or session init whose later fetches must
+  // also carry the abort (Codex review, PR #4).
+  const cleanup = () => {
     if (signal) {
       activeSignals.delete(signal);
       if (onAbort) signal.removeEventListener("abort", onAbort);
     }
-  }
+  };
+  void work.then(cleanup, cleanup);
+  if (!signal) return work;
+  return Promise.race([work, aborted]);
 }
 
 /** Rewrite a Hub URL at `resolve/main/` for a pinned model id to its pinned revision. */
