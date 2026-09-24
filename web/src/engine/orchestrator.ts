@@ -133,6 +133,7 @@ export class Orchestrator {
       await this.voice.load();
       this.voiceReady = true;
       this.emit();
+      for (const key of this.pendingNotices.splice(0)) this.notice(key);
       await this.voice.prewarm(PREWARM_KEYS);
     } catch (e) {
       this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
@@ -203,11 +204,19 @@ export class Orchestrator {
 
   /** Show a notice (a key) and, with speakMessages on, speak it. `sinceMs` measures the latency
    *  from an earlier trigger (the dial move) to the first spoken sample. */
+  private pendingNotices: string[] = [];
+
   private notice(key: string, sinceMs?: number): void {
     this.notices.push(key);
     this.lastNotice = key;
     this.emit();
     if (!this.speakMessages) return;
+    if (!this.voiceReady) {
+      // e.g. notice.no_webgpu on a page whose voice is still loading: spoken as soon as it is
+      // (Codex review, PR #18)
+      this.pendingNotices.push(key);
+      return;
+    }
     this.spoken.push(key);
     void this.voice
       .speak(key, sinceMs)
@@ -286,16 +295,27 @@ export class Orchestrator {
     const prev = this.level;
     if (level === prev) return;
     this.level = level;
-    if (!isActive(this.gen, this.play) || !this.text) {
+    if (!this.busy() || !this.text) {
       this.emit();
       return;
     }
-    const chunkIndex = await this.currentChunkIndex();
     const shorter = ORDER.indexOf(level) > ORDER.indexOf(prev);
+    // Bump the run and speak before anything is awaited: the chunk lookup can wait on the
+    // tokenizer, and a Stop in that window must win (Codex review, PR #18).
     const id = this.newRun();
     this.notice(shorter ? "notice.dial_shorter" : "notice.dial_longer", t0);
+    const chunkIndex = await this.currentChunkIndex();
+    if (id !== this.runId) return;
     const c = this.chunks?.[chunkIndex];
     await this.begin(id, level, { fromChunk: chunkIndex, base: c?.start ?? 0, end: this.text.length });
+  }
+
+  /** Active generation or playback, or speech still being synthesized for this run (a finished
+   *  generation whose first bullet's audio is not out yet is still a run; Codex review, PR #18). */
+  private busy(): boolean {
+    if (isActive(this.gen, this.play)) return true;
+    const v = this.voice.state();
+    return v.inFlight > 0 || v.enqueued > v.ended;
   }
 
   /** Rule 2: read an all-cut chunk aloud, on request only. */
@@ -440,6 +460,12 @@ export class Orchestrator {
     const { finished, metrics } = await this.voice.endStream(streamId);
     if (id !== this.runId) return;
     this.voiceRun = metrics;
+    if (!finished && this.gen === "done") {
+      // the summary is complete but its speech failed (voice load, planning or synthesis):
+      // say so instead of ending silently (Codex review, PR #18)
+      this.error = this.error ?? "voice_failed";
+      this.notice("error.voice");
+    }
     if (finished) {
       this.play = reducePlay(this.play, "drain");
       this.current = null;

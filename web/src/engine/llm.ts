@@ -469,7 +469,10 @@ export class Summarizer {
       this.runStats.tokens += r.tokens;
       this.runStats.gen_ms += r.ms;
       this.runStats.per_chunk_kept.push(kept);
-      if (seen > 0 && kept === 0) {
+      if (kept === 0) {
+        // nothing kept: every bullet cut, or no parseable bullet at all (prose, a heading, an
+        // empty reply). Same recovery either way: the notice and "Read this part" (Codex review, PR #18)
+        void seen;
         this.runStats.all_cut_chunks++;
         this.notice({ key: "notice.all_cut", chunkIndex: chunk.index, start: chunk.start, end: chunk.end });
       }
