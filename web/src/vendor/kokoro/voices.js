@@ -9,8 +9,9 @@
 
 export const VOICES = Object.freeze({
   // Only voices whose .bin ships in web/public/models/kokoro-voices/ are listed (Codex review, PR #4).
-  // S1-04 adds the second voice for 9/29 together with its vendored file.
+  // S1-04 vendored the second voice (af_bella) for 9/29 (C4).
   af_heart: { name: "Heart", language: "en-us", gender: "Female", targetQuality: "A", overallGrade: "A" },
+  af_bella: { name: "Bella", language: "en-us", gender: "Female", targetQuality: "A", overallGrade: "A-" },
 });
 
 /** @type {Map<string, Promise<Float32Array>>} */

@@ -21,6 +21,7 @@ export default defineConfig({
       input: {
         index: fileURLToPath(new URL("./index.html", import.meta.url)),
         skeleton: fileURLToPath(new URL("./skeleton.html", import.meta.url)),
+        readall: fileURLToPath(new URL("./readall.html", import.meta.url)),
       },
     },
   },
