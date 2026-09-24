@@ -191,6 +191,7 @@ async function summarize(text: string, id: number) {
     },
   });
   await llm.model.generate({ ...inputs, max_new_tokens: 220, do_sample: false, streamer });
+  if (id !== runId) return; // stopped mid-generation: drop the tail
   if (buf.trim()) flushLine(buf);
   mark("gen_done");
 }
@@ -218,10 +219,12 @@ goEl.addEventListener("click", async () => {
     await ctx.resume();
     S.ctxState = ctx.state;
     if (!llm || !tts) await loadAll();
+    if (id !== runId) return; // stopped during loading: do not continue into generation (Codex review, PR #6)
     const text = textEl.value.trim();
     if (!text) throw new Error("empty_input");
     setStatus("summarizing");
     await summarize(text, id);
+    if (id !== runId) return;
     await speakChain;
     if (speechFailed) throw new Error(`speech_failed: ${S.error ?? "unknown"}`);
     S.ctxState = ctx.state;
