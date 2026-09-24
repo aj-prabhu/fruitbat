@@ -65,6 +65,8 @@ for f in "${FILES[@]}"; do
     *)
       while IFS=: read -r lineno content; do
         trimmed="$(sed -e 's/^[[:space:]]*//' <<<"$content")"
+        # a mention inside a comment line is not a call (Codex review, PR #11)
+        case "$trimmed" in //*|\**|/\**) continue ;; esac
         echo "$f:$lineno: raw fetch() outside web/src/engine/net.ts: $trimmed"
         FAIL=1
       done < <(grep -nE 'fetch[[:space:]]*\(' "$f" || true)
