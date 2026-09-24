@@ -69,6 +69,15 @@ describe("guardedFetch", () => {
     expect(res.status).toBe(200);
     expect(spy.mock.calls[0][1]?.signal).toBe(ac.signal);
   });
+  it("reads the final URL from the service worker's header when res.url is empty", async () => {
+    const off = "https://evil.example/x";
+    const fake = vi.fn(async () => new Response("", { status: 200, headers: { "x-fruitbat-final-url": off } }));
+    vi.stubGlobal("fetch", fake);
+    const url = [...exactUrls()][0];
+    await expect(guardedFetch(url)).rejects.toThrow(/redirected off-list/);
+    vi.unstubAllGlobals();
+  });
+
   it("throws after the fact if the browser followed a redirect off the list", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
       const r = new Response("x", { status: 200 });
