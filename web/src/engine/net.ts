@@ -157,11 +157,15 @@ export async function guardedFetch(input: string | URL, init?: RequestInit): Pro
   }
   netStats.allowed++;
   const res = await fetch(d.url, { ...init, method: "GET", credentials: "omit", referrerPolicy: "no-referrer" });
-  if (res.url && res.url !== d.url.href) {
-    const final = allowedUrl(res.url);
+  // When the COI service worker controls the page it hands back a constructed Response whose
+  // `url` is empty; it carries the fetched response's final URL in a header instead (see
+  // public/coi-serviceworker.js). Either way the final URL must be on the list.
+  const finalUrl = res.url || res.headers.get("x-fruitbat-final-url") || "";
+  if (finalUrl && finalUrl !== d.url.href) {
+    const final = allowedUrl(finalUrl);
     if (!final.ok || (final.kind !== "redirect" && final.kind !== "same-origin" && final.kind !== "exact")) {
       netStats.redirect_rejected++;
-      throw new NetworkPolicyError(`redirected off-list: ${final.ok ? final.kind : final.reason}`, new URL(res.url).origin);
+      throw new NetworkPolicyError(`redirected off-list: ${final.ok ? final.kind : final.reason}`, new URL(finalUrl).origin);
     }
   }
   return res;
