@@ -9,7 +9,7 @@ name: Release
 # without ever touching a Space (docs/PLAN.md S1-15 Proof).
 #
 # workflow_dispatch lets a human run release-check.sh by hand against a hypothetical tag, without
-# pushing one, by checking out the current ref and pretending it's that tag.
+# pushing one. A manual run is ALWAYS a dry run: only a real tag push can deploy.
 on:
   push:
     tags:
@@ -58,10 +58,10 @@ jobs:
           TAG: ${{ steps.tag.outputs.tag }}
         run: scripts/release-check.sh "$GITHUB_SHA"
 
-      - name: Dry run (tag contains -test)
-        if: contains(steps.tag.outputs.tag, '-test')
+      - name: Dry run (manual run, or tag contains -test)
+        if: github.event_name != 'push' || contains(steps.tag.outputs.tag, '-test')
         run: |
-          echo "### DRY RUN: '${{ steps.tag.outputs.tag }}' contains -test — nothing is deployed. ###"
+          echo "### DRY RUN: manual run or '-test' tag — nothing is deployed. ###"
           case "${{ steps.tag.outputs.tag }}" in
             web-v*) echo "would run: scripts/deploy-space.sh 2shay/fruitbat --allow-public" ;;
             mac-v*) echo "would hand off to scripts/release.sh (S2-12, not built yet)" ;;
@@ -69,13 +69,13 @@ jobs:
           esac
 
       - name: Deploy web release
-        if: startsWith(steps.tag.outputs.tag, 'web-v') && !contains(steps.tag.outputs.tag, '-test')
+        if: github.event_name == 'push' && startsWith(steps.tag.outputs.tag, 'web-v') && !contains(steps.tag.outputs.tag, '-test')
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: scripts/deploy-space.sh 2shay/fruitbat --allow-public
 
       - name: Mac release hand-off
-        if: startsWith(steps.tag.outputs.tag, 'mac-v') && !contains(steps.tag.outputs.tag, '-test')
+        if: github.event_name == 'push' && startsWith(steps.tag.outputs.tag, 'mac-v') && !contains(steps.tag.outputs.tag, '-test')
         run: |
           echo "mac release: hand-off to scripts/release.sh (S2-12, not built yet)"
           exit 1

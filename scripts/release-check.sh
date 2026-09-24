@@ -43,20 +43,26 @@ run_check() {
   return 0
 }
 
-# (a) commit is an ancestor of main, or equals HEAD (checks local main, falls back to origin/main
-# for a CI checkout that never creates a local main branch)
+# (a) the commit must be checked out: every check below runs against the working tree, so a
+# commit that is not HEAD would be checked against the wrong files (Codex review, PR #6).
 HEAD_FULL="$(git rev-parse HEAD)"
-MAIN_REF=""
-if git rev-parse --verify -q main >/dev/null; then MAIN_REF=main
-elif git rev-parse --verify -q origin/main >/dev/null; then MAIN_REF=origin/main
-fi
 if [ "$COMMIT_FULL" = "$HEAD_FULL" ]; then
-  row commit-ancestor PASS "commit equals HEAD"
-elif [ -n "$MAIN_REF" ] && git merge-base --is-ancestor "$COMMIT_FULL" "$MAIN_REF" 2>/dev/null; then
-  row commit-ancestor PASS "commit is an ancestor of $MAIN_REF"
+  row commit-checked-out PASS "commit equals HEAD"
 else
-  row commit-ancestor FAIL "$COMMIT_FULL is neither HEAD nor an ancestor of ${MAIN_REF:-main}"
+  row commit-checked-out FAIL "$COMMIT_FULL is not HEAD ($HEAD_FULL); check it out first"
 fi
+
+# Evidence files (bench rows, graded files, the privacy request log) are committed on top of the
+# commit they describe, so they are named by an earlier SHA. A file's evidence is valid for
+# COMMIT when its SHA is an ancestor of COMMIT and nothing but evidence files changed since
+# (docs/PLAN.md rule 3; Codex review, PR #6).
+EVIDENCE_PATHSPEC=(. ':!bench/results.csv' ':!bench/baselines.json' ':!bench/graded/*' ':!docs/qa/privacy-requests-*.json')
+evidence_valid() {
+  local sha="$1"
+  git rev-parse --verify -q "$sha^{commit}" >/dev/null 2>&1 || return 1
+  git merge-base --is-ancestor "$sha" "$COMMIT_FULL" 2>/dev/null || return 1
+  git diff --quiet "$sha" "$COMMIT_FULL" -- "${EVIDENCE_PATHSPEC[@]}"
+}
 
 # (b) spec/version.json web version not 0.0.0, and matches TAG when TAG is a web-v* tag
 WEB_VERSION="$(jq -r '.web' spec/version.json)"
@@ -133,7 +139,7 @@ else
   row gitleaks FAIL "missing: gitleaks not installed (brew install gitleaks)"
 fi
 
-# (h) bench rows valid for the commit, or a hand-filled gate file (cut list)
+# (h) bench rows valid for the commit (gate.py applies the same evidence rule), or a hand-filled gate file (cut list)
 if [ -n "${RELEASE_GATE_FILE:-}" ]; then
   if [ -s "$RELEASE_GATE_FILE" ]; then
     row bench-gate PASS "hand-filled gate file: $RELEASE_GATE_FILE"
@@ -146,19 +152,26 @@ else
   missing bench-gate S0-05 "bench/gate.py"
 fi
 
-# (i) graded files: bench/graded/<commit>-*.json count >= 18, every score >= 4
+# (i) graded files: bench/graded/<sha>-*.json for a sha whose evidence is valid for COMMIT,
+# count >= 18, every score >= 4
 if [ -d bench/graded ]; then
-  GRADED_FILES=(bench/graded/"${COMMIT_FULL}"-*.json)
-  if [ -e "${GRADED_FILES[0]}" ]; then
+  GRADED_SHA=""
+  for f in bench/graded/*-*.json; do
+    [ -e "$f" ] || continue
+    sha="$(basename "$f" | cut -d- -f1)"
+    if evidence_valid "$sha"; then GRADED_SHA="$sha"; fi
+  done
+  if [ -n "$GRADED_SHA" ]; then
+    GRADED_FILES=(bench/graded/"${GRADED_SHA}"-*.json)
     COUNT=${#GRADED_FILES[@]}
     LOW="$(jq -s 'map(select(.score < 4)) | length' "${GRADED_FILES[@]}")"
     if [ "$COUNT" -ge 18 ] && [ "$LOW" -eq 0 ]; then
-      row graded PASS "$COUNT files, all scores >= 4"
+      row graded PASS "$COUNT files for $GRADED_SHA (evidence valid for $COMMIT_FULL), all scores >= 4"
     else
-      row graded FAIL "$COUNT files (need >= 18), $LOW below score 4"
+      row graded FAIL "$COUNT files for $GRADED_SHA (need >= 18), $LOW below score 4"
     fi
   else
-    row graded FAIL "no bench/graded/$COMMIT_FULL-*.json files"
+    row graded FAIL "no bench/graded/<sha>-*.json whose sha is valid evidence for $COMMIT_FULL"
   fi
 else
   missing graded S1-14 "bench/graded/"
@@ -171,12 +184,19 @@ else
   missing strings-check S1-L0 "scripts/strings-check.mjs"
 fi
 
-# (k) docs/qa/privacy-requests-<commit>.json exists and is non-empty
-PRIVACY_FILE="docs/qa/privacy-requests-${COMMIT_FULL}.json"
-if [ -s "$PRIVACY_FILE" ]; then
-  row privacy-requests PASS "$PRIVACY_FILE"
+# (k) docs/qa/privacy-requests-<sha>.json, non-empty, for a sha whose evidence is valid for COMMIT
+PRIVACY_FILE=""
+for f in docs/qa/privacy-requests-*.json; do
+  [ -s "$f" ] || continue
+  sha="$(basename "$f" .json)"; sha="${sha#privacy-requests-}"
+  if evidence_valid "$sha"; then PRIVACY_FILE="$f"; fi
+done
+if [ -n "$PRIVACY_FILE" ]; then
+  row privacy-requests PASS "$PRIVACY_FILE (evidence valid for $COMMIT_FULL)"
+elif ls docs/qa/privacy-requests-*.json >/dev/null 2>&1; then
+  row privacy-requests FAIL "no docs/qa/privacy-requests-<sha>.json whose sha is valid evidence for $COMMIT_FULL"
 else
-  missing privacy-requests S1-12 "$PRIVACY_FILE"
+  missing privacy-requests S1-12 "docs/qa/privacy-requests-<sha>.json"
 fi
 
 # --- print the table ---
