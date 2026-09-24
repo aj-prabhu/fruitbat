@@ -1,0 +1,29 @@
+{
+  "id": "003",
+  "key_facts": [
+    "Total billed for Q3 came to $48,200, up from $41,600 in Q2",
+    "so don't read it as the pipeline suddenly working",
+    "#1051 to Okafor Labs for $2,150 (already 12 days late)",
+    "they said the check went out September 10, but it hasn't hit the account",
+    "we came in at $11,400 against a budget of $13,000",
+    "I said the Bell Foundry invoice was $6,800. It's actually $6,300",
+    "the $9,800 Meridian invoice has NOT been countersigned yet",
+    "the September 30 close date we talked about is now September 29, not the 30th"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Total Q3 billing came to $52,750, a new high for the company.",
+      "distinctive_tokens": ["52750", "high"]
+    },
+    {
+      "claim": "Legal has already finalized and fully executed the Meridian contract this week.",
+      "distinctive_tokens": ["finalized", "executed"]
+    },
+    {
+      "claim": "Sarah approved switching the board deck away from net revenue reporting.",
+      "distinctive_tokens": ["approved", "switching"]
+    }
+  ],
+  "expected_oneline_keywords": ["q3", "invoices", "budget", "revenue"],
+  "notes": "Self-correcting email ($6,800 -> $6,300) and an explicit not-yet-signed status are the traps."
+}
