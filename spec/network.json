@@ -5,8 +5,12 @@
     "same_origin": {
       "$comment": "The privacy test restricts same-origin requests to the Vite build manifest plus public/.",
       "paths_observed": [
-        "/", "/index.html", "/coi-serviceworker.js", "/assets/*",
-        "/ort/ort-wasm-simd-threaded.asyncify.mjs", "/ort/ort-wasm-simd-threaded.asyncify.wasm",
+        "/",
+        "/index.html",
+        "/coi-serviceworker.js",
+        "/assets/*",
+        "/ort/ort-wasm-simd-threaded.asyncify.mjs",
+        "/ort/ort-wasm-simd-threaded.asyncify.wasm",
         "/models/kokoro-voices/af_heart.bin"
       ]
     },
@@ -31,18 +35,39 @@
       ],
       "unpinned_note": "Transformers.js 4.3.0 fetched tokenizer_config.json at main once per model despite the revision option. S1-03a's loader must pin it; the privacy test must fail on any resolve/main/ URL."
     },
-    "redirect_hosts": ["us.aws.cdn.hf.co", "huggingface.co"],
-    "redirect_host_patterns": ["*.cdn.hf.co"],
+    "redirect_hosts": [
+      "us.aws.cdn.hf.co",
+      "huggingface.co"
+    ],
+    "redirect_host_patterns": [
+      "*.cdn.hf.co"
+    ],
     "redirects_observed": {
       "lfs": "https://huggingface.co/{id}/resolve/{revision}/{path} -> 302 -> https://us.aws.cdn.hf.co/xet-bridge-us/{hash}/{hash}?{signed params} -> 200",
       "small_json": "https://huggingface.co/{id}/resolve/{revision}/{path} -> 307 -> https://huggingface.co/api/resolve-cache/models/{id}/{revision}/{path}?{encoded path}=&etag={etag} -> 200",
       "how_checked": "curl -sI on 2026-09-24; the coi-serviceworker hides these hops from page-level Playwright capture"
     },
     "redirect_query_params": {
-      "us.aws.cdn.hf.co": ["user_id", "X-Xet-Cas-Uid", "response-content-disposition", "Expires", "Policy", "Signature", "Key-Pair-Id", "Hash-Algorithm"],
-      "huggingface.co": ["etag", "<url-encoded original path as the parameter name>"]
+      "us.aws.cdn.hf.co": [
+        "user_id",
+        "X-Xet-Cas-Uid",
+        "response-content-disposition",
+        "Expires",
+        "Policy",
+        "Signature",
+        "Key-Pair-Id",
+        "Hash-Algorithm",
+        "response-content-type"
+      ],
+      "huggingface.co": [
+        "etag",
+        "<url-encoded original path as the parameter name>"
+      ],
+      "$comment": "Keyed by host. A host that matches a redirect_host_pattern uses the parameters recorded for any listed host under the same pattern (region prefixes vary). S1-03a added response-content-type: the Hub sends it on small LFS files such as tokenizer.json (curl -sI 2026-09-24)."
     },
-    "methods": ["GET"],
+    "methods": [
+      "GET"
+    ],
     "everything_else": "denied"
   },
   "mac": {
