@@ -4,7 +4,7 @@
 // (rule 11), and turns an AbortSignal into a rejected load with in-flight downloads cancelled.
 import { env, type ProgressInfo } from "@huggingface/transformers";
 import { guardedFetch } from "./net";
-import { pinnedModels, type PinnedModel } from "./pins";
+import { pinnedModels, summarizerTiers, type PinnedModel } from "./pins";
 
 /** Transformers.js's own progress events (initiate, download, progress, progress_total, done, ready). */
 export type LoadProgress = ProgressInfo;
@@ -99,8 +99,8 @@ export function pinUrl(input: string | URL): string {
   const s = typeof input === "string" ? input : input.href;
   const m = /^(https:\/\/huggingface\.co\/)(.+?)\/resolve\/main\/(.+)$/.exec(s);
   if (!m) return s;
-  const { summarizer, voice } = pinnedModels().web;
-  const rev = [summarizer, voice].find((p) => p.id === m[2])?.revision;
+  const { voice } = pinnedModels().web;
+  const rev = [...summarizerTiers(), voice].find((p) => p.id === m[2])?.revision; // fallback tiers too (S1-05)
   return rev ? `${m[1]}${m[2]}/resolve/${rev}/${m[3]}` : s;
 }
 
