@@ -7,20 +7,29 @@
       "paths_observed": [
         "/",
         "/index.html",
+        "/skeleton.html",
         "/coi-serviceworker.js",
         "/assets/*",
         "/ort/ort-wasm-simd-threaded.asyncify.mjs",
         "/ort/ort-wasm-simd-threaded.asyncify.wasm",
-        "/models/kokoro-voices/af_heart.bin"
+        "/models/kokoro-voices/af_heart.bin",
+        "/sample.txt",
+        "/fonts/AtkinsonHyperlegible-Regular.woff2",
+        "/fonts/AtkinsonHyperlegible-Bold.woff2",
+        "/fonts/AtkinsonHyperlegible-Italic.woff2",
+        "/fonts/AtkinsonHyperlegible-BoldItalic.woff2"
       ],
       "prefixes": [
         "/assets/",
         "/ort/",
         "/models/",
         "/demo/",
+        "/fonts/",
         "/coi-serviceworker.js",
         "/",
-        "/index.html"
+        "/index.html",
+        "/skeleton.html",
+        "/sample.txt"
       ]
     },
     "hub_files": {
