@@ -9,6 +9,10 @@ name: Health
 # them). Leave it set to `1` (Settings > Secrets and variables > Actions > Variables) until
 # web-v0.1.0 makes the public Space public (docs/PLAN.md rule 10) — until then the public Space
 # 401s and would fail this job every week for a reason nobody can fix yet.
+permissions:
+  contents: read
+  issues: write # the failure handler files or comments on the health issue (Codex review, PR #11)
+
 on:
   schedule:
     - cron: "17 9 * * 1" # Mondays 09:17 UTC
