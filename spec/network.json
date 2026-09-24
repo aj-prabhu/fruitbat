@@ -1,17 +1,30 @@
 {
-  "$comment": "Every allowed outbound destination per target (docs/PLAN.md rule 1). Source for the privacy test (S1-12), the generated CSP connect-src, NetworkPolicy (Mac), and PRIVACY.md. S1-00b recorded the web section from a cold load of the dev Space on 2026-09-24 plus curl -sI on the pinned file URLs. S0-03 adds the mac section (Polar, appcast, release assets) and the fallback-model URLs.",
+  "$comment": "Every allowed outbound destination per target (docs/PLAN.md rule 1). Source for the privacy test (S1-12), the generated CSP connect-src (scripts/csp.mjs), NetworkPolicy.swift, and PRIVACY.md. web: S1-00b recorded the observed requests and redirects from a cold load of the dev Space on 2026-09-24 (plus curl -sI on the pinned file URLs); S0-03 added allowed_urls for every model tier, the same-origin prefixes, the CSP list, and the mac section (Hub placeholder for S2-03a, Polar x3, appcast fixed URL, release assets + objects.githubusercontent.com).",
   "version": 1,
   "web": {
     "same_origin": {
       "$comment": "The privacy test restricts same-origin requests to the Vite build manifest plus public/.",
       "paths_observed": [
-        "/", "/index.html", "/coi-serviceworker.js", "/assets/*",
-        "/ort/ort-wasm-simd-threaded.asyncify.mjs", "/ort/ort-wasm-simd-threaded.asyncify.wasm",
+        "/",
+        "/index.html",
+        "/coi-serviceworker.js",
+        "/assets/*",
+        "/ort/ort-wasm-simd-threaded.asyncify.mjs",
+        "/ort/ort-wasm-simd-threaded.asyncify.wasm",
         "/models/kokoro-voices/af_heart.bin"
+      ],
+      "prefixes": [
+        "/assets/",
+        "/ort/",
+        "/models/",
+        "/demo/",
+        "/coi-serviceworker.js",
+        "/",
+        "/index.html"
       ]
     },
     "hub_files": {
-      "$comment": "Exact file URLs = url_template from spec/models.json with each model's pinned revision. GET only. No query string on the first request.",
+      "$comment": "Exact file URLs = url_template from spec/models.json with each model's pinned revision. GET only. No query string on the first request. allowed_urls (S0-03) is derived from spec/models.json for every tier (default, fallback-a, fallback-b, low-end, the CPU try-out files, the q8f16 voice variant); observed_2026_09_24 (S1-00b) is the subset the default configuration actually requested on the dev Space, and must stay a subset of allowed_urls. The privacy test asserts every Hub request URL is in allowed_urls and that the request count matches the chosen configuration.",
       "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}",
       "observed_2026_09_24": [
         "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/config.json",
@@ -29,23 +42,107 @@
         "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/main/tokenizer_config.json",
         "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/tokenizer_config.json"
       ],
-      "unpinned_note": "Transformers.js 4.3.0 fetched tokenizer_config.json at main once per model despite the revision option. S1-03a's loader must pin it; the privacy test must fail on any resolve/main/ URL."
+      "unpinned_note": "Transformers.js 4.3.0 fetched tokenizer_config.json at main once per model despite the revision option. S1-03a's loader must pin it; the privacy test must fail on any resolve/main/ URL.",
+      "allowed_urls": [
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/config.json",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/generation_config.json",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/tokenizer.json",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/tokenizer_config.json",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/onnx/model_q4f16.onnx",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/onnx/model_q4f16.onnx_data",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/onnx/model_q4.onnx",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/onnx/model_q4.onnx_data",
+        "https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/cc5cc01a65cc3ff17bdb73a7de33d879f62599b0/config.json",
+        "https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/cc5cc01a65cc3ff17bdb73a7de33d879f62599b0/generation_config.json",
+        "https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/cc5cc01a65cc3ff17bdb73a7de33d879f62599b0/tokenizer.json",
+        "https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/cc5cc01a65cc3ff17bdb73a7de33d879f62599b0/tokenizer_config.json",
+        "https://huggingface.co/onnx-community/Qwen2.5-0.5B-Instruct/resolve/cc5cc01a65cc3ff17bdb73a7de33d879f62599b0/onnx/model_q4f16.onnx",
+        "https://huggingface.co/onnx-community/Qwen3-0.6B-ONNX/resolve/da1453100cf3ff33ef56d17983fc7a8648706db6/config.json",
+        "https://huggingface.co/onnx-community/Qwen3-0.6B-ONNX/resolve/da1453100cf3ff33ef56d17983fc7a8648706db6/generation_config.json",
+        "https://huggingface.co/onnx-community/Qwen3-0.6B-ONNX/resolve/da1453100cf3ff33ef56d17983fc7a8648706db6/tokenizer.json",
+        "https://huggingface.co/onnx-community/Qwen3-0.6B-ONNX/resolve/da1453100cf3ff33ef56d17983fc7a8648706db6/tokenizer_config.json",
+        "https://huggingface.co/onnx-community/Qwen3-0.6B-ONNX/resolve/da1453100cf3ff33ef56d17983fc7a8648706db6/onnx/model_q4f16.onnx",
+        "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct/resolve/a10cc1512eabd3dde888204e902eca88bddb4951/config.json",
+        "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct/resolve/a10cc1512eabd3dde888204e902eca88bddb4951/generation_config.json",
+        "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct/resolve/a10cc1512eabd3dde888204e902eca88bddb4951/tokenizer.json",
+        "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct/resolve/a10cc1512eabd3dde888204e902eca88bddb4951/tokenizer_config.json",
+        "https://huggingface.co/HuggingFaceTB/SmolLM2-360M-Instruct/resolve/a10cc1512eabd3dde888204e902eca88bddb4951/onnx/model_q4f16.onnx",
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/config.json",
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer.json",
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer_config.json",
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/onnx/model_quantized.onnx",
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/onnx/model_q8f16.onnx"
+      ]
     },
-    "redirect_hosts": ["us.aws.cdn.hf.co", "huggingface.co"],
-    "redirect_host_patterns": ["*.cdn.hf.co"],
+    "redirect_hosts": [
+      "us.aws.cdn.hf.co",
+      "huggingface.co"
+    ],
+    "redirect_host_patterns": [
+      "*.cdn.hf.co"
+    ],
     "redirects_observed": {
       "lfs": "https://huggingface.co/{id}/resolve/{revision}/{path} -> 302 -> https://us.aws.cdn.hf.co/xet-bridge-us/{hash}/{hash}?{signed params} -> 200",
       "small_json": "https://huggingface.co/{id}/resolve/{revision}/{path} -> 307 -> https://huggingface.co/api/resolve-cache/models/{id}/{revision}/{path}?{encoded path}=&etag={etag} -> 200",
       "how_checked": "curl -sI on 2026-09-24; the coi-serviceworker hides these hops from page-level Playwright capture"
     },
     "redirect_query_params": {
-      "us.aws.cdn.hf.co": ["user_id", "X-Xet-Cas-Uid", "response-content-disposition", "Expires", "Policy", "Signature", "Key-Pair-Id", "Hash-Algorithm"],
-      "huggingface.co": ["etag", "<url-encoded original path as the parameter name>"]
+      "us.aws.cdn.hf.co": [
+        "user_id",
+        "X-Xet-Cas-Uid",
+        "response-content-disposition",
+        "Expires",
+        "Policy",
+        "Signature",
+        "Key-Pair-Id",
+        "Hash-Algorithm"
+      ],
+      "huggingface.co": [
+        "etag",
+        "<url-encoded original path as the parameter name>"
+      ]
     },
-    "methods": ["GET"],
-    "everything_else": "denied"
+    "methods": [
+      "GET"
+    ],
+    "everything_else": "denied",
+    "csp_connect_src": [
+      "'self'",
+      "https://huggingface.co",
+      "https://us.aws.cdn.hf.co",
+      "https://*.cdn.hf.co"
+    ],
+    "$comment_csp": "scripts/csp.mjs (S1-12) generates <meta http-equiv=Content-Security-Policy> connect-src from this list. The CDN entries come from S1-00b's observed redirects; a new redirect host observed later is added here, never guessed."
   },
   "mac": {
-    "$comment": "Filled in S0-03: Hub files, Polar activate/validate/deactivate, appcast fixed URL, GitHub release assets + objects.githubusercontent.com."
+    "methods": [
+      "GET",
+      "POST"
+    ],
+    "hub": {
+      "$comment": "Exact file URLs added in S2-03a from models.json.mac.",
+      "allowed_urls": [],
+      "redirect_hosts": []
+    },
+    "polar": {
+      "$comment": "Stage 2b, deferred (docs/PLAN.md Q2). validate at most weekly; nag, never lock.",
+      "allowed_urls": [
+        "https://api.polar.sh/v1/customer-portal/license-keys/activate",
+        "https://api.polar.sh/v1/customer-portal/license-keys/validate",
+        "https://api.polar.sh/v1/customer-portal/license-keys/deactivate"
+      ]
+    },
+    "updates": {
+      "$comment": "Sparkle 2. Fixed appcast URL (rule 10, C13); release assets redirect to objects.githubusercontent.com.",
+      "appcast": "https://aj-prabhu.github.io/fruitbat/appcast.xml",
+      "release_assets_prefix": "https://github.com/aj-prabhu/fruitbat/releases/download/",
+      "redirect_hosts": [
+        "objects.githubusercontent.com"
+      ]
+    },
+    "bug_report": {
+      "$comment": "Opened in the user's browser, never by the app: a prefilled GitHub issue form URL.",
+      "prefix": "https://github.com/aj-prabhu/fruitbat/issues/new"
+    }
   }
 }

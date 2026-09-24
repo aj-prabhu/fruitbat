@@ -1,0 +1,52 @@
+{
+  "$comment": "The compression dial (docs/PLAN.md C3, S0-03). Web and Mac load this file; neither hard-codes a level. Order = dial order, longest first. Labels come from spec/strings/en.json by label_key. Prompts are complete user messages with a {{text}} placeholder (reduce: {{lines}}); the runtime sends them through the model's chat template with thinking off.",
+  "version": 1,
+  "default": "short",
+  "levels": [
+    {
+      "id": "readall",
+      "label_key": "dial.readall",
+      "uses_llm": false,
+      "spoken": true,
+      "description": "Every sentence, in order, read aloud. No model. Always one key away."
+    },
+    {
+      "id": "short",
+      "label_key": "dial.short",
+      "uses_llm": true,
+      "spoken": true,
+      "prompt": "prompts/short.md",
+      "max_bullets_per_chunk": 6,
+      "min_bullets_per_chunk": 1,
+      "max_words_per_bullet": 18,
+      "max_new_tokens": 220,
+      "description": "3 to 6 plain sentences per chunk."
+    },
+    {
+      "id": "caveman",
+      "label_key": "dial.caveman",
+      "uses_llm": true,
+      "spoken": true,
+      "prompt": "prompts/caveman.md",
+      "max_bullets_per_chunk": 5,
+      "min_bullets_per_chunk": 1,
+      "max_words_per_bullet": 9,
+      "max_new_tokens": 120,
+      "description": "2 to 5 bullets of at most 9 words. Register: plain words, one idea per line, answer first."
+    },
+    {
+      "id": "oneline",
+      "label_key": "dial.oneline",
+      "uses_llm": true,
+      "spoken": true,
+      "prompt": "prompts/oneline.md",
+      "reduce_prompt": "prompts/reduce-oneline.md",
+      "max_bullets_per_chunk": 1,
+      "min_bullets_per_chunk": 1,
+      "max_words_per_bullet": 25,
+      "max_new_tokens": 60,
+      "reduce": { "group_size": 10, "max_depth": 2, "fallback_level": "short", "max_cut_fraction": 0.5 },
+      "description": "One line for the whole document. More than one chunk: per-chunk lines, then reduce. Only the final line is spoken."
+    }
+  ]
+}
