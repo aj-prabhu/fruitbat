@@ -55,6 +55,7 @@ let llm: { tokenizer: PreTrainedTokenizer; model: PreTrainedModel } | null = nul
 let tts: KokoroTTS | null = null;
 let nextStart = 0;
 let speakChain: Promise<void> = Promise.resolve();
+let speechFailed = false;
 const sources: AudioBufferSourceNode[] = [];
 let runId = 0;
 
@@ -133,8 +134,12 @@ function speak(text: string, id: number) {
     S.audioScheduled += buf.duration;
     S.ctxState = ctx.state;
   }).catch((e: unknown) => {
-    // Keep the chain usable after a failed synthesis (Codex review, PR #2).
-    if (id === runId) S.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+    // Keep the chain usable after a failed synthesis (Codex review, PR #2), but record it so the
+    // run reports failure, not success (Codex review, PR #3).
+    if (id === runId) {
+      S.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      speechFailed = true;
+    }
   });
 }
 
@@ -188,6 +193,7 @@ async function summarize(text: string, id: number) {
 }
 
 goEl.addEventListener("click", async () => {
+  if (S.state === "loading" || S.state === "generating") return; // one run at a time (Codex review, PR #3)
   const id = ++runId;
   S.bullets = [];
   S.raw = "";
@@ -195,6 +201,7 @@ goEl.addEventListener("click", async () => {
   S.audioScheduled = 0;
   S.playStart = null;
   nextStart = 0;
+  speechFailed = false;
   bulletsEl.replaceChildren();
   rawEl.textContent = "";
   mark("click");
@@ -208,6 +215,7 @@ goEl.addEventListener("click", async () => {
     setStatus("summarizing");
     await summarize(text, id);
     await speakChain;
+    if (speechFailed) throw new Error(`speech_failed: ${S.error ?? "unknown"}`);
     S.ctxState = ctx.state;
     S.state = "done";
     setStatus(`done: ${S.bullets.length} bullets, ${S.audioScheduled.toFixed(1)} s of audio`);
