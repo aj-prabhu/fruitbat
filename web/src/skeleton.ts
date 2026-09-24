@@ -24,6 +24,7 @@ const S = {
   error: null as string | null,
   audioScheduled: 0,
   ctxState: "none",
+  play: "idle" as "idle" | "playing" | "done",
   playStart: null as number | null,
   timings: {} as Record<string, number>,
   downloaded: {} as Record<string, number>,
@@ -122,9 +123,11 @@ function speak(text: string, id: number) {
     const t = Math.max(ctx.currentTime, nextStart);
     src.start(t);
     sources.push(src);
+    S.play = "playing";
     src.onended = () => {
       const i = sources.indexOf(src);
       if (i >= 0) sources.splice(i, 1);
+      if (sources.length === 0 && ctx && ctx.currentTime >= nextStart - 0.05) S.play = "done";
     };
     if (S.playStart === null) {
       S.playStart = t;
@@ -188,46 +191,60 @@ async function summarize(text: string, id: number) {
     },
   });
   await llm.model.generate({ ...inputs, max_new_tokens: 220, do_sample: false, streamer });
+  if (id !== runId) return; // stopped mid-generation: drop the tail
   if (buf.trim()) flushLine(buf);
   mark("gen_done");
 }
 
+let inFlight: Promise<void> | null = null;
+
 goEl.addEventListener("click", async () => {
   if (S.state === "loading" || S.state === "generating") return; // one run at a time (Codex review, PR #3)
   const id = ++runId;
+  stopScheduledAudio(); // a new summary never plays over the previous one (Codex review, PR #4)
+  if (inFlight) await inFlight.catch(() => undefined); // a stopped run must finish before its replacement starts
+  if (id !== runId) return;
   S.bullets = [];
   S.raw = "";
   S.error = null;
   S.audioScheduled = 0;
   S.playStart = null;
-  nextStart = 0;
+  S.play = "idle";
   speechFailed = false;
   bulletsEl.replaceChildren();
   rawEl.textContent = "";
   mark("click");
-  try {
+  const run = (async () => {
     if (!ctx) ctx = new AudioContext({ sampleRate: 24000 });
     await ctx.resume();
     S.ctxState = ctx.state;
     if (!llm || !tts) await loadAll();
+    if (id !== runId) return; // stopped during loading: do not continue into generation (Codex review, PR #6)
     const text = textEl.value.trim();
     if (!text) throw new Error("empty_input");
     setStatus("summarizing");
     await summarize(text, id);
+    if (id !== runId) return;
     await speakChain;
     if (speechFailed) throw new Error(`speech_failed: ${S.error ?? "unknown"}`);
     S.ctxState = ctx.state;
-    S.state = "done";
+    S.state = "done"; // generation and synthesis done; playback is tracked by S.play (Codex review, PR #4)
     setStatus(`done: ${S.bullets.length} bullets, ${S.audioScheduled.toFixed(1)} s of audio`);
+  })();
+  inFlight = run;
+  try {
+    await run;
   } catch (e) {
+    if (id !== runId) return; // stopped: the replacement run reports its own state
     S.state = "failed";
     S.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
     setStatus(`failed: ${S.error}`);
+  } finally {
+    if (inFlight === run) inFlight = null;
   }
 });
 
-stopEl.addEventListener("click", () => {
-  runId++;
+function stopScheduledAudio() {
   for (const src of sources.splice(0)) {
     try {
       src.stop();
@@ -236,6 +253,11 @@ stopEl.addEventListener("click", () => {
     }
   }
   nextStart = 0;
+}
+
+stopEl.addEventListener("click", () => {
+  runId++;
+  stopScheduledAudio();
   if (ctx) void ctx.suspend();
   S.state = "idle";
   setStatus("stopped");
