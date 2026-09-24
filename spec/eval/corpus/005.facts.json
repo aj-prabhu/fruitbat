@@ -15,15 +15,24 @@
   "forbidden_claims": [
     {
       "claim": "Bob covered the whole electric bill for the house out of generosity, and Alice never paid him anything.",
-      "distinctive_tokens": ["generosity", "whole"]
+      "distinctive_tokens": [
+        "generosity",
+        "whole"
+      ]
     },
     {
       "claim": "Dev owes Carla a corrected $450 for the May grocery run.",
-      "distinctive_tokens": ["450", "corrected"]
+      "distinctive_tokens": [
+        "450",
+        "corrected"
+      ]
     },
     {
       "claim": "Carla eventually forgave and waived Dev's $40 grocery debt.",
-      "distinctive_tokens": ["forgave", "waived"]
+      "distinctive_tokens": [
+        "forgave",
+        "waived"
+      ]
     }
   ],
   "relational_checks": [
@@ -31,94 +40,174 @@
       "payer": "Alice",
       "payee": "Bob",
       "amount": "120",
-      "negated_phrases": ["not the water bill"],
-      "must_not_say": ["Alice paid Bob $120 for the water bill"]
+      "negated_phrases": [
+        "not the water bill"
+      ],
+      "must_not_say": [
+        "Alice paid Bob $120 for the water bill"
+      ],
+      "kind": "payment"
     },
     {
       "payer": "Bob",
       "payee": "Alice",
       "amount": "45",
-      "negated_phrases": ["never repaid"],
-      "must_not_say": ["Bob repaid Alice the $45 parking ticket"]
+      "negated_phrases": [
+        "never repaid"
+      ],
+      "must_not_say": [
+        "Bob repaid Alice the $45 parking ticket"
+      ],
+      "kind": "payment"
     },
     {
       "payer": "Carla",
       "payee": "Dev",
       "amount": "her car",
-      "negated_phrases": ["not her truck"],
-      "must_not_say": ["Carla lent Dev her truck for the weekend"]
+      "negated_phrases": [
+        "not her truck"
+      ],
+      "must_not_say": [
+        "Carla lent Dev her truck for the weekend"
+      ],
+      "kind": "loan",
+      "relation": "Carla lent Dev her car, not her truck; no money changed hands"
     },
     {
       "payer": "Dev",
       "payee": "Carla",
       "amount": "80",
-      "negated_phrases": ["rather than the full $200 estimate"],
-      "must_not_say": ["Dev paid Carla the full $200 for the repair"]
+      "negated_phrases": [
+        "rather than the full $200 estimate"
+      ],
+      "must_not_say": [
+        "Dev paid Carla the full $200 for the repair"
+      ],
+      "kind": "payment"
     },
     {
       "payer": "Dev",
       "payee": "Carla",
       "amount": "95",
-      "negated_phrases": ["paid off that lower amount in full"],
-      "must_not_say": ["Dev never paid off the repaired bumper balance"]
+      "negated_phrases": [
+        "paid off that lower amount in full"
+      ],
+      "must_not_say": [
+        "Dev never paid off the repaired bumper balance"
+      ],
+      "kind": "payment"
     },
     {
       "payer": "Dev",
       "payee": "Carla",
       "amount": "40",
-      "negated_phrases": ["not $400"],
-      "must_not_say": ["Dev owes Carla $400 for the grocery run"]
+      "negated_phrases": [
+        "not $400"
+      ],
+      "must_not_say": [
+        "Dev owes Carla $400 for the grocery run"
+      ],
+      "kind": "debt",
+      "relation": "Dev owes Carla $40, unpaid"
     },
     {
       "payer": "Alice",
       "payee": "Bob",
       "amount": "150",
-      "negated_phrases": ["not $180"],
-      "must_not_say": ["Bob sold Alice the bike for $180"]
+      "negated_phrases": [
+        "not $180"
+      ],
+      "must_not_say": [
+        "Bob sold Alice the bike for $180"
+      ],
+      "kind": "payment"
     },
     {
       "payer": "Bob",
       "payee": "Alice",
       "amount": "30",
-      "negated_phrases": ["rather than argue about it"],
-      "must_not_say": ["Alice paid Bob the full asking price for the bike"]
+      "negated_phrases": [
+        "rather than argue about it"
+      ],
+      "must_not_say": [
+        "Bob paid Alice $30",
+        "Alice paid Bob the full asking price for the bike"
+      ],
+      "kind": "discount",
+      "relation": "Bob knocked $30 off the bike's price for Alice; no money moved from Bob to Alice"
     },
     {
       "payer": "Alice",
       "payee": "Bob",
       "amount": "75",
-      "negated_phrases": ["in two installments of $75 each"],
-      "must_not_say": ["Alice paid Bob the $150 in one lump sum"]
+      "negated_phrases": [
+        "in two installments of $75 each"
+      ],
+      "must_not_say": [
+        "Alice paid Bob the $150 in one lump sum"
+      ],
+      "kind": "payment"
     },
     {
       "payer": "Carla",
       "payee": "herself",
       "amount": "60",
-      "negated_phrases": ["instead of splitting it four ways", "no longer expects"],
-      "must_not_say": ["The housemates split the internet bill four ways and repaid Carla"]
+      "negated_phrases": [
+        "instead of splitting it four ways",
+        "no longer expects"
+      ],
+      "must_not_say": [
+        "The housemates split the internet bill four ways and repaid Carla"
+      ],
+      "kind": "self-paid",
+      "relation": "Carla paid the $60 internet bill herself; nobody paid Carla"
     },
     {
       "payer": "Bob",
       "payee": "Alice",
       "amount": "45",
-      "negated_phrases": ["had not repaid"],
-      "must_not_say": ["Bob repaid Alice's $45 by the end of June"]
+      "negated_phrases": [
+        "had not repaid"
+      ],
+      "must_not_say": [
+        "Bob repaid Alice's $45 by the end of June"
+      ],
+      "kind": "debt",
+      "relation": "Bob still owes Alice $45, unpaid"
     },
     {
       "payer": "Alice",
       "payee": "no one",
       "amount": "anything",
-      "negated_phrases": ["owed no one anything"],
-      "must_not_say": ["Alice still owed Bob money at the end of May"]
+      "negated_phrases": [
+        "owed no one anything"
+      ],
+      "must_not_say": [
+        "Alice still owed Bob money at the end of May"
+      ],
+      "kind": "none",
+      "relation": "Alice owed no one anything at the end of May"
     },
     {
       "payer": "Carla",
       "payee": "no one",
       "amount": "anything",
-      "negated_phrases": ["owed no one anything"],
-      "must_not_say": ["Carla still owed the group money at the end of May"]
+      "negated_phrases": [
+        "owed no one anything"
+      ],
+      "must_not_say": [
+        "Carla still owed the group money at the end of May"
+      ],
+      "kind": "none",
+      "relation": "Carla owed no one anything at the end of May"
     }
   ],
-  "expected_oneline_keywords": ["house share", "debts", "owed", "repaid"],
-  "notes": "Dense relational/negation doc: reversed payer/payee and dropped negations (never, not $X, no longer) are the main trap; 13 relational checks cover every money/favor relation."
+  "expected_oneline_keywords": [
+    "house share",
+    "debts",
+    "owed",
+    "repaid"
+  ],
+  "notes": "Dense relational/negation doc: reversed payer/payee and dropped negations (never, not $X, no longer) are the main trap; 13 relational checks cover every money/favor relation.",
+  "$comment_relational": "kind: payment|loan|debt|discount|self-paid|none. For payment/loan/debt the grader checks payer -> payee direction and amount; for discount/self-paid/none it checks the stated `relation` sentence and the negation, because no money moved in that direction (Codex review, PR #13)."
 }

@@ -29,10 +29,13 @@ without the source text in front of you.
 3. **Check each `forbidden_claims` entry.** For each one, decide if the output asserts that
    claim (in substance, not just by containing its `distinctive_tokens` — that token check is
    `score.py`'s automated proxy, not what a human/LLM grader judges). Record `forbidden_hits`.
-4. **For doc `005` only, check each `relational_checks` entry.** Confirm the output states the
-   correct `payer`/`payee`/`amount` direction, and does not contradict any `negated_phrases`
-   entry (e.g. does not say "not $400" happened, does not drop a "never"). Record
-   `relational_failures` (count of entries the output gets wrong).
+4. **For doc `005` only, check each `relational_checks` entry.** Each entry has a `kind`. For
+   `payment`, `loan`, and `debt`, confirm the output states the correct `payer`/`payee`/`amount`
+   direction. For `discount`, `self-paid`, and `none`, no money moved in that direction: check
+   the entry's `relation` sentence instead (e.g. Bob knocked $30 off the price; he did not pay
+   Alice $30). In every case the output must not contradict a `negated_phrases` entry (does not
+   say "not $400" happened, does not drop a "never") and must not assert a `must_not_say` line.
+   Record `relational_failures` (count of entries the output gets wrong).
 5. **Score the three rubric scales** (`spec/eval/rubric.md`): `faithfulness`, `coverage`,
    `clarity`, each 1-5. Any forbidden-claim hit or relational failure caps `faithfulness` at 1.
 6. **`score`** is `min(faithfulness, coverage, clarity)`.

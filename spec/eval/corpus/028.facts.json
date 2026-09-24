@@ -4,7 +4,7 @@
     "It is a truth universally acknowledged, that a single man in possession of a good fortune must be in want of a wife.",
     "A single man of large fortune; four or five thousand a year.",
     "his having ten thousand a year",
-    "instead of twelve, he had brought only six with him from London, his five sisters and a cousin",
+    "he had brought only six with him from London, his five sisters and a cousin. And when the party entered the assembly-room, it consisted of only five altogether",
     "Mr. Bingley inherited property to the amount of nearly a hundred thousand pounds from his father",
     "had a fortune of twenty thousand pounds",
     "an estate of two thousand a year, which, unfortunately for his daughters, was entailed, in default of heirs male, on a distant relation",
@@ -15,17 +15,31 @@
   "forbidden_claims": [
     {
       "claim": "Mr. Darcy was rumored to have an income of thirty thousand a year, triple Bingley's.",
-      "distinctive_tokens": ["thirty", "triple"]
+      "distinctive_tokens": [
+        "thirty",
+        "triple"
+      ]
     },
     {
       "claim": "Bingley's party expanded from six to twelve people inside the assembly room.",
-      "distinctive_tokens": ["expanded", "inside"]
+      "distinctive_tokens": [
+        "expanded",
+        "inside"
+      ]
     },
     {
       "claim": "Mr. Bennet's estate of two thousand a year was guaranteed to pass outright to his five daughters.",
-      "distinctive_tokens": ["guaranteed", "outright"]
+      "distinctive_tokens": [
+        "guaranteed",
+        "outright"
+      ]
     }
   ],
-  "expected_oneline_keywords": ["bennet", "bingley", "darcy", "marriage"],
+  "expected_oneline_keywords": [
+    "bennet",
+    "bingley",
+    "darcy",
+    "marriage"
+  ],
   "notes": "Money figures are dense and easy to swap (Bingley 4-5k, Darcy 10k, Mrs. Bennet's 4k, the Longbourn estate's 2k); the entail explicitly excludes the daughters, a reversal trap."
 }
