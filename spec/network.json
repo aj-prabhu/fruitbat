@@ -1,0 +1,51 @@
+{
+  "$comment": "Every allowed outbound destination per target (docs/PLAN.md rule 1). Source for the privacy test (S1-12), the generated CSP connect-src, NetworkPolicy (Mac), and PRIVACY.md. S1-00b recorded the web section from a cold load of the dev Space on 2026-09-24 plus curl -sI on the pinned file URLs. S0-03 adds the mac section (Polar, appcast, release assets) and the fallback-model URLs.",
+  "version": 1,
+  "web": {
+    "same_origin": {
+      "$comment": "The privacy test restricts same-origin requests to the Vite build manifest plus public/.",
+      "paths_observed": [
+        "/", "/index.html", "/coi-serviceworker.js", "/assets/*",
+        "/ort/ort-wasm-simd-threaded.asyncify.mjs", "/ort/ort-wasm-simd-threaded.asyncify.wasm",
+        "/models/kokoro-voices/af_heart.bin"
+      ]
+    },
+    "hub_files": {
+      "$comment": "Exact file URLs = url_template from spec/models.json with each model's pinned revision. GET only. No query string on the first request.",
+      "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}",
+      "observed_2026_09_24": [
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/config.json",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/generation_config.json",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/tokenizer.json",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/tokenizer_config.json",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/onnx/model_q4f16.onnx",
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/onnx/model_q4f16.onnx_data",
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/config.json",
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer.json",
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer_config.json",
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/onnx/model_quantized.onnx"
+      ],
+      "unpinned_seen_2026_09_24": [
+        "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/main/tokenizer_config.json",
+        "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/tokenizer_config.json"
+      ],
+      "unpinned_note": "Transformers.js 4.3.0 fetched tokenizer_config.json at main once per model despite the revision option. S1-03a's loader must pin it; the privacy test must fail on any resolve/main/ URL."
+    },
+    "redirect_hosts": ["us.aws.cdn.hf.co", "huggingface.co"],
+    "redirect_host_patterns": ["*.cdn.hf.co"],
+    "redirects_observed": {
+      "lfs": "https://huggingface.co/{id}/resolve/{revision}/{path} -> 302 -> https://us.aws.cdn.hf.co/xet-bridge-us/{hash}/{hash}?{signed params} -> 200",
+      "small_json": "https://huggingface.co/{id}/resolve/{revision}/{path} -> 307 -> https://huggingface.co/api/resolve-cache/models/{id}/{revision}/{path}?{encoded path}=&etag={etag} -> 200",
+      "how_checked": "curl -sI on 2026-09-24; the coi-serviceworker hides these hops from page-level Playwright capture"
+    },
+    "redirect_query_params": {
+      "us.aws.cdn.hf.co": ["user_id", "X-Xet-Cas-Uid", "response-content-disposition", "Expires", "Policy", "Signature", "Key-Pair-Id", "Hash-Algorithm"],
+      "huggingface.co": ["etag", "<url-encoded original path as the parameter name>"]
+    },
+    "methods": ["GET"],
+    "everything_else": "denied"
+  },
+  "mac": {
+    "$comment": "Filled in S0-03: Hub files, Polar activate/validate/deactivate, appcast fixed URL, GitHub release assets + objects.githubusercontent.com."
+  }
+}

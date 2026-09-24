@@ -1,0 +1,59 @@
+{
+  "$comment": "Pinned models, voices, and inference libraries per target (docs/PLAN.md rule 4). Every file URL is exact; the privacy test allows nothing else. S0-03 completes the fallback tiers; S1-00a pinned the web runtime and the two models the walking skeleton proved.",
+  "version": 1,
+  "web": {
+    "libraries": {
+      "@huggingface/transformers": "4.3.0",
+      "onnxruntime-web": "1.31.0-dev.20260914-8d85527a0",
+      "phonemizer": "1.2.1",
+      "kokoro-js": "1.2.1 (vendored loader in web/src/vendor/kokoro, Apache-2.0; npm package pins Transformers.js 3.x)"
+    },
+    "summarizer": {
+      "role": "default",
+      "id": "onnx-community/Qwen3.5-0.8B-Text-ONNX",
+      "revision": "1e45daba048899e7f771657ada617ec49350aa91",
+      "dtype": "q4f16",
+      "device": "webgpu",
+      "license": "unknown-on-card (base model Qwen/Qwen3.5-0.8B; record before web-v0.1.0, S0-03)",
+      "files": [
+        { "path": "config.json", "bytes": 1543 },
+        { "path": "generation_config.json", "bytes": 214 },
+        { "path": "tokenizer.json", "bytes": 19168000 },
+        { "path": "tokenizer_config.json", "bytes": 7900 },
+        { "path": "onnx/model_q4f16.onnx", "bytes": 600000 },
+        { "path": "onnx/model_q4f16.onnx_data", "bytes": 469300000 }
+      ],
+      "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}"
+    },
+    "voice": {
+      "id": "onnx-community/Kokoro-82M-v1.0-ONNX",
+      "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+      "dtype": "q8",
+      "device": "wasm",
+      "license": "apache-2.0",
+      "files": [
+        { "path": "config.json", "bytes": 1000 },
+        { "path": "tokenizer.json", "bytes": 3000 },
+        { "path": "tokenizer_config.json", "bytes": 700 },
+        { "path": "onnx/model_quantized.onnx", "bytes": 92400000 }
+      ],
+      "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}",
+      "voices_vendored": {
+        "path": "web/public/models/kokoro-voices/",
+        "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
+        "files": ["af_heart.bin"],
+        "bytes_each": 522240
+      },
+      "tts_phoneme_limit": 510,
+      "tts_phoneme_target": 300
+    },
+    "runtime_assets_same_origin": {
+      "path": "web/public/ort/",
+      "from": "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded*.{mjs,wasm}",
+      "why": "Transformers.js otherwise loads the WASM runtime from a CDN, which rule 1 forbids"
+    }
+  },
+  "mac": {
+    "$comment": "Pinned in S2-03a."
+  }
+}
