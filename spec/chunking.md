@@ -57,8 +57,9 @@ Rules:
    over-long bullet is kept but counted (`bullet_overlength`). The prompt asks; the parser
    enforces. On doc `011` (CPU try-out, 2026-09-23) Caveman returned 7 bullets where the prompt
    asked for 2–5, so the parser cap is not optional.
-5. Docs `001–020` in the corpus are one chunk; `021–030` are several; `025` is the multi-chunk
-   fixture for the graded set.
+5. With the real pinned tokenizer (S1-03, 2026-09-24): docs `001–010` are one chunk, `011` is
+   2 chunks (1,329 words ≈ 1,700 tokens), `025` is 10; `025` is the multi-chunk fixture for the
+   graded set. Word counts only estimate tokens; the budget is always measured.
 
 ## One-line policy on more than one chunk
 
