@@ -141,6 +141,35 @@ test("stop within 200 ms while reading", async () => {
   expect(r.ahead).toBe(0);
 });
 
+test("stop during planning settles readAll; stop cancels a pending spoken message (Codex review, PR #17)", async () => {
+  // 020 is one long unpunctuated paragraph: planning phonemizes it for a couple of seconds, so a
+  // stop() issued right after readAll() lands while the worker is still planning.
+  const r = await page.evaluate(async (t) => {
+    const p = window.__tts.readAll(t);
+    await new Promise((r) => setTimeout(r, 30));
+    const phaseAtStop = window.__tts.state().phase;
+    const ms = window.__tts.stop();
+    const res = await Promise.race([p, new Promise<"hung">((r) => setTimeout(() => r("hung"), 20_000))]);
+    const s = window.__tts.state();
+    return { phaseAtStop, ms, res, phase: s.phase, enqueued: s.enqueued };
+  }, DOC020);
+  expect(r.phaseAtStop).toBe("planning");
+  expect(r.res).not.toBe("hung");
+  expect((r.res as { finished: boolean }).finished).toBe(false);
+  expect(r.phase).toBe("stopped");
+  expect(r.enqueued).toBe(0);
+
+  const m = await page.evaluate(async () => {
+    const p = window.__tts.speak("notice.oneline_failed");
+    await new Promise((r) => setTimeout(r, 20));
+    window.__tts.stop();
+    const res = await Promise.race([p, new Promise<"hung">((r) => setTimeout(() => r("hung"), 20_000))]);
+    return res;
+  });
+  expect(m).not.toBe("hung");
+  expect((m as { seconds: number }).seconds).toBe(0);
+});
+
 test("read all to the end writes a RunStats row", async ({}, testInfo) => {
   const text = PARAGRAPHS_011[0];
   const result = await page.evaluate(

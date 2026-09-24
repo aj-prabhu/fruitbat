@@ -69,10 +69,12 @@ interface Scheduled {
   source: SourceLike;
   startAt: number;
   seconds: number;
-  timer: ReturnType<typeof setTimeout> | null;
   started: boolean;
   ended: boolean;
 }
+
+/** How often the audio clock is polled for start notifications (ms). */
+const TICK_MS = 25;
 
 const EPS = 0.005;
 
@@ -96,6 +98,9 @@ export class AudioQueue {
   ended = 0;
   /** true once the driver says no more items will come for this run */
   private closed = false;
+  /** Start notifications follow the AudioContext clock, not wall time: while the context is
+   * suspended the clock stands still and nothing "starts" (Codex review, PR #17). */
+  private ticker: ReturnType<typeof setInterval> | null = null;
 
   constructor(ctx: ContextLike, opts: AudioQueueOptions = {}) {
     this.ctx = ctx;
@@ -179,7 +184,7 @@ export class AudioQueue {
     const source = this.ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(this.getAnalyser() ?? this.ctx.destination);
-    const s: Scheduled = { item, buffer, source, startAt, seconds: buffer.duration, timer: null, started: false, ended: false };
+    const s: Scheduled = { item, buffer, source, startAt, seconds: buffer.duration, started: false, ended: false };
     source.onended = () => {
       if (s.ended) return;
       s.ended = true;
@@ -191,16 +196,31 @@ export class AudioQueue {
         this.maybeDrain();
       }
     };
-    const delayMs = Math.max(0, (startAt - this.ctx.currentTime) * 1000);
-    s.timer = setTimeout(() => {
-      s.timer = null;
-      if (s.ended || item.runId !== this.runId) return;
-      s.started = true;
-      this.opts.onStart?.({ runId: item.runId, seq: item.seq, start: item.start, end: item.end, at: startAt, seconds: s.seconds });
-    }, delayMs);
     source.start(startAt);
     this.scheduled.push(s);
+    this.ensureTicker();
+    this.tick();
     return s;
+  }
+
+  private ensureTicker(): void {
+    if (this.ticker === null) this.ticker = setInterval(() => this.tick(), TICK_MS);
+  }
+
+  /** Fire onStart for every scheduled item whose start time the audio clock has reached. */
+  private tick(): void {
+    const now = this.ctx.currentTime;
+    for (const s of this.scheduled) {
+      if (s.started || s.ended || s.item.runId !== this.runId) continue;
+      if (now + EPS >= s.startAt) {
+        s.started = true;
+        this.opts.onStart?.({ runId: s.item.runId, seq: s.item.seq, start: s.item.start, end: s.item.end, at: s.startAt, seconds: s.seconds });
+      }
+    }
+    if (this.scheduled.length === 0 && this.ticker !== null) {
+      clearInterval(this.ticker);
+      this.ticker = null;
+    }
   }
 
   private maybeDrain(): void {
@@ -224,7 +244,6 @@ export class AudioQueue {
   stop(): number {
     const t0 = typeof performance !== "undefined" ? performance.now() : Date.now();
     for (const s of this.scheduled) {
-      if (s.timer) clearTimeout(s.timer);
       s.ended = true;
       try {
         s.source.stop();
@@ -233,6 +252,10 @@ export class AudioQueue {
       }
     }
     this.scheduled = [];
+    if (this.ticker !== null) {
+      clearInterval(this.ticker);
+      this.ticker = null;
+    }
     this.nextStart = this.ctx.currentTime;
     this.runId++;
     this.closed = false;
@@ -257,7 +280,6 @@ export class AudioQueue {
     const current = this.scheduled[idx];
     // Silence the current one and every later source; a started BufferSourceNode cannot restart.
     for (const s of [current, ...rest]) {
-      if (s.timer) clearTimeout(s.timer);
       s.ended = true;
       try {
         s.source.stop();

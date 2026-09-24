@@ -248,6 +248,17 @@ export class VoiceEngine {
       this.waiters.delete(key);
       return;
     }
+    if ((m.type === "error" || m.type === "overlimit") && m.seq === -1) {
+      // A failure while loading (runId -1) or planning arrives without a seq: route it to that
+      // waiter so load()/plan()/readAll() reject instead of hanging (Codex review, PR #17).
+      const err = m.type === "error" ? new Error(`${m.name}: ${m.message}`) : new Error(`tts_overlimit: ${m.phonemes} > ${m.limit}`);
+      const key = m.runId === -1 && this.waiters.has("loaded") ? "loaded" : `planned:${m.runId}`;
+      const w = this.waiters.get(key);
+      if (!w) return;
+      this.waiters.delete(key);
+      w.reject(err);
+      return;
+    }
     const key = `${m.runId}:${m.seq}`;
     const w = this.waiters.get(key);
     if (!w) return; // stale
@@ -255,12 +266,24 @@ export class VoiceEngine {
     w.resolve(m);
   }
 
+  /** Reject every waiter that belongs to `runId` (a stopped run or a cancelled message). */
+  private settleWaiters(runId: number, reason: string): void {
+    const err = new Error(reason);
+    err.name = "AbortError";
+    for (const [key, w] of this.waiters) {
+      if (key === `planned:${runId}` || key.startsWith(`${runId}:`)) {
+        this.waiters.delete(key);
+        w.reject(err);
+      }
+    }
+  }
+
   /** Load the voice model (92 MB once, then cached). Idempotent. */
   load(): Promise<LoadedInfo> {
     if (!this.loaded) {
       this.phase = "loading";
       const p = this.wait("loaded").then((m) => {
-        this.phase = "idle";
+        if (this.phase === "loading") this.phase = "idle";
         return m as LoadedInfo;
       });
       this.send({ type: "load" });
@@ -295,7 +318,17 @@ export class VoiceEngine {
    */
   async readAll(text: string, opts: ReadAllOptions = {}): Promise<ReadAllResult> {
     this.ensureContext();
-    await this.load();
+    // Stop/Esc while the model loads bumps runId; a read requested before that must not start
+    // afterwards (Codex review, PR #17).
+    const before = this.runId;
+    try {
+      await this.load();
+    } catch (e) {
+      this.phase = "failed";
+      this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      return this.result(before, 0, 0, false);
+    }
+    if (this.runId !== before) return this.result(before, 0, 0, false);
     const runId = ++this.runId;
     const queue = this.queue!;
     queue.beginRun(runId);
@@ -316,7 +349,18 @@ export class VoiceEngine {
 
     const plannedP = this.wait(`planned:${runId}`);
     this.send({ type: "plan", runId, text, limits: LIMITS });
-    const planned = (await plannedP) as Extract<FromWorker, { type: "planned" }>;
+    let planned: Extract<FromWorker, { type: "planned" }>;
+    try {
+      planned = (await plannedP) as Extract<FromWorker, { type: "planned" }>;
+    } catch (e) {
+      // stop() during planning settles this waiter (Codex review, PR #17); a real planning
+      // failure lands here too and fails the run cleanly.
+      if (runId === this.runId) {
+        this.phase = "failed";
+        this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      }
+      return this.result(runId, 0, 0, false);
+    }
     if (runId !== this.runId) return this.result(runId, planned.segments.length, 0, false);
     const segments = planned.segments;
     opts.onPlanned?.(segments);
@@ -334,25 +378,34 @@ export class VoiceEngine {
     // The driver: keep <= maxInFlight requests out and <= 30 s scheduled; results arrive in
     // order because each request is awaited in sequence (one at a time per slot).
     let nextSeq = 0;
+    let firstError: unknown = null;
     const inflight = new Map<number, Promise<void>>();
     const pump = async (): Promise<void> => {
-      while (nextSeq < segments.length && runId === this.runId) {
+      while (nextSeq < segments.length && runId === this.runId && firstError === null) {
         if (!queue.canAccept()) {
           await new Promise((r) => setTimeout(r, 50));
           continue;
         }
         const seg = segments[nextSeq++];
         queue.requestSent();
-        const p = this.synthOne(runId, seg, voice, rate, queue).finally(() => {
-          queue.requestSettled();
-          inflight.delete(seg.seq);
-        });
+        // Every rejection is handled the moment it happens (no unhandled rejection while the
+        // pump waits for capacity); the first one fails the run (Codex review, PR #17).
+        const p = this.synthOne(runId, seg, voice, rate, queue)
+          .catch((e: unknown) => {
+            if (firstError === null) firstError = e;
+          })
+          .finally(() => {
+            queue.requestSettled();
+            inflight.delete(seg.seq);
+          });
         inflight.set(seg.seq, p);
       }
       await Promise.all([...inflight.values()]);
+      if (firstError !== null) throw firstError;
       if (runId === this.runId) queue.close();
     };
     void pump().catch((e: unknown) => {
+      if (runId !== this.runId) return; // stopped: not a failure
       this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
       this.phase = "failed";
       this.pendingDone?.resolve(false);
@@ -369,7 +422,13 @@ export class VoiceEngine {
     const key = `${runId}:${seg.seq}`;
     const p = this.wait(key);
     this.send({ type: "synth", runId, seq: seg.seq, phonemes: seg.phonemes, start: seg.start, end: seg.end, voice, speed, limit: LIMITS.limit });
-    const m = await p;
+    let m: FromWorker;
+    try {
+      m = await p;
+    } catch (e) {
+      if (runId !== this.runId) return; // stop() settled this waiter
+      throw e;
+    }
     if (runId !== this.runId) return;
     if (m.type === "pcm") {
       this.runSynthMs += m.synthMs;
@@ -463,12 +522,25 @@ export class VoiceEngine {
 
   // ---------------------------------------------------------------- controls
   /** Stop everything within 200 ms. Returns the measured stop time in ms. */
+  private pendingMessages = new Set<number>();
+  private messageEpoch = 0;
+
   stop(): number {
     const t0 = performance.now();
     const stale = this.runId;
     this.runId++;
     this.send({ type: "cancel", runId: stale });
     this.queue?.stop();
+    // Waiters of the stopped run (planning or synthesis in flight) settle now instead of hanging
+    // on replies the worker suppresses for a cancelled run (Codex review, PR #17).
+    this.settleWaiters(stale, "stopped");
+    // A spoken message still being synthesized is cancelled too: its PCM is dropped on arrival.
+    this.messageEpoch++;
+    for (const seq of this.pendingMessages) {
+      this.send({ type: "cancel", runId: -seq });
+      this.settleWaiters(-seq, "stopped");
+    }
+    this.pendingMessages.clear();
     for (const s of this.messageSources.splice(0)) {
       try {
         s.stop();
@@ -506,9 +578,20 @@ export class VoiceEngine {
     const text = t(messageKey);
     const seq = ++this.messageSeq;
     const runId = -seq; // negative: independent of playback runs, still cancelled by stop()
+    const epoch = this.messageEpoch;
     const p = this.wait(`${runId}:${seq}`);
+    this.pendingMessages.add(seq);
     this.send({ type: "speak", runId, seq, text, voice: this.voice, speed: this.rate, limits: LIMITS });
-    const m = await p;
+    let m: FromWorker;
+    try {
+      m = await p;
+    } catch (e) {
+      if (epoch !== this.messageEpoch) return { seconds: 0 }; // stopped while synthesizing
+      throw e;
+    } finally {
+      this.pendingMessages.delete(seq);
+    }
+    if (epoch !== this.messageEpoch) return { seconds: 0 }; // stop() raced the reply
     if (m.type !== "pcm") throw new Error(m.type === "error" ? `${m.name}: ${m.message}` : "tts_overlimit");
     const buf = ctx.createBuffer(1, m.pcm.length, m.sampleRate);
     buf.copyToChannel(m.pcm as Float32Array<ArrayBuffer>, 0);

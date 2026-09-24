@@ -130,15 +130,34 @@ describe("AudioQueue", () => {
     q.beginRun(1);
     q.enqueue(item(1, 0, 1, 0));
     q.enqueue(item(1, 1, 1, 10));
-    vi.advanceTimersByTime(0);
+    expect(starts).toEqual([0]); // the first item starts at the current clock, at once
+    vi.advanceTimersByTime(1000); // wall time alone changes nothing...
     expect(starts).toEqual([0]);
-    vi.advanceTimersByTime(1000);
+    ctx.currentTime = 1; // ...the audio clock does
+    vi.advanceTimersByTime(50);
     expect(starts).toEqual([0, 10]);
     ctx.sources[0].end();
     expect(ends).toEqual([10]);
     ctx.sources[1].end();
     expect(ends).toEqual([10, 20]);
     expect(q.ended).toBe(2);
+  });
+
+  it("start notifications freeze while the context is suspended (audio clock, not wall clock)", async () => {
+    const starts: number[] = [];
+    const q = new AudioQueue(ctx, { onStart: (e) => starts.push(e.seq) });
+    q.beginRun(1);
+    q.enqueue(item(1, 0, 1));
+    q.enqueue(item(1, 1, 1));
+    q.enqueue(item(1, 2, 1));
+    expect(starts).toEqual([0]);
+    await q.pause(); // a suspended context's currentTime stands still
+    vi.advanceTimersByTime(5000);
+    expect(starts).toEqual([0]);
+    await q.resume();
+    ctx.currentTime = 2.01;
+    vi.advanceTimersByTime(50);
+    expect(starts).toEqual([0, 1, 2]);
   });
 
   it("records the worst underrun gap between items", () => {
