@@ -53,7 +53,8 @@ let clockAdvances = false;
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {
   page = await browser.newPage();
-  await page.goto("/readall.html");
+  // TTS_DEVICE=webgpu loads the q8f16 voice on WebGPU instead of q8 on WASM (S1-06 measurement).
+  await page.goto(`/readall.html${process.env.TTS_DEVICE === "webgpu" ? "?tts=webgpu" : ""}`);
   await waitIsolated(page);
   await page.waitForFunction(() => typeof window.__tts !== "undefined", null, { timeout: 20_000 });
   const loaded = await page.evaluate(() => window.__tts.load());

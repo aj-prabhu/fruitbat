@@ -19,7 +19,9 @@ export type Decision =
 
 export class NetworkPolicyError extends Error {
   constructor(public readonly reason: string, public readonly url: string) {
-    super(`network policy: ${reason}`);
+    // `url` is origin + path only (never a query string), so the message names the file without
+    // leaking anything (S1-06: needed to see which request a policy rejection was about).
+    super(`network policy: ${reason} (${url})`);
     this.name = "NetworkPolicyError";
   }
 }

@@ -8,6 +8,9 @@ import preact from "@preact/preset-vite";
 // plain Node.
 export default defineConfig({
   plugins: [preact()],
+  // The spec folder is the source of truth (rule 7): prompts and word lists are imported with
+  // `?raw` from ../spec, outside the web root, so the test server must be allowed to read it.
+  server: { fs: { allow: [".."] } },
   test: {
     include: ["src/tests/**/*.test.ts", "src/tests/**/*.test.tsx"],
     environment: "node",

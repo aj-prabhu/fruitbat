@@ -24,17 +24,17 @@ export interface PlannedSegment {
 }
 
 export type ToWorker =
-  | { type: "load" }
+  | { type: "load"; device?: "wasm" | "webgpu" }
   | { type: "plan"; runId: number; text: string; limits: Limits; firstPieceTarget?: number }
-  | { type: "synth"; runId: number; seq: number; phonemes: string; start: number; end: number; voice: string; speed: number; limit: number }
+  | { type: "synth"; runId: number; seq: number; phonemes: string; start: number; end: number; voice: string; speed: number; limit: number; tag?: number }
   | { type: "speak"; runId: number; seq: number; text: string; voice: string; speed: number; limits: Limits }
   | { type: "cancel"; runId: number };
 
 export type FromWorker =
-  | { type: "loaded"; maxTokens: number; downloadedBytes: number; isolated: boolean; threads: number | null; cores: number; warmupMs: number }
+  | { type: "loaded"; maxTokens: number; downloadedBytes: number; isolated: boolean; threads: number | null; cores: number; warmupMs: number; device: "wasm" | "webgpu"; dtype: string }
   | { type: "progress"; file: string; loaded: number; total: number }
   | { type: "planned"; runId: number; segments: PlannedSegment[]; maxPhonemes: number; splitMs: number }
-  | { type: "pcm"; runId: number; seq: number; start: number; end: number; sampleRate: number; pcm: Float32Array; phonemes: number; synthMs: number }
+  | { type: "pcm"; runId: number; seq: number; start: number; end: number; sampleRate: number; pcm: Float32Array; phonemes: number; synthMs: number; tag?: number }
   | { type: "overlimit"; runId: number; seq: number; phonemes: number; limit: number }
   | { type: "error"; runId: number; seq: number; name: string; message: string };
 
@@ -56,7 +56,10 @@ function post(msg: FromWorker, transfer?: Transferable[]): void {
   scope.postMessage(msg, transfer);
 }
 
-function ensureLoaded(): Promise<KokoroTTS> {
+let loadedDevice: "wasm" | "webgpu" = "wasm";
+let loadedDtype = "q8";
+
+function ensureLoaded(device: "wasm" | "webgpu" = "wasm"): Promise<KokoroTTS> {
   if (tts) return Promise.resolve(tts);
   if (!loading) {
     configureRuntime();
@@ -67,7 +70,19 @@ function ensureLoaded(): Promise<KokoroTTS> {
     if (wasm && typeof crossOriginIsolated !== "undefined" && crossOriginIsolated) {
       wasm.numThreads = Math.max(4, Math.min(8, cores - 2));
     }
-    const spec = pinnedModels().web.voice;
+    const pinned = pinnedModels().web.voice;
+    // `?tts=webgpu` (S1-06 measurement): the q8f16 variant on WebGPU instead of q8 on WASM. The
+    // variant's file URL is on the allowlist through spec/models.json `variants` (pins.ts).
+    const variant = device === "webgpu" ? pinned.variants?.q8f16 : undefined;
+    // Transformers.js 4.3.0 knows no `q8f16` dtype (it would fall back to fp32 and ask for the
+    // unpinned model.onnx, which the policy refuses), so the variant is loaded by file name with
+    // dtype fp32 and reported as q8f16.
+    const spec = variant
+      ? { ...pinned, dtype: "fp32", device: "webgpu", files: [...pinned.files.filter((f) => !f.path.startsWith("onnx/")), { path: variant.path, bytes: variant.bytes }] }
+      : pinned;
+    const modelFileName = variant ? variant.path.replace(/^onnx\//, "").replace(/\.onnx$/, "") : undefined;
+    loadedDevice = variant ? "webgpu" : "wasm";
+    loadedDtype = variant ? "q8f16" : spec.dtype;
     const seen = new Map<string, number>();
     loading = load(
       spec,
@@ -78,6 +93,7 @@ function ensureLoaded(): Promise<KokoroTTS> {
           revision: o.revision,
           progress_callback: o.progress_callback,
           loadVoice,
+          model_file_name: modelFileName,
         }),
       (p: LoadProgress) => {
         if (p.status === "progress" && "file" in p) {
@@ -114,7 +130,7 @@ scope.onmessage = async (e: MessageEvent<ToWorker>) => {
   const m = e.data;
   try {
     if (m.type === "load") {
-      const model = await ensureLoaded();
+      const model = await ensureLoaded(m.device ?? "wasm");
       // Warm-up: the first inference pays for session initialization (about 10 s on WASM), so it
       // is paid here, inside load(), not on the user's first "Read all" (warm TTFA gate, 3 s).
       const t0 = performance.now();
@@ -131,6 +147,8 @@ scope.onmessage = async (e: MessageEvent<ToWorker>) => {
         threads: wasm?.numThreads ?? null,
         cores: typeof navigator !== "undefined" ? navigator.hardwareConcurrency : 0,
         warmupMs: Math.round(performance.now() - t0),
+        device: loadedDevice,
+        dtype: loadedDtype,
       });
       return;
     }
@@ -183,7 +201,7 @@ scope.onmessage = async (e: MessageEvent<ToWorker>) => {
       if (cancelled.has(m.runId)) return;
       const { pcm, sampleRate, synthMs } = await synthesizePhonemes(model, m.phonemes, m.voice, m.speed, m.limit);
       if (cancelled.has(m.runId)) return;
-      post({ type: "pcm", runId: m.runId, seq: m.seq, start: m.start, end: m.end, sampleRate, pcm, phonemes: m.phonemes.length, synthMs }, [pcm.buffer as ArrayBuffer]);
+      post({ type: "pcm", runId: m.runId, seq: m.seq, start: m.start, end: m.end, sampleRate, pcm, phonemes: m.phonemes.length, synthMs, tag: m.tag }, [pcm.buffer as ArrayBuffer]);
       return;
     }
     if (m.type === "speak") {
