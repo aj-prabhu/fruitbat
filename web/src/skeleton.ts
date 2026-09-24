@@ -55,6 +55,7 @@ let llm: { tokenizer: PreTrainedTokenizer; model: PreTrainedModel } | null = nul
 let tts: KokoroTTS | null = null;
 let nextStart = 0;
 let speakChain: Promise<void> = Promise.resolve();
+const sources: AudioBufferSourceNode[] = [];
 let runId = 0;
 
 async function probe() {
@@ -119,6 +120,11 @@ function speak(text: string, id: number) {
     src.connect(ctx.destination);
     const t = Math.max(ctx.currentTime, nextStart);
     src.start(t);
+    sources.push(src);
+    src.onended = () => {
+      const i = sources.indexOf(src);
+      if (i >= 0) sources.splice(i, 1);
+    };
     if (S.playStart === null) {
       S.playStart = t;
       mark("first_audio_scheduled");
@@ -126,6 +132,9 @@ function speak(text: string, id: number) {
     nextStart = t + buf.duration;
     S.audioScheduled += buf.duration;
     S.ctxState = ctx.state;
+  }).catch((e: unknown) => {
+    // Keep the chain usable after a failed synthesis (Codex review, PR #2).
+    if (id === runId) S.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
   });
 }
 
@@ -211,6 +220,14 @@ goEl.addEventListener("click", async () => {
 
 stopEl.addEventListener("click", () => {
   runId++;
+  for (const src of sources.splice(0)) {
+    try {
+      src.stop();
+    } catch {
+      // already ended
+    }
+  }
+  nextStart = 0;
   if (ctx) void ctx.suspend();
   S.state = "idle";
   setStatus("stopped");

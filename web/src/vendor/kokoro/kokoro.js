@@ -150,6 +150,7 @@ export class KokoroTTS {
         ? text.split(split_pattern).map((c) => c.trim()).filter((c) => c.length > 0)
         : [text];
       splitter.push(...chunks);
+      splitter.close(); // a string input is complete; without this the iterator never ends (Codex review, PR #2)
     } else {
       throw new Error("Invalid input type. Expected string or TextSplitterStream.");
     }
