@@ -14,11 +14,13 @@ SPEC = HERE.parent
 dial = json.loads((SPEC / "dial.json").read_text())
 schema = json.loads((SPEC / "dial.schema.json").read_text())
 
+# Structural check: `jsonschema` when installed, else the stdlib subset below. The semantic
+# checks after it always run either way (Codex review, PR #8).
+used_jsonschema = False
 try:
     import jsonschema  # type: ignore
     jsonschema.validate(dial, schema)
-    print("dial.json OK (jsonschema)")
-    sys.exit(0)
+    used_jsonschema = True
 except ImportError:
     pass
 
@@ -75,4 +77,4 @@ for l in dial["levels"]:
         if words > 120: problems.append(f"{l['prompt']}: {words} words > 120")
 if problems:
     print("\n".join(problems)); sys.exit(1)
-print("dial.json OK (stdlib checker)")
+print("dial.json OK (jsonschema + semantic checks)" if used_jsonschema else "dial.json OK (stdlib checker + semantic checks)")
