@@ -151,3 +151,78 @@ done
 
 ### experiment v3 (rules after the text), short on 005 and the 011 stand-in — not adopted
 (13 and 12 bullets; see above)
+
+## Rerun on the redone corpus (4c130a4), 2026-09-24 00:2x
+
+Validator: `python3 spec/eval/validate.py --corpus-only` → `30 docs OK, roles OK`. Proof (caveman, real 011): PASS, 8 bullets, no <think>.
+
+### caveman on 011
+```
+onnx-community/Qwen3.5-0.8B-Text-ONNX@1e45dab q4/cpu level=caveman doc=011.txt words=1000 prompt_tokens=1428 new_tokens=120 load_ms=1222 gen_ms=10319 tok_s=11.6
+- The park hosts 17 bat species, including free-tailed and cave myotis.
+- These bats roost in caves, trees, or rock cliffs.
+- Bats are mammals that give live birth and are warm-blooded.
+- They are insectivores and weigh about 1/2 ounce.
+- Their numbers fluctuate seasonally and daily.
+- Researchers use thermal cameras to count bats.
+- The resident colony is typically greater than 50% male.
+- WNS is a deadly fungus affecting bats in the US.
+- WNS
+[caveman 011] bullets=9 think=0
+```
+
+### short on 005
+```
+onnx-community/Qwen3.5-0.8B-Text-ONNX@1e45dab q4/cpu level=short doc=005.txt words=437 prompt_tokens=702 new_tokens=220 load_ms=1231 gen_ms=12669 tok_s=17.4
+- Alice paid Bob $120 on March 3 to cover her half of the electric bill, not the water bill, which Carla had already handled separately.
+- Bob never repaid Alice for a $45 parking ticket he asked her to cover in February, and by June he still owed her that amount, in addition to nothing else.
+- Carla lent Dev her car for the weekend of April 12, not her truck, because the truck was in the shop that week.
+- Dev scratched the car's bumper and paid Carla $80 toward the repair, rather than the full $200 estimate, since Carla decided the shop was overcharging and got a second quote for $95 instead.
+- Dev has since paid off that lower amount in full, owing Carla $40 for a grocery run in May, not $400 — a typo in the group spreadsheet listed it as $400 for two weeks before Alice caught the error and fixed it.
+- Carla has not chased Dev for the $40 yet, and Dev
+[short 005] bullets=6 think=0
+```
+
+### oneline on 005
+```
+onnx-community/Qwen3.5-0.8B-Text-ONNX@1e45dab q4/cpu level=oneline doc=005.txt words=437 prompt_tokens=659 new_tokens=21 load_ms=1236 gen_ms=2861 tok_s=7.3
+- Bob owed Alice $45 for a ride to the airport, which Carla denied.
+[oneline 005] bullets=1 think=0
+```
+
+### caveman on 005
+```
+onnx-community/Qwen3.5-0.8B-Text-ONNX@1e45dab q4/cpu level=caveman doc=005.txt words=437 prompt_tokens=673 new_tokens=120 load_ms=1321 gen_ms=8018 tok_s=15.0
+- Alice paid Bob $120 on March 3 to cover her half of the electric bill, not the water bill.
+- Bob never repaid Alice for a $45 parking ticket he asked her to cover in February.
+- Carla lent Dev her car for the weekend of April 12, not her truck.
+- Dev scratched the car's bumper and paid Carla $80 toward the repair, not the full $200 estimate.
+- Dev owes Carla $40 for a grocery run in May, not $400 — a typo in the
+[caveman 005] bullets=5 think=0
+```
+
+### short on 011
+```
+onnx-community/Qwen3.5-0.8B-Text-ONNX@1e45dab q4/cpu level=short doc=011.txt words=1000 prompt_tokens=1457 new_tokens=220 load_ms=1161 gen_ms=15340 tok_s=14.3
+- The park hosts 17 bat species, including free-tailed bats and cave myotis.
+- Free-tailed bats roost in the caverns and fly 1.5 miles before exiting the Natural Entrance.
+- Other species like eastern red bats and hoary bats roost in trees or rock cliffs.
+- Bats are mammals that give live birth, are warm-blooded, and have fur.
+- Bats are the only true flying mammals in the park.
+- All bats in the area are insectivores.
+- The Brazilian free-tailed bat weighs about 1/2 ounce (3 nickel coins).
+- Their wingspan is approximately 11 inches (28 cm).
+- Bat numbers in the cavern vary, with summer colonies reaching 400,000.
+- Migration numbers peaked at 793,000 in 2005.
+- Researchers use thermal infrared cameras and visual recognition software to count bats.
+- The resident colony should not be called the maternity colony because it is
+[short 011] bullets=12 think=0
+```
+
+### oneline on 011
+```
+onnx-community/Qwen3.5-0.8B-Text-ONNX@1e45dab q4/cpu level=oneline doc=011.txt words=1000 prompt_tokens=1414 new_tokens=32 load_ms=1315 gen_ms=5871 tok_s=5.5
+- The text states bats are mammals that give live birth, are warm-blooded, have fur, and are fed breast milk by their mothers.
+[oneline 011] bullets=1 think=0
+```
+
