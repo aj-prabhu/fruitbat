@@ -68,8 +68,10 @@ function SummarizerSection({ s }: { s: Snapshot }) {
   // Either this button, or the app's own "Read it" (rule 11's "first summary request") can start
   // the download; either way `s.gen` and `s.progress` move once it does (Codex review would flag
   // a button that only knows about clicks on itself).
-  const started = phase !== "idle" || s.gen !== "idle" || s.progress !== null;
-  const done = phase === "ready" || ["running", "done"].includes(s.gen);
+  // Readiness comes from the summarizer's own state, not from `s.gen`: a Read-all run moves gen
+  // through loading/running/done without ever loading the summarizer (Codex review, PR #20).
+  const started = phase !== "idle" || s.progress !== null || llm.state === "loading";
+  const done = phase === "ready" || (s.progress !== null && llm.state !== "loading" && llm.state !== "failed" && !llm.error);
   const loaded = mb(s.progress?.loaded);
   const total = mb(s.progress?.total) || (started ? llm.sizeMb() : 0);
 
