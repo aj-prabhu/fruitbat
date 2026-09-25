@@ -214,12 +214,13 @@ export function buildIssueUrl(report: BugReport): string {
   const title = buildTitle(report);
   const events = [...report.events];
   const runStats = [...report.run_stats];
+  let description = report.user_description;
 
   const build = (): string => {
     const params = new URLSearchParams();
     params.set("template", "bug.yml");
     params.set("title", title);
-    params.set("what_happened", report.user_description);
+    params.set("what_happened", description);
     params.set("env", JSON.stringify(report.env, null, 2));
     params.set("models", JSON.stringify(report.models, null, 2));
     params.set("run_stats", JSON.stringify(runStats, null, 2));
@@ -235,6 +236,12 @@ export function buildIssueUrl(report: BugReport): string {
   }
   while (url.length > MAX_URL_LENGTH && runStats.length > 0) {
     runStats.shift(); // oldest first, only once every event is already gone
+    url = build();
+  }
+  // A long description can exceed the budget on its own once encoded: clip it last, in steps,
+  // so the URL always fits (Codex review, PR #23). The full text stays in "Copy report".
+  while (url.length > MAX_URL_LENGTH && description.length > 0) {
+    description = description.slice(0, Math.max(0, description.length - 200));
     url = build();
   }
   return url;

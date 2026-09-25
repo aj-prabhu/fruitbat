@@ -453,7 +453,9 @@ export class Orchestrator {
     if (!ok) {
       this.gen = reduceGen(this.gen, "fail");
       this.error = this.llm.error;
-      this.voice.stop();
+      // End the (empty) bullet stream without stopping the voice: the failure notice
+      // ensureLoaded() just spoke must stay audible (Codex review, PR #23).
+      void this.voice.endStream(streamId);
       this.play = reducePlay(this.play, "reset");
       return;
     }
