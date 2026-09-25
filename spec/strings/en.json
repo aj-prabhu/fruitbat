@@ -57,6 +57,7 @@
     "demo.try_it_now": "Try it now",
     "demo.recording_label": "This one is a recording. Your own text runs on your machine.",
     "demo.switch_level": "Turn the dial to hear the same article shorter or longer.",
+    "demo.excerpt_note": "This is the first part of the article, not the whole thing.",
     "loading.probing": "Checking what this browser can do.",
     "loading.voice": "Getting the voice ready.",
     "loading.summarizer_button": "Load summarizer ({mb} MB)",

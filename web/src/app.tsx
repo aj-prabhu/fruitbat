@@ -12,6 +12,8 @@ import { ReadChip } from "./intake/ReadChip";
 import { orchestrator, type Snapshot } from "./engine/orchestrator";
 import { setLevel as setSharedLevel } from "./state/level";
 import { t } from "./strings";
+import { Demo } from "./ui/Demo";
+import { Loading } from "./ui/Loading";
 import type { Level } from "./types";
 
 interface DialLevel {
@@ -185,7 +187,9 @@ export function App() {
         <Dial level={level} onChange={setLevel} />
         <ThemeToggle />
       </header>
+      <Loading />
       <main class="app-main">
+        <Demo />
         <Article paragraphs={paragraphs} />
         <PasteBox />
       </main>

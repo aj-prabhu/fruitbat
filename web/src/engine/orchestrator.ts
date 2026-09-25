@@ -53,7 +53,10 @@ export interface Snapshot {
   voiceReady: boolean;
   prewarmed: boolean;
   speakMessages: boolean;
+  /** Summarizer download progress (S1-09 Loading UX: per-file MB while the summarizer loads). */
   progress: { file?: string; loaded?: number; total?: number } | null;
+  /** Voice download progress (S1-09 Loading UX: per-file MB while the voice loads). */
+  voiceProgress: { file?: string; loaded?: number; total?: number } | null;
   error: string | null;
   voice: { aheadSeconds: number; enqueued: number; inFlight: number; ended: number; phase: string };
 }
@@ -99,6 +102,7 @@ export class Orchestrator {
   current: Cursor | null = null;
   error: string | null = null;
   progress: Snapshot["progress"] = null;
+  voiceProgress: Snapshot["voiceProgress"] = null;
   private runId = 0;
   private text = "";
   private chunks: Chunk[] | null = null;
@@ -123,6 +127,11 @@ export class Orchestrator {
       this.progress = p;
       this.emit();
     };
+    // S1-09 Loading UX: the voice's own per-file MB progress, same shape as the summarizer's.
+    voice.onProgress((file, loaded, total) => {
+      this.voiceProgress = { file, loaded, total };
+      this.emit();
+    });
     // Rule 11: the voice loads on page load, except on data saver / mobile. (No Worker = a unit
     // test environment: nothing loads, nothing is reported.)
     if (typeof Worker !== "undefined" && !saveData() && !isMobile()) void this.warmVoice();
@@ -166,6 +175,7 @@ export class Orchestrator {
       prewarmed: this.voice.prewarmed,
       speakMessages: this.speakMessages,
       progress: this.progress,
+      voiceProgress: this.voiceProgress,
       error: this.error,
       voice: { aheadSeconds: v.aheadSeconds, enqueued: v.enqueued, inFlight: v.inFlight, ended: v.ended, phase: v.phase },
     };
