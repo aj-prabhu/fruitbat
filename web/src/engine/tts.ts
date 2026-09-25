@@ -14,7 +14,6 @@ export const VOICES = ["af_heart", "af_bella"] as const;
 export type VoiceId = (typeof VOICES)[number];
 const RATE_KEY = "fruitbat.rate";
 const VOICE_KEY = "fruitbat.voice";
-const STATS_KEY = "fruitbat.stats.last";
 const LIMITS = { target: 300, limit: 510 }; // spec/chunking.md, measured in S1-00a
 
 export interface LoadedInfo {
@@ -519,8 +518,10 @@ export class VoiceEngine {
       coverage,
       tts_overlimit: this.runOverlimit,
     });
+    // In-memory only (stats() below): the validated, retained copy lives in stats/store.ts under
+    // "fruitbat.stats", keyed by RunStats' own schema rather than this class's internal shape
+    // (S1-10; this used to also write "fruitbat.stats.last" here, which duplicated that).
     this.lastStats = row;
-    writeStored(STATS_KEY, JSON.stringify(row));
     return { runId, segments, coverage, ttsOverlimit: this.runOverlimit, seconds, finished };
   }
 
@@ -739,7 +740,6 @@ export class VoiceEngine {
     const stopMs = performance.now() - t0;
     if (this.lastStats) {
       this.lastStats = { ...this.lastStats, stop_ms: Math.round(stopMs * 100) / 100 };
-      writeStored(STATS_KEY, JSON.stringify(this.lastStats));
     }
     this.pendingDone?.resolve(false);
     this.pendingDone = null;

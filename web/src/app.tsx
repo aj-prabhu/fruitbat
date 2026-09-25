@@ -13,6 +13,7 @@ import { orchestrator, type Snapshot } from "./engine/orchestrator";
 import { setLevel as setSharedLevel } from "./state/level";
 import { t } from "./strings";
 import type { Level } from "./types";
+import { Stats } from "./ui/Stats";
 
 interface DialLevel {
   id: string;
@@ -166,6 +167,7 @@ function Panel() {
 
 export function App() {
   const [level, setLevel] = useState<Level>(DEFAULT_LEVEL);
+  const [statsOpen, setStatsOpen] = useState(false);
   const paragraphs = useSampleArticle();
 
   useEffect(() => {
@@ -183,6 +185,9 @@ export function App() {
       <header class="app-header">
         <h1 class="app-title">{t("app.title")}</h1>
         <Dial level={level} onChange={setLevel} />
+        <button type="button" class="stats-toggle" onClick={() => setStatsOpen(true)}>
+          {t("panel.stats")}
+        </button>
         <ThemeToggle />
       </header>
       <main class="app-main">
@@ -191,6 +196,7 @@ export function App() {
       </main>
       <Panel />
       <ReadChip />
+      {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
     </div>
   );
 }
