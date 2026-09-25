@@ -85,6 +85,24 @@ export function Demo() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [track?.level]);
 
+  // Esc and fruitbat.stop() must silence the recording too, not only the engine's voice
+  // (Codex review, PR #20). main.tsx dispatches fruitbat:stop for both.
+  useEffect(() => {
+    const stop = () => {
+      const el = audioRef.current;
+      if (el && !el.paused) el.pause();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") stop();
+    };
+    window.addEventListener("fruitbat:stop", stop);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("fruitbat:stop", stop);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, []);
+
   const onTryItNow = () => {
     const el = audioRef.current;
     if (!el) return;
