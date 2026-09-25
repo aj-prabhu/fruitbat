@@ -43,7 +43,7 @@ export interface GpuProbe {
   adapter: boolean;
   device: boolean;
   f16: boolean;
-  reason: "ok" | "no_navigator_gpu" | "no_adapter" | "no_device" | "injected_nogpu";
+  reason: "ok" | "no_navigator_gpu" | "no_adapter" | "no_device" | "injected_nogpu" | "aborted";
 }
 
 /** Stage one: adapter + device only. Never downloads anything. */

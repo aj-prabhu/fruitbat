@@ -55,7 +55,10 @@ window.addEventListener("fruitbat:stop", () => o.stop());
 // (e.g. a spoken "notice.done" that fires after gen is already "done").
 let lastRecordedRunId = 0;
 o.subscribe((snap) => {
-  if ((snap.gen === "done" || snap.gen === "failed") && snap.runId !== lastRecordedRunId) {
+  // gen turns terminal before the summary's speech has played; record once the voice has drained
+  // too, so the row carries the voice metrics (Codex review, PR #22).
+  const voiceIdle = snap.play !== "playing" && snap.play !== "paused" && snap.voice.inFlight === 0 && snap.voice.enqueued <= snap.voice.ended;
+  if ((snap.gen === "done" || snap.gen === "failed") && voiceIdle && snap.runId !== lastRecordedRunId) {
     lastRecordedRunId = snap.runId;
     stats.record(o.stats());
   }

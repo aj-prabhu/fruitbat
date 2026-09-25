@@ -131,9 +131,7 @@ export class Orchestrator {
   private async warmVoice(): Promise<void> {
     try {
       await this.voice.load();
-      this.voiceReady = true;
-      this.emit();
-      for (const key of this.pendingNotices.splice(0)) this.notice(key);
+      this.markVoiceReady();
       await this.voice.prewarm(PREWARM_KEYS);
     } catch (e) {
       this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
@@ -184,7 +182,7 @@ export class Orchestrator {
       stop_ms: this.stopMs === null ? null : Math.round(this.stopMs * 100) / 100,
       notice_latency_ms: this.noticeLatency,
       notices_spoken: [...this.spoken],
-      gen: this.genStats ?? this.llm.stats(),
+      gen: this.genStats ?? (this.level === "readall" ? null : this.llm.stats()), // a Read-all run has no summarizer stats (Codex review, PR #22)
       voice: this.voice.stats(),
       voice_run: this.voiceRun,
     };
@@ -205,6 +203,16 @@ export class Orchestrator {
   /** Show a notice (a key) and, with speakMessages on, speak it. `sinceMs` measures the latency
    *  from an earlier trigger (the dial move) to the first spoken sample. */
   private pendingNotices: string[] = [];
+
+  /** The voice is usable from here on (warm-up on load, the on-demand load on mobile / data
+   *  saver, or the load a summary's speech triggers): flush the notices that waited for it
+   *  (Codex review, PRs #20/#21/#22). */
+  private markVoiceReady(): void {
+    if (this.voiceReady) return;
+    this.voiceReady = true;
+    this.emit();
+    for (const key of this.pendingNotices.splice(0)) this.notice(key);
+  }
 
   private notice(key: string, sinceMs?: number): void {
     this.notices.push(key);
@@ -363,6 +371,7 @@ export class Orchestrator {
   }
 
   private async begin(id: number, level: Level, o: { fromChunk: number; base: number; end: number }): Promise<void> {
+    this.last = { level, chars: o.end - o.base }; // dial regeneration and "Read this part" are runs too (Codex review, PR #22)
     this.play = reducePlay(this.play, "reset");
     this.bullets = [];
     this.allCut = [];
@@ -396,7 +405,7 @@ export class Orchestrator {
     let planned: PlannedSegment[] = [];
     await this.voice.load();
     if (id !== this.runId) return;
-    this.voiceReady = true;
+    this.markVoiceReady();
     this.gen = reduceGen(this.gen, "loaded");
     this.emit();
     const r = await this.voice.readAll(slice, {
@@ -427,6 +436,9 @@ export class Orchestrator {
   }
 
   private async summarize(id: number, level: Exclude<Level, "readall">, fromChunk: number): Promise<void> {
+    // On mobile / data saver the voice was not warmed on load; the summary's speech loads it.
+    // Load in parallel with the summarizer so readiness and the pending notices follow.
+    if (!this.voiceReady) void this.voice.load().then(() => this.markVoiceReady(), () => undefined);
     const streamId = this.voice.beginStream({
       onStart: (e) => {
         if (id !== this.runId) return;
