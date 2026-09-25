@@ -172,7 +172,9 @@ export class Summarizer {
   async probe(): Promise<GpuProbe> {
     if (this.gpu) return this.gpu;
     this.state = "probing";
-    this.gpu = await probeWebGpu(this.flags.inject);
+    const probed = await probeWebGpu(this.flags.inject);
+    if ((this.state as GenState) === "stopped") return { ...probed, ok: false, reason: "aborted" }; // Esc while probing: nothing starts
+    this.gpu = probed;
     if (this.flags.llm === "fake") this.gpu = { ...this.gpu, ok: true, reason: "ok" };
     if (!this.gpu.ok) {
       this.state = "failed";
@@ -352,7 +354,7 @@ export class Summarizer {
 
   /** Stop the current run: abort the worker, drop everything still queued. */
   abort(): void {
-    if (this.state !== "running" && this.state !== "loading") return;
+    if (this.state !== "running" && this.state !== "loading" && this.state !== "probing") return; // Esc during the probe counts (Codex review, PR #21)
     const runId = this.runId;
     this.state = "stopped";
     this.post({ type: "abort", runId });

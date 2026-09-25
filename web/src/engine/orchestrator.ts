@@ -131,9 +131,7 @@ export class Orchestrator {
   private async warmVoice(): Promise<void> {
     try {
       await this.voice.load();
-      this.voiceReady = true;
-      this.emit();
-      for (const key of this.pendingNotices.splice(0)) this.notice(key);
+      this.markVoiceReady();
       await this.voice.prewarm(PREWARM_KEYS);
     } catch (e) {
       this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
@@ -205,6 +203,15 @@ export class Orchestrator {
   /** Show a notice (a key) and, with speakMessages on, speak it. `sinceMs` measures the latency
    *  from an earlier trigger (the dial move) to the first spoken sample. */
   private pendingNotices: string[] = [];
+
+  /** The voice is usable from here on (warm-up on load, or the on-demand load on mobile / data
+   *  saver): flush the notices that waited for it (Codex review, PRs #20/#21). */
+  private markVoiceReady(): void {
+    if (this.voiceReady) return;
+    this.voiceReady = true;
+    this.emit();
+    for (const key of this.pendingNotices.splice(0)) this.notice(key);
+  }
 
   private notice(key: string, sinceMs?: number): void {
     this.notices.push(key);
@@ -396,7 +403,7 @@ export class Orchestrator {
     let planned: PlannedSegment[] = [];
     await this.voice.load();
     if (id !== this.runId) return;
-    this.voiceReady = true;
+    this.markVoiceReady();
     this.gen = reduceGen(this.gen, "loaded");
     this.emit();
     const r = await this.voice.readAll(slice, {

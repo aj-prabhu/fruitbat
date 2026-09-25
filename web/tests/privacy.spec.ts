@@ -172,7 +172,15 @@ function validateRedirectTarget(u: URL, allow: Allowlist): { ok: boolean; reason
   const matchedPath = new URL(matched).pathname; // the huggingface.co small-file redirect (Form A)
   // carries this PATHNAME, not the full URL, as a query param NAME (S1-00b observed it; net.ts's
   // redirectAllowed() compares against pathnames for the same reason).
-  const allowedParams = new Set(allow.redirectParams[u.host] ?? []);
+  // A host under a recorded pattern (another CDN region, e.g. eu.aws.cdn.hf.co) inherits the
+  // parameter names recorded for every host under the same pattern, as net.ts does
+  // (Codex review, PR #21).
+  const patternOf = (host: string) => allow.redirectPatterns.find((pat) => pat.startsWith("*.") && host.endsWith(pat.slice(1)) && host.length > pat.length - 1) ?? null;
+  const allowedParams = new Set<string>(allow.redirectParams[u.host] ?? []);
+  if (allowedParams.size === 0) {
+    const pat = patternOf(u.host);
+    if (pat) for (const [h, names] of Object.entries(allow.redirectParams)) if (patternOf(h) === pat) names.forEach((n) => allowedParams.add(n));
+  }
   for (const key of u.searchParams.keys()) {
     if (allowedParams.has(key)) continue;
     if (decodeURIComponent(key) === matchedPath) continue; // the pinned path travels as a param NAME
@@ -353,6 +361,16 @@ async function runLevel(page: Page, level: Level, timeoutMs: number): Promise<Sn
     () => {
       const g = (window as unknown as FruitbatWindow).__fruitbat.state().gen;
       return g === "done" || g === "failed";
+    },
+    null,
+    { timeout: timeoutMs },
+  );
+  // gen turns "done" before the summary's speech has been synthesized and played; wait for the
+  // voice to drain so every request the run makes is in the log (Codex review, PR #21).
+  await page.waitForFunction(
+    () => {
+      const s = (window as unknown as FruitbatWindow).__fruitbat.state() as unknown as { play: string; voice: { inFlight: number; enqueued: number; ended: number } };
+      return s.play !== "playing" && s.play !== "paused" && s.voice.inFlight === 0 && s.voice.enqueued <= s.voice.ended;
     },
     null,
     { timeout: timeoutMs },
