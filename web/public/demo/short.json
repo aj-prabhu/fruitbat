@@ -1,0 +1,53 @@
+{
+  "level": "short",
+  "label_key": "dial.short",
+  "source_doc": "spec/eval/corpus/011.txt",
+  "source_start": 0,
+  "source_end": 1173,
+  "sample_rate": 24000,
+  "duration_seconds": 26.5,
+  "items": [
+    {
+      "text": "The park hosts 17 different bat species.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 0,
+      "audioEnd": 3.25
+    },
+    {
+      "text": "The large colony of Brazilian free-tailed bats roosts in caves.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 3.25,
+      "audioEnd": 7.95
+    },
+    {
+      "text": "Two other species have also been found regularly in Carlsbad Caverns.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 7.95,
+      "audioEnd": 12.9
+    },
+    {
+      "text": "They typically roost in a different part of the cavern.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 12.9,
+      "audioEnd": 16.25
+    },
+    {
+      "text": "They fly about 1.5 miles before exiting the Natural Entrance.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 16.25,
+      "audioEnd": 21.375
+    },
+    {
+      "text": "Among the other species using the park are eastern red bats and hoary bats.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 21.375,
+      "audioEnd": 26.5
+    }
+  ]
+}
