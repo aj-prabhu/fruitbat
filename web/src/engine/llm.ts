@@ -356,8 +356,18 @@ export class Summarizer {
     const runId = this.runId;
     this.state = "stopped";
     this.post({ type: "abort", runId });
-    this.pending?.resolve({ tokens: 0, ms: 0, aborted: true });
+    // The worker's generate() keeps running until it sees the abort; the next serialized run must
+    // not start on top of it. Hold the pending resolution until the worker acks (5 s cap), and let
+    // summarizeNow() wait on that ack (Codex review, PR #21).
+    const pending = this.pending;
     this.pending = null;
+    const ack = this.waitFor("aborted", runId);
+    const cap = new Promise<void>((r) => setTimeout(r, 5000));
+    this.abortAck = Promise.race([ack.then(() => undefined, () => undefined), cap]).then(() => {
+      pending?.resolve({ tokens: 0, ms: 0, aborted: true });
+      if (this.abortAck === settled) this.abortAck = null;
+    });
+    const settled = this.abortAck;
     // A Stop during the download must settle ensureLoaded()'s waiters too (Codex review, PR #16).
     const err = new Error("aborted");
     err.name = "AbortError";
@@ -370,6 +380,7 @@ export class Summarizer {
   }
 
   private inFlight: Promise<RunStats> | null = null;
+  private abortAck: Promise<void> | null = null;
 
   /** Runs are serialized: a second call waits for the previous one to settle (Codex review, PR #16). */
   summarize(text: string, level: Level, opts: SummarizeOptions = {}): Promise<RunStats> {
@@ -388,6 +399,7 @@ export class Summarizer {
   }
 
   private async summarizeNow(text: string, level: Level, opts: SummarizeOptions = {}): Promise<RunStats> {
+    if (this.abortAck) await this.abortAck; // the previous generate() has stopped in the worker
     if (!(await this.ensureLoaded({ signal: opts.signal }))) return this.stats();
     const runId = ++this.runId;
     const started = performance.now();

@@ -255,6 +255,10 @@ export class Orchestrator {
 
   /** New input at `level`. Resolves when the run has settled (done, failed, or superseded). */
   run(text: string, level: Level): Promise<void> {
+    // Create and resume the AudioContext while the click's user activation is live: Safari
+    // loses it at the first await (the model download), so this must be the first statement
+    // (Codex review, PRs #20/#21).
+    this.voice.ensureContext();
     this.runs++;
     this.last = { level, chars: text.length };
     this.text = text;
@@ -324,6 +328,7 @@ export class Orchestrator {
    *  generation whose first bullet's audio is not out yet is still a run; Codex review, PR #18). */
   private busy(): boolean {
     if (isActive(this.gen, this.play)) return true;
+    if (this.play === "stopped") return false; // Esc'd audio is not a run to regenerate (Codex review, PR #20)
     const v = this.voice.state();
     return v.inFlight > 0 || v.enqueued > v.ended;
   }
@@ -340,11 +345,16 @@ export class Orchestrator {
   private async ensureChunks(): Promise<Chunk[] | null> {
     if (this.chunks) return this.chunks;
     if (!this.text) return null;
+    const text = this.text;
+    let chunks: Chunk[] | null = null;
     try {
-      this.chunks = await this.llm.chunk(this.text);
+      chunks = await this.llm.chunk(text);
     } catch {
-      this.chunks = null; // input limit: summarize() reports it
+      chunks = null; // input limit: summarize() reports it
     }
+    // A new input may have arrived while tokenizing: never cache a stale result (Codex review, PR #21).
+    if (text !== this.text) return null;
+    this.chunks = chunks;
     return this.chunks;
   }
 
