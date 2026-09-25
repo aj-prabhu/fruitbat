@@ -5,7 +5,8 @@
 // orchestrator, which owns the pipeline (engine/orchestrator.ts).
 import { render } from "preact";
 import { App } from "./app";
-import { orchestrator } from "./engine/orchestrator";
+import { pushEvent } from "./engine/events";
+import { orchestrator, type Snapshot } from "./engine/orchestrator";
 import { subscribeLevel } from "./state/level";
 import * as stats from "./stats/store";
 import type { FruitbatAPI, FruitbatStats, Level } from "./types";
@@ -61,6 +62,31 @@ o.subscribe((snap) => {
   if ((snap.gen === "done" || snap.gen === "failed") && voiceIdle && snap.runId !== lastRecordedRunId) {
     lastRecordedRunId = snap.runId;
     stats.record(o.stats());
+  }
+});
+// S1-11: a small structured-event log for the bug report (engine/events.ts), fed purely by
+// diffing successive snapshots -- deliberately *not* wired inside orchestrator.ts itself, so the
+// pipeline's own code never has to know a bug report exists. This is a best-effort subset of
+// event.schema.json's event names: only what a Snapshot diff can identify safely (numbers and
+// enums only, per Non-negotiable 1), which is plenty of margin for a bug report's own recent-run
+// history.
+let prevSnap: Snapshot | null = null;
+o.subscribe((snap) => {
+  const prev = prevSnap;
+  prevSnap = snap;
+  if (!prev) return;
+  if (snap.level !== prev.level) pushEvent("dial_change", { from_level: prev.level, to_level: snap.level });
+  if (prev.gen !== "loading" && snap.gen === "loading") pushEvent("run_start", { level: snap.level });
+  if (prev.gen !== "done" && snap.gen === "done") pushEvent("run_done", { level: snap.level });
+  if (prev.gen !== "failed" && snap.gen === "failed") pushEvent("run_failed", { level: snap.level, reason: "unknown" });
+  if (snap.allCut.length > prev.allCut.length) pushEvent("all_cut", { chunk_index: snap.allCut[snap.allCut.length - 1] });
+  if (snap.lastNotice !== prev.lastNotice && snap.lastNotice) {
+    if (snap.lastNotice === "notice.stopped") pushEvent("run_stopped", { level: snap.level });
+    else if (snap.lastNotice === "notice.input_limit") pushEvent("input_limit", {});
+    else if (snap.lastNotice === "error.storage_full") pushEvent("quota_error", { store: "stats" });
+    else if (snap.lastNotice === "notice.no_webgpu" || snap.lastNotice === "notice.probe_failed") {
+      pushEvent("probe_result", { probe_result: "fail" });
+    }
   }
 });
 // The dial (app.tsx) writes state/level; a move mid-run regenerates from the current chunk.
