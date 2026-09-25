@@ -25,3 +25,6 @@ __pycache__/
 !.vscode/extensions.json
 
 Thumbs.db
+
+.cache/
+web/public/ort/

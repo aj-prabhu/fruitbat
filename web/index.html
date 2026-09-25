@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fruitbat walking skeleton</title>
+    <!-- Cross-origin isolation on a static host: the service worker adds COOP/COEP (S1-00a). -->
+    <script src="/coi-serviceworker.js"></script>
+  </head>
+  <body>
+    <h1>Fruitbat, walking skeleton (S1-00a)</h1>
+    <p>No styling on purpose. Real text in, real bullets out, spoken. Nothing you type leaves this page.</p>
+    <p id="status">starting</p>
+    <textarea id="text" rows="12" cols="90" placeholder="Paste text here"></textarea>
+    <p>
+      <button id="go" type="button">Summarize (downloads about 560 MB of models on first use)</button>
+      <button id="stop" type="button">Stop</button>
+    </p>
+    <ul id="bullets"></ul>
+    <pre id="raw"></pre>
+    <script type="module" src="/src/skeleton.ts"></script>
+  </body>
+</html>
