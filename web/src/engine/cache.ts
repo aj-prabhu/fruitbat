@@ -17,9 +17,11 @@ export async function isCached(url: string): Promise<boolean> {
   }
 }
 
-/** Was `model`'s first pinned file already downloaded in an earlier session? */
+/** Was `model` already downloaded in an earlier session? Checked on its largest file (the
+ *  weights): config.json lands first, so a cancelled download would otherwise look cached
+ *  (Codex review, PR #20). */
 export function isModelCached(model: Pick<PinnedModel, "id" | "revision" | "url_template" | "files">): Promise<boolean> {
-  const first = model.files[0];
-  if (!first) return Promise.resolve(false);
-  return isCached(pinnedFileUrl(model as PinnedModel, first.path));
+  const largest = [...model.files].sort((a, b) => b.bytes - a.bytes)[0];
+  if (!largest) return Promise.resolve(false);
+  return isCached(pinnedFileUrl(model as PinnedModel, largest.path));
 }
