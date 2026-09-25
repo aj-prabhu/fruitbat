@@ -497,7 +497,9 @@ test.describe("privacy: full sweep on the real app", () => {
     // and passing on wasm-ci (below): same allowlist/redirect/canary code path, real Kokoro
     // download, just a smaller one. Re-run this test alone, uncontended, to get it green and
     // produce docs/qa/privacy-requests-<commit>.json; then remove this fixme.
-    test.fixme(true, "not completed in this session: sandbox bandwidth contention from other agents' worktrees, see comment above");
+    // The real-model sweep runs whenever this project is selected; it needs one uncontended
+    // network (about 560 MB of pinned downloads) and writes docs/qa/privacy-requests-<commit>.json.
+    test.setTimeout(45 * 60 * 1000);
     test.setTimeout(50 * 60 * 1000);
 
     const network = readJson<NetworkJson>("spec/network.json");
