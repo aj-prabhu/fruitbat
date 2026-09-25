@@ -267,7 +267,21 @@ export class Summarizer {
    * Stage two: download on demand (rule 11: only from a summary request or the explicit button),
    * then a 1-token probe. Failure → state "failed" and a notice; Read all is unaffected.
    */
-  async ensureLoaded(opts: { signal?: AbortSignal } = {}): Promise<boolean> {
+  private loading: Promise<boolean> | null = null;
+
+  /** Two callers reaching here before the load finishes (the Load button and a first summary
+   *  request) share one in-flight load instead of posting two (Codex review, PR #20). */
+  ensureLoaded(opts: { signal?: AbortSignal } = {}): Promise<boolean> {
+    if (this.loaded) return Promise.resolve(true);
+    if (this.loading) return this.loading;
+    const p = this.ensureLoadedNow(opts).finally(() => {
+      if (this.loading === p) this.loading = null;
+    });
+    this.loading = p;
+    return p;
+  }
+
+  private async ensureLoadedNow(opts: { signal?: AbortSignal } = {}): Promise<boolean> {
     if (this.loaded) return true;
     const gpu = await this.probe();
     if (!gpu.ok) return false;
