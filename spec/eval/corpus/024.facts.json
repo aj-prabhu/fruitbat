@@ -1,0 +1,30 @@
+{
+  "id": "024",
+  "key_facts": [
+    "A \"joint work\" is a work prepared by two or more authors with the intention that their contributions be merged into inseparable or interdependent parts of a unitary whole.",
+    "in a limited edition of 200 copies or fewer that are signed and consecutively numbered by the author",
+    "for purposes such as criticism, comment, news reporting, teaching (including multiple copies for classroom use), scholarship, or research, is not an infringement of copyright",
+    "The fact that a work is unpublished shall not itself bar a finding of fair use",
+    "The rights of reproduction and distribution under this section apply to three copies or phonorecords of an unpublished work duplicated solely for purposes of preservation and security",
+    "during the last 20 years of any term of copyright of a published work, a library or archives",
+    "primarily directed to blind or other handicapped persons who are unable to read normal printed material",
+    "performance on a single occasion of a dramatic literary work published at least ten years before the date of the performance",
+    "the making imperceptible, by or at the direction of a member of a private household, of limited portions of audio or video content of a motion picture"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "A work of visual art may exist in an edition of up to 500 numbered copies without losing protection.",
+      "distinctive_tokens": ["500", "losing"]
+    },
+    {
+      "claim": "An unpublished work is automatically barred from a fair use defense under Section 107.",
+      "distinctive_tokens": ["automatically", "barred"]
+    },
+    {
+      "claim": "Libraries may use the last-20-years exemption even while a work is still sold commercially at an affordable price.",
+      "distinctive_tokens": ["sold", "affordable"]
+    }
+  ],
+  "expected_oneline_keywords": ["copyright", "definitions", "fair use", "libraries"],
+  "notes": "Section 107 explicitly says unpublished status does NOT bar fair use -- a dropped-negation trap. Four unrelated code sections concatenated."
+}

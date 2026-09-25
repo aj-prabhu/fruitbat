@@ -1,0 +1,29 @@
+{
+  "id": "012",
+  "key_facts": [
+    "To Sherlock Holmes she is always the woman.",
+    "that woman was the late Irene Adler, of dubious and questionable memory",
+    "of his summons to Odessa in the case of the Trepoff murder",
+    "One night—it was on the twentieth of March, 1888—I was returning from a journey to a patient",
+    "I think, Watson, that you have put on seven and a half pounds since I saw you.",
+    "the leather is scored by six almost parallel cuts",
+    "Now, I know that there are seventeen steps, because I have both seen and observed.",
+    "“The paper was made in Bohemia,” I said."
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Holmes said Watson had gained ten pounds since their last meeting.",
+      "distinctive_tokens": ["ten", "gained"]
+    },
+    {
+      "claim": "Watson worked out from Holmes's shoes that Holmes employed a careless housemaid.",
+      "distinctive_tokens": ["deduced", "housemaid"]
+    },
+    {
+      "claim": "The note asked Holmes to travel to a stranger's home at midnight.",
+      "distinctive_tokens": ["midnight", "travel"]
+    }
+  ],
+  "expected_oneline_keywords": ["holmes", "watson", "deduction", "mystery"],
+  "notes": "Reversed-agency traps: Holmes deduces about Watson (not vice versa), and a visitor comes to Holmes's rooms (not the other way)."
+}

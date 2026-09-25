@@ -178,17 +178,125 @@ def check_corpus(problems):
         problems.append(f"{original_cc0_count} docs are original-CC0, max is {MAX_ORIGINAL_CC0}")
 
 
-def check_facts(problems):
-    """S0-04b: per-doc key facts. Not built yet in this packet."""
-    manifest = load_manifest(problems)
-    if manifest is None:
-        return False
-    missing = []
+TOKEN_RE = re.compile(r"[a-z0-9]+")
+TOKEN_ONLY_RE = re.compile(r"^[a-z0-9]+$")
+MIN_KEY_FACTS = 5
+MAX_KEY_FACTS = 10
+REQUIRED_FORBIDDEN = 3
+MIN_TOKENS = 2
+MAX_TOKENS = 4
+MIN_KEYWORDS = 3
+MAX_KEYWORDS = 5
+MIN_RELATIONAL = 10
+
+
+def doc_word_set(text):
+    return set(TOKEN_RE.findall(text.lower()))
+
+
+def check_facts(manifest, problems):
+    """S0-04b: per-doc key facts, forbidden claims, keywords, and (005) relational checks.
+
+    Returns (total_key_facts, total_forbidden_claims) across all docs; the counts are only
+    meaningful when `problems` is still empty when this returns.
+    """
+    total_key_facts = 0
+    total_forbidden = 0
+
     for d in manifest.get("docs", []):
-        facts_path = HERE / "corpus" / f"{d['id']}.facts.json"
+        did = d.get("id", "?")
+        facts_path = HERE / "corpus" / f"{did}.facts.json"
+
         if not facts_path.exists():
-            missing.append(d["id"])
-    return len(missing) == 0
+            problems.append(f"{did}: missing {facts_path.name}")
+            continue
+
+        try:
+            facts = json.loads(facts_path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError as e:
+            problems.append(f"{did}: {facts_path.name} is not valid JSON: {e}")
+            continue
+
+        file_rel = d.get("file")
+        fpath = HERE / file_rel if file_rel else None
+        if not fpath or not fpath.exists():
+            problems.append(f"{did}: corpus file {file_rel!r} does not exist (checked by check_corpus)")
+            continue
+        text = fpath.read_text(encoding="utf-8")
+        words = doc_word_set(text)
+
+        # key_facts: 5-10, each a verbatim substring of the doc.
+        key_facts = facts.get("key_facts")
+        if not isinstance(key_facts, list) or not (MIN_KEY_FACTS <= len(key_facts) <= MAX_KEY_FACTS):
+            problems.append(
+                f"{did}: key_facts has {len(key_facts) if isinstance(key_facts, list) else 'invalid'} "
+                f"entries, expected {MIN_KEY_FACTS}-{MAX_KEY_FACTS}"
+            )
+            key_facts = key_facts if isinstance(key_facts, list) else []
+        for fact in key_facts:
+            if not isinstance(fact, str) or fact not in text:
+                problems.append(f"{did}: key_facts entry not found verbatim in doc: {fact!r}")
+        total_key_facts += len(key_facts)
+
+        # forbidden_claims: exactly 3, each with 2-4 lowercase alnum tokens absent from the doc.
+        forbidden = facts.get("forbidden_claims")
+        if not isinstance(forbidden, list) or len(forbidden) != REQUIRED_FORBIDDEN:
+            problems.append(
+                f"{did}: forbidden_claims has {len(forbidden) if isinstance(forbidden, list) else 'invalid'} "
+                f"entries, expected exactly {REQUIRED_FORBIDDEN}"
+            )
+            forbidden = forbidden if isinstance(forbidden, list) else []
+        for claim in forbidden:
+            if not isinstance(claim, dict):
+                problems.append(f"{did}: forbidden_claims entry is not an object: {claim!r}")
+                continue
+            tokens = claim.get("distinctive_tokens")
+            if not isinstance(tokens, list) or not (MIN_TOKENS <= len(tokens) <= MAX_TOKENS):
+                problems.append(
+                    f"{did}: distinctive_tokens has "
+                    f"{len(tokens) if isinstance(tokens, list) else 'invalid'} entries, "
+                    f"expected {MIN_TOKENS}-{MAX_TOKENS} ({claim.get('claim')!r})"
+                )
+                tokens = tokens if isinstance(tokens, list) else []
+            for tok in tokens:
+                if not isinstance(tok, str) or not TOKEN_ONLY_RE.match(tok):
+                    problems.append(f"{did}: distinctive_token not lowercase letters/digits: {tok!r}")
+                elif tok in words:
+                    problems.append(f"{did}: distinctive_token {tok!r} appears in the doc (must be absent)")
+        total_forbidden += len(forbidden)
+
+        # expected_oneline_keywords: 3-5.
+        keywords = facts.get("expected_oneline_keywords")
+        if not isinstance(keywords, list) or not (MIN_KEYWORDS <= len(keywords) <= MAX_KEYWORDS):
+            problems.append(
+                f"{did}: expected_oneline_keywords has "
+                f"{len(keywords) if isinstance(keywords, list) else 'invalid'} entries, "
+                f"expected {MIN_KEYWORDS}-{MAX_KEYWORDS}"
+            )
+
+        # relational_checks: only doc 005 has them, and it needs >= 10 with verbatim fields.
+        relational = facts.get("relational_checks")
+        if did == "005":
+            if not isinstance(relational, list) or len(relational) < MIN_RELATIONAL:
+                problems.append(
+                    f"005: relational_checks has "
+                    f"{len(relational) if isinstance(relational, list) else 'invalid'} entries, "
+                    f"expected >= {MIN_RELATIONAL}"
+                )
+                relational = relational if isinstance(relational, list) else []
+            for entry in relational:
+                if not isinstance(entry, dict):
+                    problems.append(f"005: relational_checks entry is not an object: {entry!r}")
+                    continue
+                for key in ("payer", "payee", "amount"):
+                    val = entry.get(key)
+                    if not isinstance(val, str) or val not in text:
+                        problems.append(f"005: relational_checks[{key}]={val!r} not found verbatim in doc")
+        else:
+            if relational not in (None, []):
+                problems.append(f"{did}: relational_checks should be absent or empty (only 005 has them)")
+
+    return total_key_facts, total_forbidden
 
 
 def main():
@@ -208,11 +316,17 @@ def main():
         print("30 docs OK, roles OK")
         sys.exit(0)
 
-    if not check_facts(problems):
-        print("facts: not yet (S0-04b)")
+    manifest = load_manifest(problems)
+    n_facts, m_forbidden = (0, 0)
+    if manifest is not None:
+        n_facts, m_forbidden = check_facts(manifest, problems)
+
+    if problems:
+        for p in problems:
+            print(p)
         sys.exit(1)
 
-    print("30 docs OK, roles OK, facts OK")
+    print(f"30 docs, {n_facts} facts, {m_forbidden} forbidden OK")
     sys.exit(0)
 
 

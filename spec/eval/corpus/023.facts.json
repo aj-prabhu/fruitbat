@@ -1,0 +1,31 @@
+{
+  "id": "023",
+  "key_facts": [
+    "Commander Neil Armstrong, Command Module Pilot Michael Collins, and Lunar Module Pilot Edwin \"Buzz\" Aldrin",
+    "Armstrong became the first human to walk on the Moon approximately six hours after landing, followed by Aldrin nineteen minutes later",
+    "collecting 21.5 kg (47.5 lb) of lunar material",
+    "It fulfilled a national goal set by President John F. Kennedy in May 1961",
+    "The Soviets took the lead on April 12, 1961, when cosmonaut Yuri Gagarin became the first person in space",
+    "Eagle landed at 20:17:40 UTC on Sunday July 20 with 216 pounds (98 kg) of usable fuel remaining",
+    "Three new minerals were discovered in the rock samples collected by the astronauts: armalcolite, tranquillityite, and pyroxferroite",
+    "the astronauts left behind: an Apollo 1 mission patch in memory of astronauts Roger Chaffee, Gus Grissom, and Edward White",
+    "begin the Earth-based portion of their 21 days of quarantine",
+    "On August 10, 1969, the Interagency Committee on Back Contamination met in Atlanta and lifted the quarantine"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Aldrin followed Armstrong onto the lunar surface a full fifty minutes afterward.",
+      "distinctive_tokens": ["fifty", "afterward"]
+    },
+    {
+      "claim": "The Soviet Union's Luna 15 successfully retrieved and returned lunar soil before Apollo 11 splashed down.",
+      "distinctive_tokens": ["successfully", "retrieved"]
+    },
+    {
+      "claim": "Armstrong's first words on the Moon were flawlessly recorded with no dispute over the wording.",
+      "distinctive_tokens": ["flawlessly", "dispute"]
+    }
+  ],
+  "expected_oneline_keywords": ["apollo 11", "moon landing", "armstrong", "nasa"],
+  "notes": "Luna 15 crashed while racing Apollo 11 -- a reversal trap if a summary says it succeeded. The famous quote's missing 'a' is explicitly disputed, not settled."
+}
