@@ -43,9 +43,11 @@ async function readAll(text: string, opts: { rate?: number; voice?: "af_heart" |
     ...opts,
     onStart: (e) => {
       nowEl.textContent = text.slice(e.start, e.end);
+      nowEl.dataset.seq = String(e.seq);
     },
-    onEnd: () => {
-      nowEl.textContent = "";
+    onEnd: (e) => {
+      // Only the sentence that ended clears the line; the next one may already have started.
+      if (nowEl.dataset.seq === String(e.seq)) nowEl.textContent = "";
     },
   });
   setStatus(r.finished ? t("notice.done") : t("notice.stopped"));

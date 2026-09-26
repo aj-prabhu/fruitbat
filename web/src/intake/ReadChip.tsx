@@ -65,10 +65,16 @@ export function ReadChip() {
     document.addEventListener("mouseup", syncFromSelection);
     document.addEventListener("keyup", onKeyup);
     document.addEventListener("keydown", onKeydown);
+    // The chip is fixed-position: keep it next to the selection when the page scrolls or resizes
+    // (Codex merge-gate review, PR #12).
+    window.addEventListener("scroll", syncFromSelection, { passive: true, capture: true });
+    window.addEventListener("resize", syncFromSelection);
     return () => {
       document.removeEventListener("mouseup", syncFromSelection);
       document.removeEventListener("keyup", onKeyup);
       document.removeEventListener("keydown", onKeydown);
+      window.removeEventListener("scroll", syncFromSelection, { capture: true });
+      window.removeEventListener("resize", syncFromSelection);
     };
   }, []);
 

@@ -13,17 +13,31 @@
   "forbidden_claims": [
     {
       "claim": "Holmes said Watson had gained ten pounds since their last meeting.",
-      "distinctive_tokens": ["ten", "gained"]
+      "distinctive_tokens": [
+        "ten",
+        "gained"
+      ]
     },
     {
       "claim": "Watson worked out from Holmes's shoes that Holmes employed a careless housemaid.",
-      "distinctive_tokens": ["deduced", "housemaid"]
+      "distinctive_tokens": [
+        "housemaid",
+        "shoes"
+      ]
     },
     {
       "claim": "The note asked Holmes to travel to a stranger's home at midnight.",
-      "distinctive_tokens": ["midnight", "travel"]
+      "distinctive_tokens": [
+        "midnight",
+        "travel"
+      ]
     }
   ],
-  "expected_oneline_keywords": ["holmes", "watson", "deduction", "mystery"],
+  "expected_oneline_keywords": [
+    "holmes",
+    "watson",
+    "deduction",
+    "mystery"
+  ],
   "notes": "Reversed-agency traps: Holmes deduces about Watson (not vice versa), and a visitor comes to Holmes's rooms (not the other way)."
 }
