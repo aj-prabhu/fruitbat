@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Request as PwRequest } from "@playwright/test";
+import { test, expect, type Page, type Request as PwRequest, type Response as PwResponse } from "@playwright/test";
 import { gotoIsolated } from "./isolated";
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -158,7 +158,10 @@ function validateRedirectTarget(u: URL, allow: Allowlist): { ok: boolean; reason
     const candidate = `https://huggingface.co/${cacheMatch[1]}/resolve/${cacheMatch[2]}/${cacheMatch[3]}`;
     if (allow.hubExact.has(candidate)) matched = candidate;
   }
-  if (!matched) {
+  // Form B (CDN) must also have the bridge object path, as net.ts requires: a filename parameter
+  // alone would let an arbitrary unpinned object through (Codex review, PR #21).
+  const bridgePath = /^\/xet-bridge-[a-z0-9-]+\/[0-9a-f]{8,64}\/[0-9a-f]{8,64}$/.test(u.pathname);
+  if (!matched && bridgePath) {
     const disp = u.searchParams.get("response-content-disposition");
     if (disp) {
       const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disp);
@@ -215,13 +218,24 @@ async function attachRecorder(page: Page) {
   const byUrl = new Map<string, Rec>();
   const canaryHits: string[] = [];
   const pageErrors: string[] = [];
+  // Listener work is async (allHeaders(), response bodies): settle() waits for all of it, so the
+  // no-leak assertions never run ahead of a scan still in progress (Codex review, PR #21).
+  const inflight = new Set<Promise<void>>();
+  const track = (p: Promise<void>) => {
+    inflight.add(p);
+    void p.finally(() => inflight.delete(p));
+  };
+  const settle = async () => {
+    while (inflight.size) await Promise.allSettled([...inflight]);
+  };
 
   page.on("pageerror", (e) => pageErrors.push(String(e)));
 
   // Context scope, not page scope: after gotoIsolated the COI service worker fetches on the page's
   // behalf, and those requests are reported on the context only (Codex review, PR #21).
   const ctx = page.context();
-  ctx.on("request", async (req: PwRequest) => {
+  ctx.on("request", (req: PwRequest) => void track(onRequest(req)));
+  async function onRequest(req: PwRequest): Promise<void> {
     const rec: Rec = {
       url: req.url(),
       method: req.method(),
@@ -245,9 +259,10 @@ async function attachRecorder(page: Page) {
     for (const [k, v] of Object.entries(headers)) scan(`request header ${k} on ${rec.url}`, v, canaryHits);
     const body = req.postData();
     if (body) scan(`request body on ${rec.url}`, body, canaryHits);
-  });
+  }
 
-  ctx.on("response", async (res) => {
+  ctx.on("response", (res) => void track(onResponse(res)));
+  async function onResponse(res: PwResponse): Promise<void> {
     const req = res.request();
     const rec = byUrl.get(req.url());
     const headers = res.headers();
@@ -268,7 +283,7 @@ async function attachRecorder(page: Page) {
         }
       }
     }
-  });
+  }
 
   // context.route to see request bodies as raw bytes too (a non-UTF8 body would mangle
   // postData()'s string form): continues every request unmodified, just observes.
@@ -278,7 +293,7 @@ async function attachRecorder(page: Page) {
     await route.continue();
   });
 
-  return { records, canaryHits, pageErrors };
+  return { records, canaryHits, pageErrors, settle };
 }
 
 function evaluateAllowlist(records: Rec[], allow: Allowlist, baseOrigin: string): { violations: string[]; hubSeen: Set<string> } {
@@ -455,7 +470,7 @@ test.describe("privacy: full sweep on the real app", () => {
     const models = readJson<ModelsJson>("spec/models.json");
     const allow = buildAllowlist(network);
     await installStubs(page);
-    const { records, canaryHits, pageErrors } = await attachRecorder(page);
+    const { records, canaryHits, pageErrors, settle } = await attachRecorder(page);
 
     await gotoIsolated(page, "/?llm=fake");
     await waitReady(page);
@@ -467,6 +482,7 @@ test.describe("privacy: full sweep on the real app", () => {
 
     await assertCspBlocksOffList(page);
 
+    await settle();
     expect(canaryHits, "canary must never appear in any request URL, header, or scanned body").toEqual([]);
     expect(pageErrors, "WebSocket/RTCPeerConnection/sendBeacon/EventSource stubs must never fire").toEqual([]);
 
@@ -487,7 +503,7 @@ test.describe("privacy: full sweep on the real app", () => {
     const models = readJson<ModelsJson>("spec/models.json");
     const allow = buildAllowlist(network);
     await installStubs(page);
-    const { records, canaryHits, pageErrors } = await attachRecorder(page);
+    const { records, canaryHits, pageErrors, settle } = await attachRecorder(page);
 
     await gotoIsolated(page, "/"); // no ?llm=fake: the real summarizer path, with WebGPU disabled by the project
     await waitReady(page);
@@ -498,6 +514,7 @@ test.describe("privacy: full sweep on the real app", () => {
     expect(snap.notices).toContain("notice.no_webgpu");
     expect(snap.bullets.length, "no bullets from a degraded attempt").toBe(0);
 
+    await settle();
     expect(canaryHits).toEqual([]);
     expect(pageErrors).toEqual([]);
 
@@ -532,7 +549,7 @@ test.describe("privacy: full sweep on the real app", () => {
     const models = readJson<ModelsJson>("spec/models.json");
     const allow = buildAllowlist(network);
     await installStubs(page);
-    const { records, canaryHits, pageErrors } = await attachRecorder(page);
+    const { records, canaryHits, pageErrors, settle } = await attachRecorder(page);
 
     await gotoIsolated(page, "/"); // no ?llm=fake: real summarizer + real Kokoro
     await waitReady(page, 15 * 60_000); // Kokoro (~92 MB) under contended sandbox bandwidth
@@ -546,6 +563,7 @@ test.describe("privacy: full sweep on the real app", () => {
 
     await assertCspBlocksOffList(page);
 
+    await settle();
     expect(canaryHits).toEqual([]);
     expect(pageErrors).toEqual([]);
 
