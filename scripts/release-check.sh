@@ -51,6 +51,14 @@ if [ "$COMMIT_FULL" = "$HEAD_FULL" ]; then
 else
   row commit-checked-out FAIL "$COMMIT_FULL is not HEAD ($HEAD_FULL); check it out first"
 fi
+# ...and clean: staged, unstaged or untracked changes would be tested instead of the commit
+# (Codex review, PR #6).
+DIRTY="$(git status --porcelain)"
+if [ -z "$DIRTY" ]; then
+  row clean-checkout PASS "no local changes"
+else
+  row clean-checkout FAIL "working tree has changes: $(echo "$DIRTY" | head -3 | tr '\n' ' ')"
+fi
 
 # Evidence files (bench rows, graded files, the privacy request log) are committed on top of the
 # commit they describe, so they are named by an earlier SHA. A file's evidence is valid for
@@ -152,8 +160,10 @@ else
   missing bench-gate S0-05 "bench/gate.py"
 fi
 
-# (i) graded files: bench/graded/<sha>-*.json for a sha whose evidence is valid for COMMIT,
-# count >= 18, every score >= 4
+# (i) graded files: bench/graded/<sha>-<doc>-<level>.json for a sha whose evidence is valid for
+# COMMIT, one for every doc in the manifest's graded_set x {short, caveman, oneline} (18), each a
+# JSON object whose doc/level/commit match its name and whose numeric score is >= 4. Counting
+# files is not enough: empty or unrelated files must not pass (Codex review, PR #6).
 if [ -d bench/graded ]; then
   GRADED_SHA=""
   for f in bench/graded/*-*.json; do
@@ -162,13 +172,26 @@ if [ -d bench/graded ]; then
     if evidence_valid "$sha"; then GRADED_SHA="$sha"; fi
   done
   if [ -n "$GRADED_SHA" ]; then
-    GRADED_FILES=(bench/graded/"${GRADED_SHA}"-*.json)
-    COUNT=${#GRADED_FILES[@]}
-    LOW="$(jq -s 'map(select(.score < 4)) | length' "${GRADED_FILES[@]}")"
-    if [ "$COUNT" -ge 18 ] && [ "$LOW" -eq 0 ]; then
-      row graded PASS "$COUNT files for $GRADED_SHA (evidence valid for $COMMIT_FULL), all scores >= 4"
+    GRADED_DOCS="$(jq -r '.graded_set[]' spec/eval/manifest.json)"
+    NEED=0
+    BAD=()
+    for doc in $GRADED_DOCS; do
+      for level in short caveman oneline; do
+        NEED=$((NEED + 1))
+        f="bench/graded/${GRADED_SHA}-${doc}-${level}.json"
+        if [ ! -s "$f" ]; then BAD+=("$doc/$level missing"); continue; fi
+        if ! jq -e --arg d "$doc" --arg l "$level" --arg s "$GRADED_SHA" \
+          '(type == "object") and (.doc == $d) and (.level == $l)
+           and ((.commit | tostring) as $c | ($c | startswith($s)) or ($s | startswith($c)))
+           and ((.score | type) == "number") and (.score >= 4)' "$f" >/dev/null 2>&1; then
+          BAD+=("$doc/$level invalid or score < 4")
+        fi
+      done
+    done
+    if [ "$NEED" -ge 18 ] && [ "${#BAD[@]}" -eq 0 ]; then
+      row graded PASS "$NEED graded files for $GRADED_SHA (evidence valid for $COMMIT_FULL), all scores >= 4"
     else
-      row graded FAIL "$COUNT files for $GRADED_SHA (need >= 18), $LOW below score 4"
+      row graded FAIL "$GRADED_SHA: need $NEED (graded_set x 3 levels, >= 18); problems: ${BAD[*]:-graded_set too small}"
     fi
   else
     row graded FAIL "no bench/graded/<sha>-*.json whose sha is valid evidence for $COMMIT_FULL"
