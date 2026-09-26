@@ -393,6 +393,7 @@ export class VoiceEngine {
     opts.onPlanned?.(segments);
     const coverage = coverageOf(text, segments);
     this.phase = "reading";
+    this.runSegments = segments;
     this.next = segments[0] ?? null;
 
     let settle!: (finished: boolean) => void;
@@ -487,10 +488,14 @@ export class VoiceEngine {
     if (m.type === "error") throw new Error(`${m.name}: ${m.message}`);
   }
 
+  /** The current read's plan, so `next` can follow playback (Codex review, PR #17). */
+  private runSegments: PlannedSegment[] = [];
+
   private handleStart(e: QueueEvent): void {
     if (e.runId !== this.runId) return;
     if (this.runTtfa === null) this.runTtfa = performance.now() - this.runT0;
     this.current = { seq: e.seq, start: e.start, end: e.end, at: e.at, seconds: e.seconds };
+    this.next = this.runSegments[e.seq + 1] ?? null;
     this.userOnStart?.(this.current);
   }
 
@@ -503,6 +508,7 @@ export class VoiceEngine {
   private handleDrain(runId: number): void {
     if (runId !== this.runId) return;
     this.phase = "done";
+    this.next = null;
     this.pendingDone?.resolve(true);
     this.pendingDone = null;
   }

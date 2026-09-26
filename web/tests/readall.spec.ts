@@ -125,6 +125,11 @@ test("stop within 200 ms while reading", async () => {
     clockAdvances,
     { timeout: 120_000 },
   );
+  if (clockAdvances) {
+    // `next` follows playback: it is the segment after the one playing (Codex review, PR #17).
+    const s = await page.evaluate(() => window.__tts.state() as unknown as { current: { seq: number } | null; next: { seq: number } | null });
+    if (s.current && s.next) expect(s.next.seq).toBe(s.current.seq + 1);
+  }
   const r = await page.evaluate(() => {
     const ms = window.__tts.stop();
     const s = window.__tts.state();
