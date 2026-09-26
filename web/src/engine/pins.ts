@@ -18,7 +18,7 @@ export interface PinnedModels {
     summarizer: PinnedModel;
     /** fallback-a, fallback-b, low-end (spec/models.json, S0-03). */
     summarizer_fallbacks?: (PinnedModel & { role: string })[];
-    voice: PinnedModel & { voices_vendored: { path: string; files: string[] } };
+    voice: PinnedModel & { voices_vendored: { path: string; files: string[] }; tts_phoneme_limit: number; tts_phoneme_target: number };
     libraries: Record<string, string>;
   };
 }

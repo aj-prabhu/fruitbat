@@ -13,12 +13,12 @@ export const RATE_MAX = 1.5;
 export const VOICES = ["af_heart", "af_bella"] as const;
 export type VoiceId = (typeof VOICES)[number];
 const RATE_KEY = "fruitbat.rate";
-/** Rough English speech rate at 1.0x, used only to reserve queue room for audio still being synthesized. */
+/** Starting guess for English speech at 1.0x; the engine then learns the real rate from the audio it gets. */
 const CHARS_PER_SECOND = 14;
-const estimateSeconds = (seg: PlannedSegment, speed: number): number => Math.max(0, seg.end - seg.start) / CHARS_PER_SECOND / Math.max(speed, 0.1);
 const VOICE_KEY = "fruitbat.voice";
 const STATS_KEY = "fruitbat.stats.last";
-const LIMITS = { target: 300, limit: 510 }; // spec/chunking.md, measured in S1-00a
+// The TTS-safe split, from spec/models.json (measured in S1-00a), not a second copy (Codex review, PR #17).
+const LIMITS = { target: pinnedModels().web.voice.tts_phoneme_target, limit: pinnedModels().web.voice.tts_phoneme_limit };
 
 export interface LoadedInfo {
   maxTokens: number;
@@ -317,6 +317,14 @@ export class VoiceEngine {
   private runT0 = 0;
   private runSynthMs = 0;
   private runOverlimit = 0;
+  /** Seconds of audio per source character at 1.0x, the largest seen so far (kept across runs). */
+  private secPerChar = 1 / CHARS_PER_SECOND;
+
+  /** Estimated audio for a segment. Never below what the voice has actually produced per character,
+   *  so a voice slower than the first guess still keeps the 30 s cap (Codex review, PR #17). */
+  private estimateSeconds(seg: PlannedSegment, speed: number): number {
+    return (Math.max(0, seg.end - seg.start) * this.secPerChar) / Math.max(speed, 0.1);
+  }
 
   /**
    * Read `text` aloud in full: segment, split TTS-safe, synthesize in order under back-pressure,
@@ -342,6 +350,10 @@ export class VoiceEngine {
     const replaced = this.pendingDone;
     this.pendingDone = null;
     replaced?.resolve(false);
+    // ...and cancel its work in the worker, as stop() does, so its queued synthesis does not run
+    // ahead of this read (Codex review, PR #17).
+    this.send({ type: "cancel", runId: before });
+    this.settleWaiters(before, "stopped");
     const queue = this.queue!;
     queue.beginRun(runId);
     this.phase = "planning";
@@ -400,7 +412,7 @@ export class VoiceEngine {
         // it settles, so the 30 s cap covers audio still being synthesized (Codex review, PR #17).
         const seg = segments[nextSeq];
         const speed = opts.rate ?? this.rate;
-        const est = estimateSeconds(seg, speed);
+        const est = this.estimateSeconds(seg, speed);
         if (!queue.canAccept(est)) {
           await new Promise((r) => setTimeout(r, 50));
           continue;
@@ -451,6 +463,8 @@ export class VoiceEngine {
     if (runId !== this.runId) return;
     if (m.type === "pcm") {
       this.runSynthMs += m.synthMs;
+      const chars = m.end - m.start;
+      if (chars > 0) this.secPerChar = Math.max(this.secPerChar, ((m.pcm.length / m.sampleRate) * speed) / chars);
       queue.enqueue({ runId, seq: m.seq, pcm: m.pcm, sampleRate: m.sampleRate, start: m.start, end: m.end });
       return;
     }
