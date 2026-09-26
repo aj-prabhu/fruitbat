@@ -99,9 +99,12 @@ function redirectAllowed(url: URL): { ok: boolean; reason?: string } {
     const cachePath = `/api/resolve-cache/models/${m[1]}/${m[2]}/${m[3]}`;
     if (url.pathname === cachePath) matched = p;
   }
-  // Form B: CDN bridge; the file name travels in response-content-disposition.
+  // Form B: CDN bridge; the file name travels in response-content-disposition. The path must
+  // have the bridge's object shape (/xet-bridge-<region>/<hex>/<hex>), so a filename parameter
+  // cannot authorize an arbitrary path on the CDN host (Codex merge-gate review, PR #4).
   const disposition = url.searchParams.get("response-content-disposition");
-  if (!matched && disposition) {
+  const bridgePath = /^\/xet-bridge-[a-z0-9-]+\/[0-9a-f]{8,64}\/[0-9a-f]{8,64}$/.test(url.pathname);
+  if (!matched && disposition && bridgePath) {
     const fname = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1];
     if (fname) {
       const hit = pinnedPaths.find((p) => basename(p) === decodeURIComponent(fname));
@@ -118,6 +121,16 @@ function redirectAllowed(url: URL): { ok: boolean; reason?: string } {
   return { ok: true };
 }
 
+/** Same-origin paths our code fetches: the sample article, vendored voices, the canned demo, the
+ *  built assets, and `/__model_cache__/` (a test-only path served by web/tests/dev-proxy.mjs; it
+ *  does not exist in a deployed build). Nothing else on our own origin is ever fetched. */
+const SAME_ORIGIN_EXACT = new Set(["/sample.txt"]);
+const SAME_ORIGIN_PREFIXES = ["/models/", "/demo/", "/assets/", "/ort/", "/fonts/", "/__model_cache__/"];
+function sameOriginPathAllowed(path: string): boolean {
+  if (path.includes("..")) return false;
+  return SAME_ORIGIN_EXACT.has(path) || SAME_ORIGIN_PREFIXES.some((p) => path.startsWith(p));
+}
+
 /** Decide whether a URL may be fetched. Pure; no request is made. */
 export function allowedUrl(input: string | URL, base?: string): Decision {
   let url: URL;
@@ -130,6 +143,9 @@ export function allowedUrl(input: string | URL, base?: string): Decision {
   const origin = typeof location !== "undefined" ? location.origin : null;
   if (origin && url.origin === origin) {
     if (url.search) return { ok: false, reason: "query string on same-origin path", url };
+    // Only the shipped asset paths: a same-origin request still reaches the host's logs, so an
+    // arbitrary path could carry text off the device (Codex merge-gate review, PR #4).
+    if (!sameOriginPathAllowed(url.pathname)) return { ok: false, reason: "same-origin path not a shipped asset", url };
     return { ok: true, kind: "same-origin", url };
   }
   if (/\/resolve\/main\//.test(url.pathname)) return { ok: false, reason: "unpinned revision", url };
