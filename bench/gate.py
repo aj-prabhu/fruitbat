@@ -524,9 +524,19 @@ def cmd_pr_head(args):
             lines.append("FAIL | bench/baselines.json | changed without the baseline-reset label")
     # A baseline-reset PR must commit the baselines its rows produce: compare every replaced
     # identity against bench/baselines.json at the PR head (Codex merge-gate review, PR #15).
-    if allow_reset and updates and args.head:
+    if allow_reset and args.head:
         head_baselines = load_baselines_at(repo_root, args.head)
-        for identity, medians in updates:
+        base_baselines = load_baselines_at(repo_root, args.base)
+        replaced = {identity for identity, _ in (updates or [])}
+        # Every identity the rows did not re-measure must be untouched (Codex merge-gate review, PR #15).
+        def by_identity(doc):
+            return {identity_of(e): {k: v for k, v in e.items() if k not in ("date", "commit")} for e in doc.get("baselines", [])}
+        base_map, head_map = by_identity(base_baselines), by_identity(head_baselines)
+        for identity in set(base_map) | set(head_map):
+            if identity not in replaced and base_map.get(identity) != head_map.get(identity):
+                exit_code = 1
+                lines.append(f"FAIL | {identity_str(identity)} | baseline-reset: this identity changed but no rows re-measured it")
+        for identity, medians in (updates or []):
             committed = find_baseline(head_baselines, identity)
             if committed is None or any(
                 (committed.get(k) is None) != (v is None) or (v is not None and abs(float(committed.get(k)) - float(v)) > 1e-9)
@@ -766,7 +776,7 @@ def build_arg_parser():
     mode.add_argument("--self-test", action="store_true")
     mode.add_argument("--pr-head", action="store_true")
     mode.add_argument("--release", action="store_true")
-    ap.add_argument("--base", help="--pr-head: base sha (accepted for CI symmetry; row validity only needs --head)")
+    ap.add_argument("--base", help="--pr-head: base sha (required: the approved baselines are read from it)")
     ap.add_argument("--head", help="--pr-head: head sha")
     ap.add_argument("--commit", help="--release: commit sha")
     ap.add_argument("--allow-baseline-reset", action="store_true")
@@ -780,6 +790,9 @@ def main():
     if args.self_test:
         sys.exit(run_self_tests())
 
+    if args.pr_head and not args.base:
+        print("bench-gate: --pr-head needs --base (the approved baselines are the base revision's)", file=sys.stderr)
+        return 2
     if args.pr_head:
         if not args.head:
             print("--pr-head requires --head", file=sys.stderr)
