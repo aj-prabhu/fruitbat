@@ -31,6 +31,8 @@ type Tts = {
   readAll(text: string, opts?: { rate?: number }): Promise<{ runId: number; segments: number; coverage: number; ttsOverlimit: number; seconds: number; finished: boolean }>;
   speak(key: string): Promise<{ seconds: number }>;
   stop(): number;
+  pause(): void;
+  resume(): void;
   state(): { phase: string; error: string | null; playing: unknown; aheadSeconds: number; inFlight: number; enqueued: number; ended: number; ctxState: string };
   stats(): Record<string, unknown> | null;
 };
@@ -152,6 +154,28 @@ test("a second Read all replaces the first and settles it (Codex review, PR #17)
   }, PARAGRAPHS_011[0]);
   expect(first).not.toBeNull();
   expect(first!.finished).toBe(false);
+});
+
+test("a notice spoken while paused waits for resume and does not un-pause the read (Codex review, PR #17)", async () => {
+  test.skip(!clockAdvances, "needs an advancing audio clock to tell paused from playing");
+  const text = PARAGRAPHS_011.slice(0, 2).join("\n\n");
+  await page.evaluate((t) => void window.__tts.readAll(t), text);
+  await page.waitForFunction(() => window.__tts.state().playing !== null, null, { timeout: 120_000 });
+  const r = await page.evaluate(async () => {
+    window.__tts.pause();
+    await new Promise((res) => setTimeout(res, 300));
+    let spoke = false;
+    const said = window.__tts.speak("notice.stopped").then(() => (spoke = true));
+    await new Promise((res) => setTimeout(res, 3000)); // long enough to synthesize and play if it were going to
+    const whilePaused = { ctx: window.__tts.state().ctxState, spoke };
+    window.__tts.resume();
+    await said;
+    window.__tts.stop();
+    return { whilePaused, spokeAfter: spoke };
+  });
+  expect(r.whilePaused.ctx).toBe("suspended");
+  expect(r.whilePaused.spoke).toBe(false);
+  expect(r.spokeAfter).toBe(true);
 });
 
 test("stop during planning settles readAll; stop cancels a pending spoken message (Codex review, PR #17)", async () => {

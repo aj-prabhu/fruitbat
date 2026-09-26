@@ -203,7 +203,7 @@ export class VoiceEngine {
         onDrain: (id) => this.handleDrain(id),
       });
     }
-    void this.ctx.resume();
+    if (!this.paused) void this.ctx.resume(); // a paused read stays paused (Codex review, PR #17)
     return this.ctx;
   }
 
@@ -333,6 +333,7 @@ export class VoiceEngine {
    * play. Resolves when playback of the last segment ends, or when stopped.
    */
   async readAll(text: string, opts: ReadAllOptions = {}): Promise<ReadAllResult> {
+    this.releasePause(); // a new Read all is an explicit start: it ends any pause
     this.ensureContext();
     // Stop/Esc while the model loads bumps runId; a read requested before that must not start
     // afterwards (Codex review, PR #17).
@@ -582,6 +583,7 @@ export class VoiceEngine {
   private messageEpoch = 0;
 
   stop(): number {
+    this.releasePause(); // waiting messages wake, see the new epoch, and return
     const t0 = performance.now();
     const stale = this.runId;
     this.runId++;
@@ -618,10 +620,20 @@ export class VoiceEngine {
     return stopMs;
   }
 
+  /** Pause holds the whole voice: the read and any spoken message wait for resume(). */
+  private paused = false;
+  private resumeWaiters: Array<() => void> = [];
+  private releasePause(): void {
+    this.paused = false;
+    for (const w of this.resumeWaiters.splice(0)) w();
+  }
+
   pause(): void {
+    this.paused = true;
     void this.queue?.pause();
   }
   resume(): void {
+    this.releasePause();
     void this.queue?.resume();
   }
   skip(): boolean {
@@ -653,6 +665,12 @@ export class VoiceEngine {
     }
     if (epoch !== this.messageEpoch) return { seconds: 0 }; // stop() raced the reply
     if (m.type !== "pcm") throw new Error(m.type === "error" ? `${m.name}: ${m.message}` : "tts_overlimit");
+    if (this.paused) {
+      // A notice raised while the read is paused is spoken after the user resumes, not by waking
+      // the shared context and the paused read with it (Codex review, PR #17).
+      await new Promise<void>((r) => this.resumeWaiters.push(r));
+      if (epoch !== this.messageEpoch) return { seconds: 0 }; // stopped while waiting
+    }
     const buf = ctx.createBuffer(1, m.pcm.length, m.sampleRate);
     buf.copyToChannel(m.pcm as Float32Array<ArrayBuffer>, 0);
     const src = ctx.createBufferSource();
