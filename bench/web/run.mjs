@@ -357,6 +357,31 @@ function computeTimeoutMs(text, level, cold, { warmup = false } = {}) {
   return Math.min(Math.max(ms, 60_000), 180 * 60_000); // clamp 1..180 minutes
 }
 
+async function measureStop(page, doc, level, text, timeoutMs) {
+  const runId = await page.evaluate(
+    ({ doc, level, text }) => {
+      window.__fruitbat.setDocId(doc);
+      window.__fruitbat.run(text, level);
+      return window.__fruitbat.state().runId;
+    },
+    { doc, level, text }
+  );
+  await page.waitForFunction(
+    (runId) => {
+      const s = window.__fruitbat.state();
+      return s.runId === runId && s.play === "playing";
+    },
+    runId,
+    { timeout: timeoutMs, polling: 50 }
+  );
+  const ms = await page.evaluate(() => {
+    window.__fruitbat.stop(); // the orchestrator measures the stop synchronously
+    return window.__fruitbat.stats().stop_ms;
+  });
+  if (typeof ms !== "number" || !Number.isFinite(ms)) fail(`stop_ms not measured for doc=${doc} level=${level}`);
+  return ms;
+}
+
 async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, discard = false }) {
   const sampler = discard ? null : startPeakSampler(profileDir);
 
@@ -409,6 +434,10 @@ async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, dis
   }
   row.peak_mb = peak_mb;
   row.heap_mb = heap_mb;
+  // stop_ms: the app never records it on a row (a stopped run is never a row, S1-10), so the
+  // runner measures it for this identity: the same run again, Stop once audio plays, and the
+  // engine's own measured stop time. bench/gate.py requires it at every level (Codex review, PR #27).
+  row.stop_ms = await measureStop(page, doc, level, text, timeoutMs);
 
   if (level !== "readall") {
     const bullets = await page.evaluate(() => window.__fruitbat.state().bullets);

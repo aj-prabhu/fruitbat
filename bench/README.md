@@ -162,7 +162,9 @@ dispatches to `bench/web/run.mjs` (`--target mac` prints `S2-13` and exits 2 -- 
    `web/src/main.tsx` itself uses before calling `stats.record()`, so by the time the poll
    resolves the app has already written a fresh `RunStats` row to its own `localStorage` (read via
    `window.__fruitbat.rows()`, last entry). The runner does not build a row from scratch: it takes
-   that row and fills in only what the browser genuinely cannot know --
+   that row and fills in only what the browser genuinely cannot know (plus `stop_ms`, which the
+   app never records because a stopped run is never a row: the runner starts the same run again,
+   presses Stop once audio plays, and takes the engine's measured stop time) --
    `facts_token_hit`/`halluc_flags`/`forbidden_hits`/`oneline_keyword_hit` from `bench/score.py`
    against `state().bullets`, and `peak_mb`/`heap_mb` (see `bench/web/memory.md`).
 5. Validates the filled-in row with `bench/schema_check.py` before appending it to
