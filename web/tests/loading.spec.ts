@@ -37,9 +37,11 @@ async function throttleHub(page: Page): Promise<{ urls: string[] }> {
 }
 
 test.describe("loading UX (?llm=fake, route-throttled)", () => {
-  // Download gating itself ("nothing downloads before the first summary request") is proven with
-  // real requests in summarize.spec.ts on webgpu-local. Here ?llm=fake never requests the
-  // summarizer at all, so a request check would pass whatever the page did (Codex review, PR #20).
+  // Download gating (rule 11) is enforced in the Summarizer, which this app page and the S1-05
+  // harness share; it is proven with real requests on the harness page (summarize.spec.ts, cold
+  // load, webgpu-local only). No wasm-ci test on this page can prove it: ?llm=fake never
+  // downloads, and without WebGPU the real probe stops before any request. So this test checks
+  // the Loading UI only (Codex review, PR #20).
   test("summarizer size shown before the click; progress bars reach 100 %; cache detection", async ({ page }) => {
     await throttleHub(page);
     await gotoIsolated(page, "/?llm=fake");
