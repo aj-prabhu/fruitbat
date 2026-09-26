@@ -1,0 +1,79 @@
+17 USC 106A: Rights of certain authors to attribution and integrity
+
+§106A. Rights of certain authors to attribution and integrity
+
+(a) Rights of Attribution and Integrity.-Subject to section 107 and independent of the exclusive rights provided in section 106, the author of a work of visual art-
+
+(1) shall have the right-
+
+(A) to claim authorship of that work, and
+
+(B) to prevent the use of his or her name as the author of any work of visual art which he or she did not create;
+
+(2) shall have the right to prevent the use of his or her name as the author of the work of visual art in the event of a distortion, mutilation, or other modification of the work which would be prejudicial to his or her honor or reputation; and
+
+(3) subject to the limitations set forth in section 113(d), shall have the right-
+
+(A) to prevent any intentional distortion, mutilation, or other modification of that work which would be prejudicial to his or her honor or reputation, and any intentional distortion, mutilation, or modification of that work is a violation of that right, and
+
+(B) to prevent any destruction of a work of recognized stature, and any intentional or grossly negligent destruction of that work is a violation of that right.
+
+(b) Scope and Exercise of Rights.-Only the author of a work of visual art has the rights conferred by subsection (a) in that work, whether or not the author is the copyright owner. The authors of a joint work of visual art are coowners of the rights conferred by subsection (a) in that work.
+
+(c) Exceptions.-(1) The modification of a work of visual art which is a result of the passage of time or the inherent nature of the materials is not a distortion, mutilation, or other modification described in subsection (a)(3)(A).
+
+(2) The modification of a work of visual art which is the result of conservation, or of the public presentation, including lighting and placement, of the work is not a destruction, distortion, mutilation, or other modification described in subsection (a)(3) unless the modification is caused by gross negligence.
+
+(3) The rights described in paragraphs (1) and (2) of subsection (a) shall not apply to any reproduction, depiction, portrayal, or other use of a work in, upon, or in any connection with any item described in subparagraph (A) or (B) of the definition of "work of visual art" in section 101, and any such reproduction, depiction, portrayal, or other use of a work is not a destruction, distortion, mutilation, or other modification described in paragraph (3) of subsection (a).
+
+(d) Duration of Rights.-(1) With respect to works of visual art created on or after the effective date set forth in section 610(a) of the Visual Artists Rights Act of 1990, the rights conferred by subsection (a) shall endure for a term consisting of the life of the author.
+
+(2) With respect to works of visual art created before the effective date set forth in section 610(a) of the Visual Artists Rights Act of 1990, but title to which has not, as of such effective date, been transferred from the author, the rights conferred by subsection (a) shall be coextensive with, and shall expire at the same time as, the rights conferred by section 106.
+
+(3) In the case of a joint work prepared by two or more authors, the rights conferred by subsection (a) shall endure for a term consisting of the life of the last surviving author.
+
+(4) All terms of the rights conferred by subsection (a) run to the end of the calendar year in which they would otherwise expire.
+
+(e) Transfer and Waiver.-(1) The rights conferred by subsection (a) may not be transferred, but those rights may be waived if the author expressly agrees to such waiver in a written instrument signed by the author. Such instrument shall specifically identify the work, and uses of that work, to which the waiver applies, and the waiver shall apply only to the work and uses so identified. In the case of a joint work prepared by two or more authors, a waiver of rights under this paragraph made by one such author waives such rights for all such authors.
+
+(2) Ownership of the rights conferred by subsection (a) with respect to a work of visual art is distinct from ownership of any copy of that work, or of a copyright or any exclusive right under a copyright in that work. Transfer of ownership of any copy of a work of visual art, or of a copyright or any exclusive right under a copyright, shall not constitute a waiver of the rights conferred by subsection (a). Except as may otherwise be agreed by the author in a written instrument signed by the author, a waiver of the rights conferred by subsection (a) with respect to a work of visual art shall not constitute a transfer of ownership of any copy of that work, or of ownership of a copyright or of any exclusive right under a copyright in that work.
+
+17 USC 121: Limitations on exclusive rights: Reproduction for blind or other people with disabilities
+
+§121. Limitations on exclusive rights: Reproduction for blind or other people with disabilities
+
+(a) Notwithstanding the provisions of section 106, it is not an infringement of copyright for an authorized entity to reproduce or to distribute in the United States copies or phonorecords of a previously published literary work or of a previously published musical work that has been fixed in the form of text or notation if such copies or phonorecords are reproduced or distributed in accessible formats exclusively for use by eligible persons.
+
+(b)(1) Copies or phonorecords to which this section applies shall-
+
+(A) not be reproduced or distributed in the United States in a format other than an accessible format exclusively for use by eligible persons;
+
+(B) bear a notice that any further reproduction or distribution in a format other than an accessible format is an infringement; and
+
+(C) include a copyright notice identifying the copyright owner and the date of the original publication.
+
+(2) The provisions of this subsection shall not apply to standardized, secure, or norm-referenced tests and related testing material, or to computer programs, except the portions thereof that are in conventional human language (including descriptions of pictorial works) and displayed to users in the ordinary course of using the computer programs.
+
+(c) Notwithstanding the provisions of section 106, it is not an infringement of copyright for a publisher of print instructional materials for use in elementary or secondary schools to create and distribute to the National Instructional Materials Access Center copies of the electronic files described in sections 612(a)(23)(C), 613(a)(6), and section 674(e) of the Individuals with Disabilities Education Act that contain the contents of print instructional materials using the National Instructional Material Accessibility Standard (as defined in section 674(e)(3) of that Act), if-
+
+(1) the inclusion of the contents of such print instructional materials is required by any State educational agency or local educational agency;
+
+(2) the publisher had the right to publish such print instructional materials in print formats; and
+
+(3) such copies are used solely for reproduction or distribution of the contents of such print instructional materials in accessible formats.
+
+(d) For purposes of this section, the term-
+
+(1) "accessible format" means an alternative manner or form that gives an eligible person access to the work when the copy or phonorecord in the accessible format is used exclusively by the eligible person to permit him or her to have access as feasibly and comfortably as a person without such disability as described in paragraph (3);
+
+(2) "authorized entity" means a nonprofit organization or a governmental agency that has a primary mission to provide specialized services relating to training, education, or adaptive reading or information access needs of blind or other persons with disabilities;
+
+(3) "eligible person" means an individual who, regardless of any other disability-
+
+(A) is blind;
+
+(B) has a visual impairment or perceptual or reading disability that cannot be improved to give visual function substantially equivalent to that of a person who has no such impairment or disability and so is unable to read printed works to substantially the same degree as a person without an impairment or disability; or
+
+(C) is otherwise unable, through physical disability, to hold or manipulate a book or to focus or move the eyes to the extent that would be normally acceptable for reading; and
+
+(4) "print instructional materials" has the meaning given under section 674(e)(3)(C) of the Individuals with Disabilities Education Act.

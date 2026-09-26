@@ -1,0 +1,493 @@
+{
+  "version": 1,
+  "graded_set": [
+    "005",
+    "011",
+    "013",
+    "020",
+    "025",
+    "028"
+  ],
+  "docs": [
+    {
+      "id": "001",
+      "file": "corpus/001.txt",
+      "category": "short",
+      "word_range": [
+        300,
+        600
+      ],
+      "words": 503,
+      "genre": "fiction",
+      "role": null,
+      "source": "gutenberg",
+      "source_url": "https://www.gutenberg.org/cache/epub/11/pg11.txt",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "002",
+      "file": "corpus/002.txt",
+      "category": "short",
+      "word_range": [
+        300,
+        600
+      ],
+      "words": 578,
+      "genre": "science",
+      "role": null,
+      "source": "wikipedia",
+      "source_url": "https://en.wikipedia.org/wiki/Photosynthesis",
+      "license": "CC-BY-SA-4.0",
+      "pdf": null
+    },
+    {
+      "id": "003",
+      "file": "corpus/003.txt",
+      "category": "short",
+      "word_range": [
+        300,
+        600
+      ],
+      "words": 395,
+      "genre": "email",
+      "role": null,
+      "source": "original",
+      "source_url": null,
+      "license": "original-CC0",
+      "pdf": null
+    },
+    {
+      "id": "004",
+      "file": "corpus/004.txt",
+      "category": "short",
+      "word_range": [
+        300,
+        600
+      ],
+      "words": 324,
+      "genre": "email",
+      "role": null,
+      "source": "original",
+      "source_url": null,
+      "license": "original-CC0",
+      "pdf": null
+    },
+    {
+      "id": "005",
+      "file": "corpus/005.txt",
+      "category": "short",
+      "word_range": [
+        300,
+        600
+      ],
+      "words": 369,
+      "genre": "reference",
+      "role": "relational-negation",
+      "source": "original",
+      "source_url": null,
+      "license": "original-CC0",
+      "pdf": null
+    },
+    {
+      "id": "006",
+      "file": "corpus/006.txt",
+      "category": "short",
+      "word_range": [
+        300,
+        600
+      ],
+      "words": 304,
+      "genre": "email",
+      "role": null,
+      "source": "original",
+      "source_url": null,
+      "license": "original-CC0",
+      "pdf": null
+    },
+    {
+      "id": "007",
+      "file": "corpus/007.txt",
+      "category": "short",
+      "word_range": [
+        300,
+        600
+      ],
+      "words": 572,
+      "genre": "news",
+      "role": null,
+      "source": "nasa.gov",
+      "source_url": "https://www.nasa.gov/news-release/nasa-selects-far-infrared-telescope-as-first-in-new-mission-class/",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "008",
+      "file": "corpus/008.txt",
+      "category": "short",
+      "word_range": [
+        300,
+        600
+      ],
+      "words": 576,
+      "genre": "howto",
+      "role": null,
+      "source": "ready.gov",
+      "source_url": "https://www.ready.gov/tornadoes",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "009",
+      "file": "corpus/009.txt",
+      "category": "short",
+      "word_range": [
+        300,
+        600
+      ],
+      "words": 323,
+      "genre": "legal",
+      "role": null,
+      "source": "uscode.house.gov",
+      "source_url": "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title17-section102&num=0&edition=prelim",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "010",
+      "file": "corpus/010.txt",
+      "category": "short",
+      "word_range": [
+        300,
+        600
+      ],
+      "words": 387,
+      "genre": "essay",
+      "role": null,
+      "source": "gutenberg",
+      "source_url": "https://www.gutenberg.org/cache/epub/205/pg205.txt",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "011",
+      "file": "corpus/011.txt",
+      "category": "medium",
+      "word_range": [
+        1100,
+        1400
+      ],
+      "words": 1329,
+      "genre": "science",
+      "role": "sample-article",
+      "source": "nps.gov",
+      "source_url": "https://www.nps.gov/cave/learn/nature/bats.htm",
+      "license": "public-domain",
+      "pdf": "corpus/pdf/011.pdf"
+    },
+    {
+      "id": "012",
+      "file": "corpus/012.txt",
+      "category": "medium",
+      "word_range": [
+        1000,
+        2000
+      ],
+      "words": 1630,
+      "genre": "fiction",
+      "role": null,
+      "source": "gutenberg",
+      "source_url": "https://www.gutenberg.org/cache/epub/1661/pg1661.txt",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "013",
+      "file": "corpus/013.txt",
+      "category": "medium",
+      "word_range": [
+        1000,
+        2000
+      ],
+      "words": 1433,
+      "genre": "legal",
+      "role": null,
+      "source": "uscode.house.gov",
+      "source_url": "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title17-section106A&num=0&edition=prelim",
+      "license": "public-domain",
+      "pdf": "corpus/pdf/013.pdf"
+    },
+    {
+      "id": "014",
+      "file": "corpus/014.txt",
+      "category": "medium",
+      "word_range": [
+        1000,
+        2000
+      ],
+      "words": 1746,
+      "genre": "news",
+      "role": null,
+      "source": "wikipedia",
+      "source_url": "https://en.wikipedia.org/wiki/Chernobyl_disaster",
+      "license": "CC-BY-SA-4.0",
+      "pdf": null
+    },
+    {
+      "id": "015",
+      "file": "corpus/015.txt",
+      "category": "medium",
+      "word_range": [
+        1000,
+        2000
+      ],
+      "words": 1333,
+      "genre": "howto",
+      "role": null,
+      "source": "ready.gov",
+      "source_url": "https://www.ready.gov/home-fires",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "016",
+      "file": "corpus/016.txt",
+      "category": "medium",
+      "word_range": [
+        1000,
+        2000
+      ],
+      "words": 1737,
+      "genre": "science",
+      "role": null,
+      "source": "wikipedia",
+      "source_url": "https://en.wikipedia.org/wiki/Plate_tectonics",
+      "license": "CC-BY-SA-4.0",
+      "pdf": null
+    },
+    {
+      "id": "017",
+      "file": "corpus/017.txt",
+      "category": "medium",
+      "word_range": [
+        1000,
+        2000
+      ],
+      "words": 1762,
+      "genre": "essay",
+      "role": null,
+      "source": "gutenberg",
+      "source_url": "https://www.gutenberg.org/cache/epub/205/pg205.txt",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "018",
+      "file": "corpus/018.txt",
+      "category": "medium",
+      "word_range": [
+        1000,
+        2000
+      ],
+      "words": 1562,
+      "genre": "fiction",
+      "role": null,
+      "source": "gutenberg",
+      "source_url": "https://www.gutenberg.org/cache/epub/120/pg120.txt",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "019",
+      "file": "corpus/019.txt",
+      "category": "medium",
+      "word_range": [
+        1000,
+        2000
+      ],
+      "words": 1446,
+      "genre": "howto",
+      "role": null,
+      "source": "ready.gov",
+      "source_url": "https://www.ready.gov/winter-weather",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "020",
+      "file": "corpus/020.txt",
+      "category": "medium",
+      "word_range": [
+        1000,
+        1200
+      ],
+      "words": 1166,
+      "genre": "fiction",
+      "role": "unpunctuated",
+      "source": "gutenberg",
+      "source_url": "https://www.gutenberg.org/cache/epub/35/pg35.txt",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "021",
+      "file": "corpus/021.txt",
+      "category": "long",
+      "word_range": [
+        5000,
+        12000
+      ],
+      "words": 10234,
+      "genre": "science",
+      "role": null,
+      "source": "wikipedia",
+      "source_url": "https://en.wikipedia.org/wiki/Evolution",
+      "license": "CC-BY-SA-4.0",
+      "pdf": null
+    },
+    {
+      "id": "022",
+      "file": "corpus/022.txt",
+      "category": "long",
+      "word_range": [
+        5000,
+        12000
+      ],
+      "words": 7019,
+      "genre": "howto",
+      "role": null,
+      "source": "ready.gov",
+      "source_url": "https://www.ready.gov/earthquakes",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "023",
+      "file": "corpus/023.txt",
+      "category": "long",
+      "word_range": [
+        5000,
+        12000
+      ],
+      "words": 10295,
+      "genre": "news",
+      "role": null,
+      "source": "wikipedia",
+      "source_url": "https://en.wikipedia.org/wiki/Apollo_11",
+      "license": "CC-BY-SA-4.0",
+      "pdf": null
+    },
+    {
+      "id": "024",
+      "file": "corpus/024.txt",
+      "category": "long",
+      "word_range": [
+        5000,
+        12000
+      ],
+      "words": 7111,
+      "genre": "legal",
+      "role": null,
+      "source": "uscode.house.gov",
+      "source_url": "https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title17-section101&num=0&edition=prelim",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "025",
+      "file": "corpus/025.txt",
+      "category": "long",
+      "word_range": [
+        8000,
+        12000
+      ],
+      "words": 11483,
+      "genre": "fiction",
+      "role": "multi-chunk",
+      "source": "gutenberg",
+      "source_url": "https://www.gutenberg.org/cache/epub/46/pg46.txt",
+      "license": "public-domain",
+      "pdf": "corpus/pdf/025.pdf"
+    },
+    {
+      "id": "026",
+      "file": "corpus/026.txt",
+      "category": "long",
+      "word_range": [
+        5000,
+        12000
+      ],
+      "words": 8813,
+      "genre": "essay",
+      "role": null,
+      "source": "gutenberg",
+      "source_url": "https://www.gutenberg.org/cache/epub/1228/pg1228.txt",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "027",
+      "file": "corpus/027.txt",
+      "category": "long",
+      "word_range": [
+        5000,
+        12000
+      ],
+      "words": 7478,
+      "genre": "science",
+      "role": null,
+      "source": "wikipedia",
+      "source_url": "https://en.wikipedia.org/wiki/Immune_system",
+      "license": "CC-BY-SA-4.0",
+      "pdf": null
+    },
+    {
+      "id": "028",
+      "file": "corpus/028.txt",
+      "category": "long",
+      "word_range": [
+        5000,
+        12000
+      ],
+      "words": 9854,
+      "genre": "fiction",
+      "role": null,
+      "source": "gutenberg",
+      "source_url": "https://www.gutenberg.org/cache/epub/1342/pg1342.txt",
+      "license": "public-domain",
+      "pdf": null
+    },
+    {
+      "id": "029",
+      "file": "corpus/029.txt",
+      "category": "long",
+      "word_range": [
+        5000,
+        12000
+      ],
+      "words": 8884,
+      "genre": "news",
+      "role": null,
+      "source": "wikipedia",
+      "source_url": "https://en.wikipedia.org/wiki/Chernobyl_disaster",
+      "license": "CC-BY-SA-4.0",
+      "pdf": null
+    },
+    {
+      "id": "030",
+      "file": "corpus/030.txt",
+      "category": "long",
+      "word_range": [
+        5000,
+        12000
+      ],
+      "words": 8685,
+      "genre": "essay",
+      "role": null,
+      "source": "gutenberg",
+      "source_url": "https://www.gutenberg.org/cache/epub/1404/pg1404.txt",
+      "license": "public-domain",
+      "pdf": null
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+[
+  {
+    "name": "abbreviation_not_specially_handled",
+    "input": "Dr. Smith arrived. He was late.",
+    "expect": [
+      { "text": "Dr.", "start": 0, "end": 3 },
+      { "text": "Smith arrived.", "start": 4, "end": 18 },
+      { "text": "He was late.", "start": 19, "end": 31 }
+    ],
+    "why": "Intl.Segmenter has no abbreviation dictionary of its own, so 'Dr.' ends its own segment; downstream code must not assume every segment is a full sentence."
+  },
+  {
+    "name": "quoted_dialogue",
+    "input": "\"Is that so,\" said Filby. \"Interesting.\"",
+    "expect": [
+      { "text": "\"Is that so,\" said Filby.", "start": 0, "end": 25 },
+      { "text": "\"Interesting.\"", "start": 26, "end": 40 }
+    ],
+    "why": "a closing quote after terminal punctuation stays attached to its sentence."
+  },
+  {
+    "name": "extra_whitespace_between_sentences",
+    "input": "One sentence.  Another sentence with extra space before it.",
+    "expect": [
+      { "text": "One sentence.", "start": 0, "end": 13 },
+      { "text": "Another sentence with extra space before it.", "start": 15, "end": 59 }
+    ],
+    "why": "the double space between sentences is skipped by the leading-whitespace trim, so the second segment's start offset lands on its first real character, not the space."
+  },
+  {
+    "name": "newline_separated_lines",
+    "input": "First line.\nSecond line.\nThird line.",
+    "expect": [
+      { "text": "First line.", "start": 0, "end": 11 },
+      { "text": "Second line.", "start": 12, "end": 24 },
+      { "text": "Third line.", "start": 25, "end": 36 }
+    ],
+    "why": "newlines between otherwise-terminated sentences are trimmed the same way spaces are."
+  },
+  {
+    "name": "unpunctuated_text_is_one_giant_segment",
+    "input": "No terminal punctuation at all just words going on and on and on",
+    "expect": [{ "text": "No terminal punctuation at all just words going on and on and on", "start": 0, "end": 64 }],
+    "why": "with no sentence-ending punctuation and no paragraph break, Intl.Segmenter finds no boundary at all and returns the whole input as one Segment; split.ts is what breaks this down further for TTS. spec/eval/corpus/020.txt (role 'unpunctuated', same idea but with paragraph breaks) is covered by a dedicated real-file integration test in core.test.ts, since Intl.Segmenter still breaks on blank lines between paragraphs even with zero in-paragraph punctuation."
+  },
+  {
+    "name": "four_short_sentences_mixed_terminators",
+    "input": "Bats eat insects. They fly at night! Do they see well? Yes.",
+    "expect": [
+      { "text": "Bats eat insects.", "start": 0, "end": 17 },
+      { "text": "They fly at night!", "start": 18, "end": 36 },
+      { "text": "Do they see well?", "start": 37, "end": 54 },
+      { "text": "Yes.", "start": 55, "end": 59 }
+    ],
+    "why": "'.', '!' and '?' are all recognized sentence terminators."
+  },
+  {
+    "name": "leading_and_trailing_whitespace_on_whole_input",
+    "input": "  Leading and trailing whitespace around the whole thing.  ",
+    "expect": [{ "text": "Leading and trailing whitespace around the whole thing.", "start": 2, "end": 57 }],
+    "why": "offsets are into the ORIGINAL input; the two leading spaces shift start to 2 rather than being stripped before segmenting (which would have desynced offsets from the caller's original string)."
+  },
+  {
+    "name": "single_short_sentence",
+    "input": "A single short sentence.",
+    "expect": [{ "text": "A single short sentence.", "start": 0, "end": 24 }],
+    "why": "the trivial one-segment case: text unchanged, offsets span the whole input."
+  }
+]

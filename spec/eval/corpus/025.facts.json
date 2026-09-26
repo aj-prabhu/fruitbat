@@ -1,0 +1,31 @@
+{
+  "id": "025",
+  "key_facts": [
+    "MARLEY was dead: to begin with. There is no doubt whatever about that.",
+    "Scrooge never painted out Old Marley's name.",
+    "my clerk, with fifteen shillings a week, and a wife and family",
+    "\"Mr. Marley has been dead these seven years,\" Scrooge replied.",
+    "You will be haunted,\" resumed the Ghost, \"by Three Spirits.",
+    "Expect the first to-morrow, when the bell tolls One.",
+    "It was a strange figure--like a child",
+    "I am the Ghost of Christmas Past.",
+    "Why, it's old Fezziwig! Bless his heart; it's Fezziwig alive again!",
+    "I release you. With a full heart, for the love of him you once were."
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Scrooge complained that his clerk earned thirty shillings a week.",
+      "distinctive_tokens": ["thirty", "complained"]
+    },
+    {
+      "claim": "All three spirits are scheduled to visit Scrooge simultaneously.",
+      "distinctive_tokens": ["simultaneously", "scheduled"]
+    },
+    {
+      "claim": "Marley's ghost says his spirit travelled the whole world unrestricted while he was alive.",
+      "distinctive_tokens": ["travelled", "unrestricted"]
+    }
+  ],
+  "expected_oneline_keywords": ["scrooge", "christmas carol", "ghost", "marley"],
+  "notes": "Multi-chunk role (11.5k words, two Staves): the three spirits arrive on three SEPARATE nights, and Marley explicitly says his spirit never roved beyond his own doorstep -- both are negation/reversal traps."
+}

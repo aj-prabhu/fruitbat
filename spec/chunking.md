@@ -31,4 +31,42 @@ Rules for the TTS worker (S1-04):
 
 ## Token budgets (S0-03)
 
-Filled by S0-03 from the pinned tokenizer (S1-03a): chunk ≤ 1,600 input tokens, 256 reserved for output; sentence-aligned; docs ≤ 1,600 tokens are one chunk; per-chunk bullet caps per level; input limit 100 chunks (≈ 120,000 words); one-line reduction groups ≤ 10, depth ≤ 2.
+Tokens are counted with the pinned summarizer's tokenizer (`web/src/core/tokens.ts`, S1-03a;
+Mac counts with its own tokenizer and its own fixtures, `tokens.mac.json`). Word counts are
+never used to enforce a budget.
+
+| Budget | Value |
+|---|---|
+| `chunk_input_tokens` | 1,600 (the text of one chunk, before the prompt) |
+| `output_reserved_tokens` | 256 (per level `max_new_tokens` in `spec/dial.json` is ≤ this) |
+| `single_chunk_tokens` | 1,600: a document at or under this is one chunk |
+| `max_chunks` | 100 (≈ 120,000 words). Over: refuse with `notice.input_limit`, shown and spoken. |
+| `reduce_group_size` | 10 one-liners per reduce call |
+| `reduce_max_depth` | 2 (10 → 100 chunks) |
+
+Rules:
+1. Chunks are sentence-aligned: a chunk ends at a sentence boundary (`Intl.Segmenter` on web,
+   `NLTokenizer` on Mac) and never splits a sentence.
+2. A sentence longer than `chunk_input_tokens` is first split by the TTS-safe rule above (clause
+   punctuation, then word boundaries, source offsets kept); the pieces are then chunked as
+   sentences.
+3. Every segment carries `[start, end)` character offsets into the normalized source. Segments
+   tile the source: no gaps, no overlaps (the coverage test, S1-04).
+4. Per-chunk bullet caps come from `spec/dial.json` (`max_bullets_per_chunk`,
+   `max_words_per_bullet`). The bullet parser enforces them: extra bullets are dropped, an
+   over-long bullet is kept but counted (`bullet_overlength`). The prompt asks; the parser
+   enforces. On doc `011` (CPU try-out, 2026-09-23) Caveman returned 7 bullets where the prompt
+   asked for 2–5, so the parser cap is not optional.
+5. With the real pinned tokenizer (S1-03, 2026-09-24): docs `001–010` are one chunk, `011` is
+   2 chunks (1,329 words ≈ 1,700 tokens), `025` is 10; `025` is the multi-chunk fixture for the
+   graded set. Word counts only estimate tokens; the budget is always measured.
+
+## One-line policy on more than one chunk
+
+1. Every chunk gets a one-liner (`prompts/oneline.md`), grounded against its chunk.
+2. A cut one-liner contributes nothing and is counted. Nothing per-chunk is spoken.
+3. Survivors are reduced in groups of ≤ `reduce_group_size` with `prompts/reduce-oneline.md`,
+   at most `reduce_max_depth` deep; the reduced line is grounded against the lines it came from.
+4. If more than `max_cut_fraction` (0.5) of the chunks were cut, One line fails over to Short with
+   `notice.oneline_failed`, shown and spoken.
+5. Only the final line is spoken.
