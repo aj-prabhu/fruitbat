@@ -1,0 +1,96 @@
+name: Health
+
+# Weekly infra sweep (docs/PLAN.md S0-06): the model URLs still resolve, the Spaces respond, no
+# high/critical npm advisories, and a Playwright WASM smoke test against the public Space. A
+# failure files (or comments on) one `health: <date>` issue, labeled `health`, so an outage
+# doesn't go unnoticed between releases.
+#
+# vars.HEALTH_SKIP_SPACE controls scripts/health-check.sh's Space checks (unset/empty = run
+# them). Leave it set to `1` (Settings > Secrets and variables > Actions > Variables) until
+# web-v0.1.0 makes the public Space public (docs/PLAN.md rule 10) — until then the public Space
+# 401s and would fail this job every week for a reason nobody can fix yet.
+permissions:
+  contents: read
+  issues: write # the failure handler files or comments on the health issue (Codex review, PR #11)
+
+on:
+  schedule:
+    - cron: "17 9 * * 1" # Mondays 09:17 UTC
+  workflow_dispatch:
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run health check
+        env:
+          HEALTH_SKIP_SPACE: ${{ vars.HEALTH_SKIP_SPACE }}
+        run: scripts/health-check.sh
+
+      - name: File or update health issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const today = new Date().toISOString().slice(0, 10);
+            const title = `health: ${today}`;
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+
+            // Make sure the `health` label exists before we reference it.
+            try {
+              await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name: "health" });
+            } catch (err) {
+              if (err.status !== 404) throw err;
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: "health",
+                color: "D93F0B",
+                description: "Weekly health workflow failure",
+              });
+            }
+
+            // Never create a second issue for the same day — comment on the existing one instead.
+            const openIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: "open",
+              labels: "health",
+              per_page: 100,
+            });
+            const existing = openIssues.data.find((issue) => issue.title === title);
+
+            if (existing) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existing.number,
+                body: `Health check failed again: ${runUrl}`,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body: `Weekly health check failed: ${runUrl}`,
+                labels: ["health"],
+              });
+            }

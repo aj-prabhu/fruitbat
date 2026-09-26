@@ -16,7 +16,10 @@ The web app makes network requests for exactly two things, and nothing else:
 That's it. Every request is a `GET`. No analytics, no crash reporting, no ping of any kind. The
 text you paste or select, the bullets it generates, and the audio it plays are never sent
 anywhere -- they exist only in your browser's memory while the page is open. A Content-Security-Policy
-on every page enforces this list in your browser, not only in our own code.
+on every page enforces this list in your browser for the page itself. The summarizer and the voice
+run in background workers and a static host can't give those their own policy. There every request
+goes through one allowlist in our code, and our privacy test records every request the page and its
+workers make.
 
 ## macOS app
 

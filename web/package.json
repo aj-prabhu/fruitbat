@@ -13,7 +13,8 @@
     "test:e2e": "playwright test",
     "test:e2e:warm": "node tests/model-cache-warm.mjs",
     "measure:tts": "node scripts/measure-tts-limit.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:generated": "node ../scripts/csp.mjs --check && node ../scripts/privacy-md.mjs --check"
   },
   "dependencies": {
     "@huggingface/transformers": "4.3.0",

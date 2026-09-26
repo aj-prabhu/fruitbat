@@ -50,6 +50,8 @@ export interface LoadedOut {
   role: string;
   /** true when the low-end tier replaced the requested one after a memory failure */
   downgraded: boolean;
+  /** model bytes fetched over the network by this load (0 when every file came from the cache) */
+  netBytes?: number;
   ms: number;
 }
 export interface ProbeOut {

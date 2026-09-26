@@ -83,6 +83,9 @@ jobs:
       - name: Lint
         working-directory: web
         run: npm run lint --if-present
+      - name: Generated files are current (CSP meta tags, PRIVACY.md)
+        working-directory: web
+        run: npm run check:generated
       - name: Unit tests
         working-directory: web
         run: npm test --if-present

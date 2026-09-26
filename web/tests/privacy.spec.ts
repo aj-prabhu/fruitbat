@@ -1,4 +1,4 @@
-import { test, expect, type Page, type Request as PwRequest } from "@playwright/test";
+import { test, expect, type Page, type Request as PwRequest, type Response as PwResponse } from "@playwright/test";
 import { gotoIsolated } from "./isolated";
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
@@ -158,7 +158,10 @@ function validateRedirectTarget(u: URL, allow: Allowlist): { ok: boolean; reason
     const candidate = `https://huggingface.co/${cacheMatch[1]}/resolve/${cacheMatch[2]}/${cacheMatch[3]}`;
     if (allow.hubExact.has(candidate)) matched = candidate;
   }
-  if (!matched) {
+  // Form B (CDN) must also have the bridge object path, as net.ts requires: a filename parameter
+  // alone would let an arbitrary unpinned object through (Codex review, PR #21).
+  const bridgePath = /^\/xet-bridge-[a-z0-9-]+\/[0-9a-f]{8,64}\/[0-9a-f]{8,64}$/.test(u.pathname);
+  if (!matched && bridgePath) {
     const disp = u.searchParams.get("response-content-disposition");
     if (disp) {
       const m = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disp);
@@ -200,6 +203,8 @@ interface Rec {
   redirectedFrom: string | null;
   status: number | null;
   finalUrlHeader: string | null;
+  /** made by the coi-serviceworker on the page's behalf (visible at context scope only) */
+  fromServiceWorker: boolean;
 }
 
 function scan(where: string, value: string, hits: string[]): void {
@@ -213,10 +218,24 @@ async function attachRecorder(page: Page) {
   const byUrl = new Map<string, Rec>();
   const canaryHits: string[] = [];
   const pageErrors: string[] = [];
+  // Listener work is async (allHeaders(), response bodies): settle() waits for all of it, so the
+  // no-leak assertions never run ahead of a scan still in progress (Codex review, PR #21).
+  const inflight = new Set<Promise<void>>();
+  const track = (p: Promise<void>) => {
+    inflight.add(p);
+    void p.finally(() => inflight.delete(p));
+  };
+  const settle = async () => {
+    while (inflight.size) await Promise.allSettled([...inflight]);
+  };
 
   page.on("pageerror", (e) => pageErrors.push(String(e)));
 
-  page.on("request", (req: PwRequest) => {
+  // Context scope, not page scope: after gotoIsolated the COI service worker fetches on the page's
+  // behalf, and those requests are reported on the context only (Codex review, PR #21).
+  const ctx = page.context();
+  ctx.on("request", (req: PwRequest) => void track(onRequest(req)));
+  async function onRequest(req: PwRequest): Promise<void> {
     const rec: Rec = {
       url: req.url(),
       method: req.method(),
@@ -224,17 +243,26 @@ async function attachRecorder(page: Page) {
       redirectedFrom: req.redirectedFrom()?.url() ?? null,
       status: null,
       finalUrlHeader: null,
+      fromServiceWorker: req.serviceWorker() !== null,
     };
     records.push(rec);
     byUrl.set(rec.url, rec);
     scan(`request url`, rec.url, canaryHits);
-    const headers = req.headers();
+    // allHeaders(), not headers(): the latter omits security-related headers such as Cookie, and a
+    // leak through a cookie on an allowed request must fail this test too (Codex review, PR #21).
+    let headers: Record<string, string>;
+    try {
+      headers = await req.allHeaders();
+    } catch {
+      headers = req.headers(); // the request was gone before its headers could be read
+    }
     for (const [k, v] of Object.entries(headers)) scan(`request header ${k} on ${rec.url}`, v, canaryHits);
     const body = req.postData();
     if (body) scan(`request body on ${rec.url}`, body, canaryHits);
-  });
+  }
 
-  page.on("response", async (res) => {
+  ctx.on("response", (res) => void track(onResponse(res)));
+  async function onResponse(res: PwResponse): Promise<void> {
     const req = res.request();
     const rec = byUrl.get(req.url());
     const headers = res.headers();
@@ -255,7 +283,7 @@ async function attachRecorder(page: Page) {
         }
       }
     }
-  });
+  }
 
   // context.route to see request bodies as raw bytes too (a non-UTF8 body would mangle
   // postData()'s string form): continues every request unmodified, just observes.
@@ -265,7 +293,7 @@ async function attachRecorder(page: Page) {
     await route.continue();
   });
 
-  return { records, canaryHits, pageErrors };
+  return { records, canaryHits, pageErrors, settle };
 }
 
 function evaluateAllowlist(records: Rec[], allow: Allowlist, baseOrigin: string): { violations: string[]; hubSeen: Set<string> } {
@@ -289,7 +317,9 @@ function evaluateAllowlist(records: Rec[], allow: Allowlist, baseOrigin: string)
       const v = validateRedirectTarget(u, allow);
       if (!v.ok) violations.push(`redirect hop ${rec.url}: ${v.reason}`);
     } else if (u.origin === baseOrigin) {
-      if (rec.resourceType === "document") {
+      if (rec.resourceType === "document" || (rec.fromServiceWorker && u.pathname.match(/^\/([\w-]+\.html)?$/))) {
+        // A navigation, or the coi-serviceworker re-fetching that same page to add its isolation
+        // headers: only the test harness's own flags may ride on it.
         const badParams = [...u.searchParams.keys()].filter((k) => !TEST_HARNESS_PARAMS.has(k));
         if (badParams.length) violations.push(`unexpected query param(s) on navigation ${rec.url}: ${badParams.join(",")}`);
       } else if (u.search !== "") {
@@ -440,7 +470,7 @@ test.describe("privacy: full sweep on the real app", () => {
     const models = readJson<ModelsJson>("spec/models.json");
     const allow = buildAllowlist(network);
     await installStubs(page);
-    const { records, canaryHits, pageErrors } = await attachRecorder(page);
+    const { records, canaryHits, pageErrors, settle } = await attachRecorder(page);
 
     await gotoIsolated(page, "/?llm=fake");
     await waitReady(page);
@@ -452,6 +482,7 @@ test.describe("privacy: full sweep on the real app", () => {
 
     await assertCspBlocksOffList(page);
 
+    await settle();
     expect(canaryHits, "canary must never appear in any request URL, header, or scanned body").toEqual([]);
     expect(pageErrors, "WebSocket/RTCPeerConnection/sendBeacon/EventSource stubs must never fire").toEqual([]);
 
@@ -472,7 +503,7 @@ test.describe("privacy: full sweep on the real app", () => {
     const models = readJson<ModelsJson>("spec/models.json");
     const allow = buildAllowlist(network);
     await installStubs(page);
-    const { records, canaryHits, pageErrors } = await attachRecorder(page);
+    const { records, canaryHits, pageErrors, settle } = await attachRecorder(page);
 
     await gotoIsolated(page, "/"); // no ?llm=fake: the real summarizer path, with WebGPU disabled by the project
     await waitReady(page);
@@ -483,6 +514,7 @@ test.describe("privacy: full sweep on the real app", () => {
     expect(snap.notices).toContain("notice.no_webgpu");
     expect(snap.bullets.length, "no bullets from a degraded attempt").toBe(0);
 
+    await settle();
     expect(canaryHits).toEqual([]);
     expect(pageErrors).toEqual([]);
 
@@ -517,7 +549,7 @@ test.describe("privacy: full sweep on the real app", () => {
     const models = readJson<ModelsJson>("spec/models.json");
     const allow = buildAllowlist(network);
     await installStubs(page);
-    const { records, canaryHits, pageErrors } = await attachRecorder(page);
+    const { records, canaryHits, pageErrors, settle } = await attachRecorder(page);
 
     await gotoIsolated(page, "/"); // no ?llm=fake: real summarizer + real Kokoro
     await waitReady(page, 15 * 60_000); // Kokoro (~92 MB) under contended sandbox bandwidth
@@ -531,6 +563,7 @@ test.describe("privacy: full sweep on the real app", () => {
 
     await assertCspBlocksOffList(page);
 
+    await settle();
     expect(canaryHits).toEqual([]);
     expect(pageErrors).toEqual([]);
 
