@@ -184,7 +184,13 @@ export function App() {
     <div class="app-shell">
       <header class="app-header">
         <h1 class="app-title">{t("app.title")}</h1>
-        <Dial level={level} onChange={setLevel} />
+        <Dial
+          level={level}
+          onChange={(l) => {
+            setSharedLevel(l); // synchronous, so a read triggered right after the click sees it (Codex merge-gate review, PR #12)
+            setLevel(l);
+          }}
+        />
         <ThemeToggle />
       </header>
       <Loading />

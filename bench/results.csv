@@ -1,0 +1,1 @@
+schema_version,target,device,level,browser,browser_major,os,os_major,cache_state,model_id,model_rev,dtype,doc_id,commit,date,machine_id,ttfa_ms,gen_ms,tok_s,rtf,gap_ms,stop_ms,coverage,bullets_total,bullets_cut,cut_rate,facts_token_hit,halluc_flags,forbidden_hits,oneline_keyword_hit,tts_overlimit,peak_mb,heap_mb

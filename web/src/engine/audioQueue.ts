@@ -81,6 +81,9 @@ const TICK_MS = 25;
 
 const EPS = 0.005;
 
+/** Handed out by requestSent(); settling it only counts for the run that sent it. */
+export type RequestTicket = { run: number; seconds: number };
+
 export class AudioQueue {
   readonly maxAheadSeconds: number;
   readonly maxInFlight: number;
@@ -134,13 +137,23 @@ export class AudioQueue {
     this.maybeDrain();
   }
 
-  /** The driver calls these around each worker request so the in-flight bound holds. */
-  requestSent(): void {
+  /**
+   * The driver calls these around each worker request so the in-flight bound holds. `seconds`
+   * is the request's estimated audio, reserved against the ahead cap until it settles, so
+   * three requests sent at 29 s buffered cannot push the queue far past 30 s (Codex review, PR #17).
+   */
+  requestSent(seconds = 0): RequestTicket {
     this.inFlight++;
+    this.reserved += seconds;
+    return { run: this.runId, seconds };
   }
-  requestSettled(): void {
+  /** A request from a run that was stopped or replaced no longer counts against this run. */
+  requestSettled(ticket: RequestTicket = { run: this.runId, seconds: 0 }): void {
+    if (ticket.run !== this.runId) return;
     this.inFlight = Math.max(0, this.inFlight - 1);
+    this.reserved = Math.max(0, this.reserved - ticket.seconds);
   }
+  private reserved = 0;
   get requestsInFlight(): number {
     return this.inFlight;
   }
@@ -150,9 +163,16 @@ export class AudioQueue {
     return Math.max(0, this.nextStart - this.ctx.currentTime);
   }
 
-  /** Back-pressure: may the driver send another synthesis request? */
-  canAccept(): boolean {
-    return this.inFlight < this.maxInFlight && this.aheadSeconds() < this.maxAheadSeconds;
+  /**
+   * Back-pressure: may the driver send a request for about `nextSeconds` of audio? Scheduled plus
+   * reserved plus the new segment must fit the cap. A segment too long to ever fit is still let
+   * through once the queue is nearly empty with nothing in flight, so playback cannot stall.
+   */
+  canAccept(nextSeconds = 0): boolean {
+    if (this.inFlight >= this.maxInFlight) return false;
+    const load = this.aheadSeconds() + this.reserved;
+    if (load + nextSeconds <= this.maxAheadSeconds && load < this.maxAheadSeconds) return true;
+    return this.inFlight === 0 && load <= Math.min(5, this.maxAheadSeconds / 2);
   }
 
   /** Analyser between the sources and the destination, for Pip (S1-08). Null on a fake context. */
@@ -212,6 +232,9 @@ export class AudioQueue {
 
   /** Fire onStart for every scheduled item whose start time the audio clock has reached. */
   private tick(): void {
+    // Paused (context suspended): nothing is audible, so nothing "starts", even a buffer
+    // scheduled at the frozen current time (Codex review, PR #17).
+    if (this.ctx.state === "suspended") return;
     const now = this.ctx.currentTime;
     for (const s of this.scheduled) {
       if (s.started || s.ended || s.item.runId !== this.runId) continue;
@@ -263,6 +286,7 @@ export class AudioQueue {
     this.runId++;
     this.closed = false;
     this.inFlight = 0;
+    this.reserved = 0;
     return (typeof performance !== "undefined" ? performance.now() : Date.now()) - t0;
   }
 
