@@ -320,6 +320,10 @@ export class Orchestrator {
    *  messages" switch, not added to the panel's notices (rule 8; Codex review, PR #23). */
   speakMessage(key: string): void {
     if (!this.speakMessages) return;
+    // Never the reason for a voice download (rule 11: mobile / data saver load on demand only), and
+    // never over a read or summary in progress; the dialog's own text and its aria-live region carry
+    // the message then (Codex review, PR #23).
+    if (!this.voiceReady || this.busy()) return;
     this.spoken.push(key);
     void this.voice.speak(key).catch(() => undefined);
   }
