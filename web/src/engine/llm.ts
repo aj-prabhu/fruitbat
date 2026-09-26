@@ -211,6 +211,10 @@ export class Summarizer {
         : new Worker(new URL("../workers/llm.worker.ts", import.meta.url), { type: "module" });
     this.worker.onmessage = (e: MessageEvent<WorkerToMain>) => this.onWorkerMessage(e.data);
     this.worker.onerror = (e) => {
+      // Drop the failed worker so a retry starts a fresh one (Codex review, PR #16).
+      this.worker?.terminate();
+      this.worker = null;
+      this.loaded = false;
       this.state = "failed";
       this.error = `worker:${e.message}`;
       this.pending?.reject(new Error(this.error));
