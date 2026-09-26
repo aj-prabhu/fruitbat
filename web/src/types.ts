@@ -49,5 +49,7 @@ declare global {
     "fruitbat:stop": CustomEvent<undefined>;
     /** the demo recording is about to play (main.tsx stops a live run, never a model download) */
     "fruitbat:demo": CustomEvent<undefined>;
+    /** the orchestrator started a live run (any kind); the demo recording stops */
+    "fruitbat:live": CustomEvent<undefined>;
   }
 }

@@ -100,10 +100,12 @@ export function Demo() {
     };
     window.addEventListener("fruitbat:stop", stop);
     window.addEventListener("fruitbat:run", stop); // a live read never plays over the recording
+    window.addEventListener("fruitbat:live", stop); // nor a dial regeneration or "Read this part"
     document.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("fruitbat:stop", stop);
       window.removeEventListener("fruitbat:run", stop);
+      window.removeEventListener("fruitbat:live", stop);
       document.removeEventListener("keydown", onKey);
     };
   }, []);

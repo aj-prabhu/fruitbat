@@ -421,6 +421,9 @@ export class Orchestrator {
   private regenFrom: number | null = null;
 
   private async begin(id: number, level: Level, o: { fromChunk: number; base: number; end: number; keep?: boolean }): Promise<void> {
+    // Every live run (a new read, a dial regeneration, "Read this part") silences the demo
+    // recording, which listens for this without importing the engine (Codex review, PR #20).
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("fruitbat:live"));
     this.play = reducePlay(this.play, "reset");
     if (!o.keep) {
       this.bullets = [];
