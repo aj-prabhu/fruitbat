@@ -91,7 +91,11 @@ export function Report({ onClose }: { onClose: () => void }) {
             if (!report) return;
             // A denied clipboard (browser permission, embedding policy) says so and selects the
             // preview, so the report can still be copied by hand (Codex review, PR #23).
-            void navigator.clipboard.writeText(buildCopyText(report)).then(
+            // No Clipboard API at all (a plain-HTTP preview, an old browser) takes the same
+            // "copy it by hand" path as a refused one (Codex review, PR #23).
+            const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+            const write = clip ? clip.writeText(buildCopyText(report)) : Promise.reject(new Error("no clipboard"));
+            void write.then(
               () => {
                 setCopyFailed(false);
                 setCopied(true);

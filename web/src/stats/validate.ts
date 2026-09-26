@@ -45,13 +45,19 @@ const SCHEMA_FILES: Record<string, JsonSchemaNode> = {
   "run-stats.schema.json": runStatsSchema as unknown as JsonSchemaNode,
 };
 
-function jsonType(value: unknown): "null" | "array" | "integer" | "number" | "string" | "boolean" | "object" {
+function jsonType(value: unknown): "null" | "array" | "integer" | "number" | "string" | "boolean" | "object" | "invalid" {
   if (value === null) return "null";
+  // undefined, functions, symbols, bigints and non-finite numbers are not JSON: they match no
+  // schema type, so a missing or broken value is reported, never waved through as an object
+  // (Codex review, PR #23).
+  if (value === undefined || typeof value === "function" || typeof value === "symbol" || typeof value === "bigint") return "invalid";
+  if (typeof value === "number" && !Number.isFinite(value)) return "invalid";
   if (Array.isArray(value)) return "array";
   if (typeof value === "number") return Number.isInteger(value) ? "integer" : "number";
   if (typeof value === "string") return "string";
   if (typeof value === "boolean") return "boolean";
-  return "object";
+  if (typeof value === "object") return "object";
+  return "invalid";
 }
 
 function matchesType(value: unknown, want: string): boolean {

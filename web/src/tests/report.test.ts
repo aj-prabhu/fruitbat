@@ -9,6 +9,7 @@ import type { Event } from "../engine/events";
 import type { RunStats as GenStats } from "../engine/llm";
 import type { OrchestratorStats } from "../engine/orchestrator";
 import { buildCopyText, buildIssueUrl, buildReport, osString, validateBugReport } from "../report/build";
+import { validateAgainst } from "../stats/validate";
 import type { StatsRow } from "../stats/store";
 
 const BENCH_EXAMPLE_ROW = new URL("../../../bench/example-row.json", import.meta.url);
@@ -71,6 +72,15 @@ const SHORT_STATS: OrchestratorStats = {
 };
 
 // ---------------------------------------------------------------- buildReport
+describe("validateAgainst", () => {
+  it("an undefined or non-finite value never passes as an object (Codex review, PR #23)", () => {
+    const row = JSON.parse(readFileSync(new URL("../../../bench/example-row.json", import.meta.url), "utf8")) as Record<string, unknown>;
+    expect(validateAgainst("run-stats.schema.json", row).ok).toBe(true);
+    expect(validateAgainst("run-stats.schema.json", { ...row, ttfa_ms: undefined }).ok).toBe(false);
+    expect(validateAgainst("run-stats.schema.json", { ...row, ttfa_ms: Number.NaN }).ok).toBe(false);
+  });
+});
+
 describe("osString", () => {
   it("reads iOS before macOS: iPhone and iPad user agents say 'like Mac OS X' (Codex review, PR #23)", () => {
     expect(osString("Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15")).toBe("ios 18");
