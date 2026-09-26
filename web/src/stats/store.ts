@@ -24,6 +24,8 @@ export interface StatsEnv {
   commit: string;
   date: string;
   doc_id: string;
+  /** JS heap in MB sampled when the row is recorded (Chrome's performance.memory), else null. */
+  heap_mb?: number | null;
 }
 
 // ---------------------------------------------------------------- doc_id (bench injection point)
@@ -96,7 +98,9 @@ function buildCommit(): string {
  *  without calling `record()`; `buildRow` itself stays a pure function of its two arguments. */
 export function detectEnv(): StatsEnv {
   const ua = detectUA();
-  return { ...ua, machine_id: "web", commit: buildCommit(), date: new Date().toISOString(), doc_id: getDocId() };
+  const mem = typeof performance !== "undefined" ? (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory : undefined;
+  const heap_mb = mem ? Math.round((mem.usedJSHeapSize / 1e6) * 10) / 10 : null;
+  return { ...ua, machine_id: "web", commit: buildCommit(), date: new Date().toISOString(), doc_id: getDocId(), heap_mb };
 }
 
 // ---------------------------------------------------------------- buildRow
@@ -166,7 +170,9 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
     tok_s: gen?.tok_s ?? null,
     rtf: voiceRun?.rtf ?? voiceRow?.rtf ?? null,
     gap_ms: voiceRun?.gap_ms ?? voiceRow?.gap_ms ?? null,
-    stop_ms: stats.stop_ms,
+    // A recorded run finished; stopped runs are never recorded. The orchestrator's stop_ms belongs
+    // to whichever run was stopped before this one, so it never goes on this row (Codex review, PR #22).
+    stop_ms: null,
     coverage: level === "readall" ? (voiceRow?.coverage ?? null) : null,
     bullets_total: bulletsTotal,
     bullets_cut: bulletsCut,
@@ -179,7 +185,9 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
     oneline_keyword_hit: null,
     tts_overlimit: voiceRun?.tts_overlimit ?? voiceRow?.tts_overlimit ?? 0,
     peak_mb: null, // Mac only (bench/README.md gate table)
-    heap_mb: voiceRow?.heap_mb ?? null,
+    // Sampled when this row is recorded, for every level; the voice's own row is Read-all only
+    // (Codex review, PR #22).
+    heap_mb: env.heap_mb ?? null,
   };
 }
 

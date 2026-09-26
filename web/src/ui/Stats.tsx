@@ -20,7 +20,6 @@ const COLUMNS: (keyof StatsRow)[] = [
   "ttfa_ms",
   "tok_s",
   "rtf",
-  "stop_ms",
   "bullets_total",
   "bullets_cut",
 ];
@@ -36,7 +35,6 @@ const COLUMN_LABEL: Record<string, string> = {
   ttfa_ms: "stats.col.ttfa_ms",
   tok_s: "stats.col.tok_s",
   rtf: "stats.col.rtf",
-  stop_ms: "stats.col.stop_ms",
   bullets_total: "stats.col.bullets_total",
   bullets_cut: "stats.col.bullets_cut",
 };

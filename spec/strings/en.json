@@ -108,7 +108,6 @@
     "stats.col.ttfa_ms": "First audio (ms)",
     "stats.col.tok_s": "Tokens per second",
     "stats.col.rtf": "Voice speed (x real time)",
-    "stats.col.stop_ms": "Stop (ms)",
     "stats.col.bullets_total": "Bullets",
     "stats.col.bullets_cut": "Bullets cut",
     "a11y.panel_region": "Fruitbat panel",
