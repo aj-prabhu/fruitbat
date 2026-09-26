@@ -1,0 +1,29 @@
+{
+  "id": "015",
+  "key_facts": [
+    "A fire can become life-threatening in just two minutes. A residence can be engulfed in flames in five minutes.",
+    "In less than 30 seconds a small flame can turn into a major fire.",
+    "Room temperatures in a fire can be 100 degrees at floor level and rise to 600 degrees at eye level.",
+    "Replace the entire smoke alarm unit every 10 years or according to manufacturer’s instructions.",
+    "Find two ways to get out of each room in the event the primary way is blocked by fire or smoke.",
+    "Use cool water to treat the burn immediately for three to five minutes.",
+    "Position barbecue grills at least 10 feet away from siding and deck railings",
+    "Portable generators should NEVER be used indoors and should only be refueled outdoors"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "A residence can be fully engulfed in flames in fifteen minutes.",
+      "distinctive_tokens": ["fifteen", "fully"]
+    },
+    {
+      "claim": "It's fine to run a portable generator indoors if a window is cracked open.",
+      "distinctive_tokens": ["fine", "cracked"]
+    },
+    {
+      "claim": "It's recommended to temporarily disable smoke alarms while cooking to avoid false alarms.",
+      "distinctive_tokens": ["recommended", "temporarily"]
+    }
+  ],
+  "expected_oneline_keywords": ["fire safety", "smoke alarms", "escape plan", "home fires"],
+  "notes": "\"NEVER\" and \"Never disable\" are explicit negations a summary must keep intact."
+}

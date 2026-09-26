@@ -221,10 +221,60 @@ body {
   outline-offset: 2px;
 }
 
+.paste-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gutter);
+}
+
 .word-count {
   margin: 0;
   color: var(--color-muted);
   font-size: 0.85rem;
+}
+
+.read-button {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border-radius: var(--border-radius);
+  padding: 6px 14px;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.read-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.read-button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The selection "Read" chip (S1-02): a small floating button positioned in JS (ReadChip.tsx)
+   near the current selection's bounding rect, so left/top are set inline per instance. */
+.read-chip {
+  position: fixed;
+  z-index: 10;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.read-chip:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
 }
 
 .panel {

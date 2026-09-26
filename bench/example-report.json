@@ -1,0 +1,66 @@
+{
+  "app": "web",
+  "version": "0.1.0",
+  "env": {
+    "ua": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+    "gpu": "Apple M1 Pro",
+    "os": "macOS 15.1",
+    "chip": "Apple M1 Pro",
+    "ram_bucket": "16gb"
+  },
+  "models": [
+    { "id": "onnx-community/Qwen3.5-0.8B-Text-ONNX", "rev": "1e45daba048899e7f771657ada617ec49350aa91" },
+    { "id": "onnx-community/Kokoro-82M-v1.0-ONNX", "rev": "1939ad2a8e416c0acfeecc08a694d14ef25f2231" }
+  ],
+  "run_stats": [
+    {
+      "schema_version": 1,
+      "target": "web",
+      "device": "webgpu",
+      "level": "short",
+      "browser": "chrome",
+      "browser_major": 130,
+      "os": "macos",
+      "os_major": 15,
+      "cache_state": "warm",
+      "model_id": "onnx-community/Qwen3.5-0.8B-Text-ONNX",
+      "model_rev": "1e45daba048899e7f771657ada617ec49350aa91",
+      "dtype": "q4f16",
+      "doc_id": "011",
+      "commit": "81092b9",
+      "date": "2026-09-24T12:00:00Z",
+      "machine_id": "web",
+      "ttfa_ms": 5200,
+      "gen_ms": 3100,
+      "tok_s": 22.5,
+      "rtf": 1.4,
+      "gap_ms": 90,
+      "stop_ms": 140,
+      "coverage": null,
+      "bullets_total": 5,
+      "bullets_cut": 0,
+      "cut_rate": 0.0,
+      "facts_token_hit": 0.93,
+      "halluc_flags": 0,
+      "forbidden_hits": 0,
+      "oneline_keyword_hit": null,
+      "tts_overlimit": 0,
+      "peak_mb": 540,
+      "heap_mb": 310
+    }
+  ],
+  "events": [
+    { "event": "run_start", "t_ms": 0, "fields": { "level": "short", "chunk_count": 3 } },
+    {
+      "event": "model_load_done",
+      "t_ms": 4800,
+      "fields": {
+        "model_id": "onnx-community/Qwen3.5-0.8B-Text-ONNX",
+        "duration_ms": 4800,
+        "bytes": 469331968
+      }
+    },
+    { "event": "run_done", "t_ms": 8200, "fields": { "level": "short", "chunk_count": 3, "duration_ms": 8200 } }
+  ],
+  "user_description": "The bullets stopped updating after I moved the dial to Caveman mid-read. Read all still worked."
+}

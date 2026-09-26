@@ -1,0 +1,29 @@
+{
+  "id": "004",
+  "key_facts": [
+    "Booked my flight into Reno for Wednesday the 25th, landing at 4:10pm, not the 26th",
+    "it's $640 for the four nights, not $600, because the site added a $40 cleaning fee",
+    "Split four ways between you, me, Dad, and Priya, that's $160 each instead of $150",
+    "I already sent Dad $160 through the app, so he doesn't owe anything else",
+    "the cabin has three bedrooms, not four, so somebody's on the pull-out",
+    "the potatoes and the green beans), not dessert this time, since Priya said she wants to do pie",
+    "She now lands Tuesday night instead of Wednesday morning",
+    "I'll finalize the rental decision by Friday, not later"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "The cabin now costs $700 for the week, driven up by a pet fee.",
+      "distinctive_tokens": ["700", "pet"]
+    },
+    {
+      "claim": "Dad reimbursed Jonah $160 for the cabin booking.",
+      "distinctive_tokens": ["reimbursed", "booking"]
+    },
+    {
+      "claim": "Priya has already paid her full share of the cabin costs.",
+      "distinctive_tokens": ["paid", "full"]
+    }
+  ],
+  "expected_oneline_keywords": ["thanksgiving", "flights", "cabin", "split"],
+  "notes": "Every fact in this email is a self-correction (\"not the 26th\", \"not $600\", \"not four\") -- easy to lose the correction and keep the wrong first number."
+}

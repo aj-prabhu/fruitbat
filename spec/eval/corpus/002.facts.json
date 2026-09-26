@@ -1,0 +1,29 @@
+{
+  "id": "002",
+  "key_facts": [
+    "photopigment-bearing autotrophic organisms",
+    "a process that releases oxygen as a byproduct of water splitting",
+    "Some bacteria (e.g. purple bacteria) use bacteriochlorophyll to split hydrogen sulfide as a reductant instead of water",
+    "reaction centers, proteins that contain photosynthetic pigments or chromophores",
+    "sugars are synthesized by a subsequent sequence of light-independent reactions called the Calvin cycle",
+    "The average rate of energy captured by global photosynthesis is approximately 130 terawatts",
+    "convert around 100–115 billion tons (91–104 Pg petagrams, or billions of metric tons), of carbon into biomass per year",
+    "Photosynthesis was discovered in 1779 by Jan Ingenhousz who showed that plants need light, not just soil and water"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Photosynthesis was first discovered in 1850 by a Dutch physician named Jan Ingenhousz.",
+      "distinctive_tokens": ["1850", "physician", "dutch"]
+    },
+    {
+      "claim": "Purple bacteria split seawater and release toxic oxygen instead of sulfur.",
+      "distinctive_tokens": ["seawater", "toxic"]
+    },
+    {
+      "claim": "Archaea like Halobacterium generate about 20 percent of the planet's oxygen supply.",
+      "distinctive_tokens": ["20", "percent"]
+    }
+  ],
+  "expected_oneline_keywords": ["photosynthesis", "light", "energy", "oxygen"],
+  "notes": "Explicit negations (\"does not produce oxygen\") make good dropped-negation traps; numbers are dense (130 TW, 100-115 billion tons, 1779)."
+}

@@ -1,0 +1,43 @@
+{
+  "id": "020",
+  "key_facts": [
+    "His grey eyes shone and twinkled, and his usually pale face was flushed and animated",
+    "a mathematical line, a line of thickness nil, has no real existence",
+    "any real body must have extension in four directions it must have Length, Breadth, Thickness, and—Duration",
+    "Professor Simon Newcomb was expounding this to the New York Mathematical Society only a month or so ago",
+    "here is a portrait of a man at eight years old, another at fifteen, another at seventeen, another at twenty-three, and so on",
+    "Yesterday it was so high, yesterday night it fell, then this morning it rose again, and so gently upward to here",
+    "Our mental existences, which are immaterial and have no dimensions, are passing along the Time-Dimension with a uniform velocity from the cradle to the grave",
+    "Just as we should travel down if we began our existence fifty miles above the earth’s surface"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "The Time Traveller shows portraits of a man at twelve and forty years old.",
+      "distinctive_tokens": [
+        "twelve",
+        "forty"
+      ]
+    },
+    {
+      "claim": "The Provincial Mayor objected that a solid cube could not possibly exist.",
+      "distinctive_tokens": [
+        "objected",
+        "possibly"
+      ]
+    },
+    {
+      "claim": "The Time Traveller argues that an instantaneous cube existing for zero duration is perfectly real.",
+      "distinctive_tokens": [
+        "perfectly",
+        "zero"
+      ]
+    }
+  ],
+  "expected_oneline_keywords": [
+    "time traveller",
+    "fourth dimension",
+    "space",
+    "time"
+  ],
+  "notes": "No sentence-ending punctuation at all (role: unpunctuated) -- segmenter/grounding must work without '.', '!', '?', ';', ':'. Filby objects, not the Provincial Mayor -- a reversal trap."
+}
