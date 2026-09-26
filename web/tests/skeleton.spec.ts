@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./model-cache";
+import type { Page } from "@playwright/test";
 
 // S1-00a proof (docs/PLAN.md): real text -> >= 3 bullets, no <think>, AudioContext running with
 // >= 1 s of PCM played, crossOriginIsolated === true. The LLM test runs on `webgpu-local` only;

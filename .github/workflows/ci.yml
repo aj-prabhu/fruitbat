@@ -109,6 +109,18 @@ jobs:
       - name: Install Playwright browsers
         working-directory: web
         run: npx playwright install --with-deps chromium
+      # S1-13a: web.voice's pinned files (spec/models.json), cached by the file's own hash so a
+      # revision bump (or a models.json edit) invalidates it. actions/cache never fails the job on
+      # a miss -- Run wasm-ci e2e's globalSetup (tests/model-cache.ts) fills a cold/missing cache
+      # itself, so this step is a speed-up, not a dependency.
+      - name: Restore pinned model file cache
+        uses: actions/cache@v4
+        with:
+          path: web/.cache/models
+          key: model-cache-${{ hashFiles('spec/models.json') }}
+      - name: Warm model cache
+        working-directory: web
+        run: npm run test:e2e:warm
       - name: Run wasm-ci e2e
         working-directory: web
         run: npx playwright test --project=wasm-ci
