@@ -160,6 +160,11 @@ export class Summarizer {
     return Math.round(this.tier().files.reduce((a, f) => a + f.bytes, 0) / 1e6);
   }
 
+  /** The model is loaded and probed (the Loading panel's "done" state). */
+  isLoaded(): boolean {
+    return this.loaded;
+  }
+
   /** How many model files have been requested from the Hub so far (0 until the first summary request). */
   requests(): number {
     return this.modelRequests;

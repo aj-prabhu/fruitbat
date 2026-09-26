@@ -91,6 +91,9 @@ export function Demo() {
     const stop = () => {
       const el = audioRef.current;
       if (el && !el.paused) el.pause();
+      // Also when no element is mounted (the next level's track is still loading): otherwise it
+      // would start by itself once it loads (Codex review, PR #20).
+      setPlaying(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") stop();
@@ -108,6 +111,9 @@ export function Demo() {
   const onTryItNow = () => {
     const el = audioRef.current;
     if (!el) return;
+    // A live read or summary never plays under the recording: stop it first, through the same
+    // event Esc uses (this component does not import the engine) (Codex review, PR #20).
+    window.dispatchEvent(new CustomEvent("fruitbat:stop"));
     void el.play().catch(() => setPlaying(false));
   };
 
