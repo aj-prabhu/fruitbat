@@ -18,6 +18,8 @@ export type GenState = "idle" | "probing" | "loading" | "running" | "done" | "fa
 
 /** spec/chunking.md "Token budgets". */
 export const BUDGET = { chunk_input_tokens: 1600, max_chunks: 100 };
+/** Longest the next run waits for the worker to confirm a Stop (one uninterruptible prefill). */
+const ABORT_DRAIN_MS = 15_000;
 
 interface DialLevel {
   id: string;
@@ -124,6 +126,10 @@ export class Summarizer {
   private loaded = false;
   private modelSpec: (PinnedModel & { role: string }) | null = null;
   private pending: Pending | null = null;
+  /** In-flight model load, shared by overlapping callers (Codex review, PR #16). */
+  private loading: Promise<boolean> | null = null;
+  /** Settles once the worker confirms the last Stop, so the next run never overlaps it. */
+  private drain: Promise<void> | null = null;
   private waiters = new Map<string, { resolve: (m: WorkerToMain) => void; reject: (e: Error) => void }>();
   private modelRequests = 0; // model files requested (one per Transformers.js "initiate")
   private runStats: RunStats = emptyStats();
@@ -208,6 +214,14 @@ export class Summarizer {
   }
 
   private onWorkerMessage(m: WorkerToMain): void {
+    if (m.type === "aborted") {
+      // The Stop confirmation settles the drain even if a later load already bumped runId.
+      const w = this.waiters.get(`aborted:${m.runId}`);
+      if (w) {
+        this.waiters.delete(`aborted:${m.runId}`);
+        w.resolve(m);
+      }
+    }
     if (m.runId !== this.runId) return; // stale run: dropped (Cancellation)
     if (m.type === "progress") {
       if (m.status === "initiate") this.modelRequests++;
@@ -233,11 +247,6 @@ export class Summarizer {
       const p = this.pending;
       this.pending = null;
       p?.resolve({ tokens: 0, ms: 0, aborted: true });
-      const w = this.waiters.get(`aborted:${m.runId}`);
-      if (w) {
-        this.waiters.delete(`aborted:${m.runId}`);
-        w.resolve(m);
-      }
       return;
     }
     if (m.type === "error") {
@@ -266,6 +275,27 @@ export class Summarizer {
    */
   async ensureLoaded(opts: { signal?: AbortSignal } = {}): Promise<boolean> {
     if (this.loaded) return true;
+    if (opts.signal?.aborted) return false;
+    if (this.loading) {
+      // A second caller joins the load already running; its signal can still stop it.
+      const abort = () => this.abort();
+      opts.signal?.addEventListener("abort", abort, { once: true });
+      try {
+        return await this.loading;
+      } finally {
+        opts.signal?.removeEventListener("abort", abort);
+      }
+    }
+    const p = this.loadOnce(opts);
+    this.loading = p;
+    try {
+      return await p;
+    } finally {
+      if (this.loading === p) this.loading = null;
+    }
+  }
+
+  private async loadOnce(opts: { signal?: AbortSignal }): Promise<boolean> {
     const gpu = await this.probe();
     if (!gpu.ok) return false;
     this.state = "loading";
@@ -357,6 +387,32 @@ export class Summarizer {
         w.reject(err);
       }
     }
+    this.armDrain(runId);
+  }
+
+  /**
+   * Stop resolves the UI at once, but the worker may still be finishing an interrupted
+   * generate. The next run waits for the worker's "aborted" (capped, so a lost message
+   * cannot wedge the app) before it posts anything (Codex review, PR #16).
+   */
+  private armDrain(runId: number): void {
+    const key = `aborted:${runId}`;
+    const confirmed = this.waitFor("aborted", runId).then(
+      () => undefined,
+      () => undefined,
+    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const capped = new Promise<void>((r) => {
+      timer = setTimeout(() => {
+        this.waiters.delete(key);
+        r();
+      }, ABORT_DRAIN_MS);
+    });
+    const d: Promise<void> = Promise.race([confirmed, capped]).then(() => {
+      clearTimeout(timer);
+      if (this.drain === d) this.drain = null;
+    });
+    this.drain = d;
   }
 
   private inFlight: Promise<RunStats> | null = null;
@@ -364,7 +420,8 @@ export class Summarizer {
   /** Runs are serialized: a second call waits for the previous one to settle (Codex review, PR #16). */
   summarize(text: string, level: Level, opts: SummarizeOptions = {}): Promise<RunStats> {
     const prev = this.inFlight ?? Promise.resolve();
-    const run = prev.then(() => this.summarizeNow(text, level, opts), () => this.summarizeNow(text, level, opts));
+    const start = () => (this.drain ?? Promise.resolve()).then(() => this.summarizeNow(text, level, opts));
+    const run = prev.then(start, start);
     this.inFlight = run;
     run.then(
       () => {
@@ -378,6 +435,14 @@ export class Summarizer {
   }
 
   private async summarizeNow(text: string, level: Level, opts: SummarizeOptions = {}): Promise<RunStats> {
+    if (opts.signal?.aborted) {
+      // Cancelled while queued behind another run: never start it (Codex review, PR #16).
+      const prev = this.runStats;
+      this.runStats = { ...emptyStats(), model_id: prev.model_id, role: prev.role, downgraded: prev.downgraded, load_ms: prev.load_ms, probe_ms: prev.probe_ms, level };
+      this.state = "stopped";
+      this.error = "aborted";
+      return this.stats();
+    }
     if (!(await this.ensureLoaded({ signal: opts.signal }))) return this.stats();
     const runId = ++this.runId;
     const started = performance.now();

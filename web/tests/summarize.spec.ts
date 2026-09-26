@@ -125,6 +125,32 @@ test.describe("fake summarizer (wasm-ci, ?llm=fake)", () => {
     expect(after).toBe(atAbort);
   });
 
+  test("Stop then an immediate new summary: the next run waits for the worker, then runs clean", async ({ page }) => {
+    await open(page, "?llm=fake&delay=40");
+    const r = await page.evaluate(async () => {
+      type Api = { summarize(t: string, l: string): Promise<Result>; bullets(): { text: string }[]; abort(): void };
+      const w = window as unknown as { __llm: Api };
+      const long = Array.from({ length: 40 }, (_, i) => `Sentence number ${i + 1} says that the bat colony counted ${i + 100} animals tonight.`).join(" ");
+      const first = w.__llm.summarize(long, "short");
+      await new Promise<void>((res) => {
+        const t = setInterval(() => {
+          if (w.__llm.bullets().length >= 1) {
+            clearInterval(t);
+            res();
+          }
+        }, 10);
+      });
+      w.__llm.abort();
+      const a = await first;
+      const b = await w.__llm.summarize("The fruit bat colony roosts in the old fig tree. It leaves at dusk to feed on ripe figs.", "short");
+      return { a: a.state, b };
+    });
+    expect(r.a).toBe("stopped");
+    expect(r.b.state).toBe("done");
+    expect(r.b.bullets.length).toBeGreaterThanOrEqual(1);
+    expect(r.b.bullets.every((x) => !/Sentence number/.test(x.text))).toBe(true);
+  });
+
   test("One line falls back to Short when more than half the chunks are cut", async ({ page }) => {
     await open(page, "?llm=fake&fake=cutall");
     const r = await summarize(page, DOC025, "oneline");
