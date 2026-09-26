@@ -3,7 +3,7 @@
 // (rows() is a snapshot, not a subscription: this view only needs to be fresh when it is opened
 // or refreshed, not live during a run). Every label comes from spec/strings/en.json (S1-L0 owns
 // the values; no string literal here per CONTRIBUTING.md "Strings").
-import { useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import * as stats from "../stats/store";
 import type { StatsRow } from "../stats/store";
 import { t } from "../strings";
@@ -20,7 +20,6 @@ const COLUMNS: (keyof StatsRow)[] = [
   "ttfa_ms",
   "tok_s",
   "rtf",
-  "stop_ms",
   "bullets_total",
   "bullets_cut",
 ];
@@ -36,7 +35,6 @@ const COLUMN_LABEL: Record<string, string> = {
   ttfa_ms: "stats.col.ttfa_ms",
   tok_s: "stats.col.tok_s",
   rtf: "stats.col.rtf",
-  stop_ms: "stats.col.stop_ms",
   bullets_total: "stats.col.bullets_total",
   bullets_cut: "stats.col.bullets_cut",
 };
@@ -53,9 +51,16 @@ function downloadCsv(text: string): void {
 
 export function Stats({ onClose }: { onClose: () => void }) {
   const [rows, setRows] = useState<StatsRow[]>(() => stats.rows());
+  const ref = useRef<HTMLDivElement>(null);
+  // Opened from a button above a long article: bring the view to the reader and move focus into it,
+  // so keyboard and screen-reader users land on it too (Codex review, PR #22).
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: "start" });
+    ref.current?.focus();
+  }, []);
 
   return (
-    <div class="stats-view" role="dialog" aria-label={t("stats.title")}>
+    <div class="stats-view" role="dialog" aria-label={t("stats.title")} ref={ref} tabIndex={-1}>
       <div class="stats-view-header">
         <h2>{t("stats.title")}</h2>
         <button type="button" class="stats-close" onClick={onClose}>

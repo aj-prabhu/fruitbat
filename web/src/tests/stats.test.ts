@@ -245,6 +245,13 @@ describe("buildRow", () => {
     expect(validateRunStats(row).errors).toEqual([]);
   });
 
+  it("a recorded row never carries another run's stop time; heap comes from record time (Codex review, PR #22)", () => {
+    const row = buildRow({ ...SHORT_STATS, stop_ms: 120 }, { ...VALID_ENV, heap_mb: 84.2 });
+    expect(row.stop_ms).toBeNull();
+    expect(row.heap_mb).toBe(84.2);
+    expect(buildRow(SHORT_STATS, VALID_ENV).heap_mb).toBeNull();
+  });
+
   it("never copies an arbitrary field off the orchestrator stats object", () => {
     const tainted = { ...SHORT_STATS, gen: { ...GEN_FIXTURE, note: "source snippet: CANARY-7f3a" } } as unknown as OrchestratorStats;
     const row = buildRow(tainted, VALID_ENV);
