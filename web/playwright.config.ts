@@ -14,6 +14,11 @@ const commonArgs = ["--autoplay-policy=no-user-gesture-required", "--mute-audio"
 
 export default defineConfig({
   testDir: "tests",
+  // S1-13a: fills web/.cache/models/ (spec/models.json web.voice; +web.summarizer when
+  // MODEL_CACHE_FULL=1) once per run, before any project's tests start. tests/model-cache.ts's
+  // `test` fixture then routes Hub requests to those cached files. Idempotent -- a warm cache
+  // makes this a fast no-op check, not a re-download.
+  globalSetup: "./tests/model-cache.ts",
   timeout: 10 * 60 * 1000,
   expect: { timeout: 30_000 },
   fullyParallel: false,
@@ -24,7 +29,11 @@ export default defineConfig({
   webServer: process.env.BASE_URL
     ? undefined
     : {
-        command: `npm run build && npx vite preview --port ${port} --strictPort`,
+        // S1-13a: tests/dev-proxy.mjs fronts `vite preview` (on port+10000, internal) so
+        // /__model_cache__/** can serve a large cached model file at a SAME-ORIGIN path --
+        // route.fulfill() crashes the browser for a body this size (see dev-proxy.mjs's header
+        // comment). Everything else passes through to vite preview unchanged.
+        command: `npm run build && node tests/dev-proxy.mjs ${port} ${port + 10000}`,
         url: `http://localhost:${port}`,
         reuseExistingServer: false,
         timeout: 180_000,
