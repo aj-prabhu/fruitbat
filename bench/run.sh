@@ -36,4 +36,5 @@ if [[ "$target" != "web" ]]; then
   exit 2
 fi
 
-exec node "$HERE/web/run.mjs" "${pass_args[@]}"
+# ${arr[@]+...}: macOS's Bash 3.2 treats an empty array as unbound under `set -u` (Codex review, PR #27).
+exec node "$HERE/web/run.mjs" ${pass_args[@]+"${pass_args[@]}"}

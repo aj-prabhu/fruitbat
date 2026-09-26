@@ -56,9 +56,11 @@ const WEBGPU_ARGS = [
 // S0-05 fixture, see .gitignore).
 const DIRTY_EXCEPTIONS = [".", ":!bench/results.csv", ":!bench/baselines.json", ":!bench/last-run"];
 
+/** A run failure. Thrown, not process.exit(): main()'s `finally` must still close Chromium and
+ *  stop vite preview, and a cold rep's temp profile must still be removed (Codex review, PR #27). */
+class BenchFailure extends Error {}
 function fail(msg) {
-  console.error(`bench/web/run.mjs: ${msg}`);
-  process.exit(1);
+  throw new BenchFailure(msg);
 }
 
 function sh(cmd, args, opts = {}) {
@@ -593,6 +595,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("bench/web/run.mjs:", err?.stack ?? err);
+  console.error("bench/web/run.mjs:", err instanceof BenchFailure ? err.message : (err?.stack ?? err));
   process.exit(1);
 });
