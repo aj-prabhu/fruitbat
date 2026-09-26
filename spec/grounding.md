@@ -18,7 +18,7 @@ A bullet passes when both hold against **its own chunk's source text**:
    the same normalization), as a whole token.
 
 A bullet that fails either is cut: never shown, never spoken, counted (`cut_bullets`). If every
-bullet of a chunk is cut, the panel shows and speaks `notice.all_cut` and offers "Read this part"
+bullet of a chunk is cut, or the model gave no bullet for it, the panel shows and speaks `notice.all_cut` and offers "Read this part"
 as one key (rule 2). It never auto-plays a chunk the user did not ask for.
 
 For One line, the per-chunk lines are grounded against their chunks, and the reduced line is

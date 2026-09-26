@@ -26,6 +26,7 @@ let inject: Inject = null;
 let oomFired = false;
 let stopper: InterruptableStoppingCriteria | null = null;
 let generating: number | null = null; // runId of the generation in flight
+let probing: number | null = null; // runId of the 1-token probe in flight
 const aborted = new Set<number>();
 
 function isMemoryError(e: unknown): boolean {
@@ -98,6 +99,7 @@ async function onLoad(msg: Extract<MainToWorker, { type: "load" }>): Promise<voi
 
 async function onProbe(msg: Extract<MainToWorker, { type: "probe" }>): Promise<void> {
   const t0 = performance.now();
+  probing = msg.runId;
   try {
     if (!tokenizer || !model) throw new Error("not loaded");
     if (inject === "devicelost") {
@@ -111,6 +113,10 @@ async function onProbe(msg: Extract<MainToWorker, { type: "probe" }>): Promise<v
     post({ type: "probe_result", runId: msg.runId, ok, error: ok ? undefined : "no token", ms: Math.round(performance.now() - t0) });
   } catch (e) {
     post({ type: "probe_result", runId: msg.runId, ok: false, error: e instanceof Error ? `${e.name}: ${e.message}` : String(e), ms: Math.round(performance.now() - t0) });
+  } finally {
+    probing = null;
+    // A Stop during the probe is confirmed only once the GPU is actually free.
+    if (aborted.has(msg.runId)) post({ type: "aborted", runId: msg.runId });
   }
 }
 
@@ -182,7 +188,7 @@ self.onmessage = (e: MessageEvent<MainToWorker>) => {
       aborted.add(msg.runId);
       loadAbort?.abort();
       if (generating === msg.runId && stopper) stopper.interrupt();
-      else post({ type: "aborted", runId: msg.runId });
+      else if (probing !== msg.runId) post({ type: "aborted", runId: msg.runId }); // else onProbe confirms when done
       break;
   }
 };

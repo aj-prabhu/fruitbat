@@ -298,6 +298,13 @@ export class Summarizer {
   private async loadOnce(opts: { signal?: AbortSignal }): Promise<boolean> {
     const gpu = await this.probe();
     if (!gpu.ok) return false;
+    if (opts.signal?.aborted) {
+      // Stopped while the adapter probe was running, before the abort listener existed.
+      this.state = "stopped";
+      this.error = "aborted";
+      this.notice({ key: "notice.stopped" });
+      return false;
+    }
     this.state = "loading";
     const runId = ++this.runId;
     const spec = this.tier();
@@ -500,9 +507,7 @@ export class Summarizer {
       if (runId !== this.runId || this.state === "stopped") return false;
       const parser = new BulletParser({ max_bullets_per_chunk: cfg.max_bullets_per_chunk, max_words_per_bullet: cfg.max_words_per_bullet });
       let kept = 0;
-      let seen = 0;
       const handle = (b: { text: string; index: number }) => {
-        seen++;
         this.runStats.bullets_total++;
         const g = ground(b.text, chunk.text, COMMON_WORDS);
         if (g.ok) {
@@ -523,7 +528,8 @@ export class Summarizer {
       this.runStats.tokens += r.tokens;
       this.runStats.gen_ms += r.ms;
       this.runStats.per_chunk_kept.push(kept);
-      if (seen > 0 && kept === 0) {
+      // Nothing kept, whether every bullet was cut or the model gave none: say so (grounding.md).
+      if (kept === 0) {
         this.runStats.all_cut_chunks++;
         this.notice({ key: "notice.all_cut", chunkIndex: chunk.index, start: chunk.start, end: chunk.end });
       }
