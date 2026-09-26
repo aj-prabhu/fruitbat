@@ -32,13 +32,20 @@ row() {
   if [ "$2" = "FAIL" ]; then FAILED=1; fi
   return 0
 }
+# show_log NAME LOG: print a failing check's log tail to the job log; the runner's /tmp is
+# discarded after the job (Codex review, PR #11).
+show_log() {
+  { echo "---- $1 FAILED: last 40 lines of $2 ----"; tail -n 40 "$2"; echo "----"; } >&2
+  return 0
+}
 
 # (a) web/: npm ci && npm run build
 WEB_BUILD_LOG=/tmp/health-check-web-build.log
 if (cd web && npm ci && npm run build) >"$WEB_BUILD_LOG" 2>&1; then
   row web-build PASS "npm ci && npm run build"
 else
-  row web-build FAIL "see $WEB_BUILD_LOG"
+  row web-build FAIL "see $WEB_BUILD_LOG (tail printed above)"
+  show_log web-build "$WEB_BUILD_LOG"
 fi
 
 # (b) every model file URL from spec/models.json (web target, all tiers): HEAD after redirects.
@@ -79,7 +86,8 @@ AUDIT_LOG=/tmp/health-check-npm-audit.log
 if (cd web && npm audit --audit-level=high) >"$AUDIT_LOG" 2>&1; then
   row npm-audit PASS "no high/critical advisories"
 else
-  row npm-audit FAIL "see $AUDIT_LOG"
+  row npm-audit FAIL "see $AUDIT_LOG (tail printed above)"
+  show_log npm-audit "$AUDIT_LOG"
 fi
 
 # (d) the public and dev Spaces respond 200
@@ -112,7 +120,8 @@ else
   if (cd web && BASE_URL="$PUBLIC_SPACE_URL" npx playwright test tests/skeleton.spec.ts --project=wasm-ci) >"$SMOKE_LOG" 2>&1; then
     row space-smoke-wasm PASS "wasm-ci isolation test green against $PUBLIC_SPACE_URL"
   else
-    row space-smoke-wasm FAIL "see $SMOKE_LOG"
+    row space-smoke-wasm FAIL "see $SMOKE_LOG (tail printed above)"
+    show_log space-smoke-wasm "$SMOKE_LOG"
   fi
 fi
 
