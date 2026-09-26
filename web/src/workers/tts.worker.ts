@@ -59,6 +59,16 @@ function post(msg: FromWorker, transfer?: Transferable[]): void {
 let loadedDevice: "wasm" | "webgpu" = "wasm";
 let loadedDtype = "q8";
 
+/** networkBytes() is cumulative for the worker; each "loaded" reports only what was fetched since the
+ *  previous report, so a later warm load never inherits an earlier download (Codex review, PR #22). */
+let reportedNetBytes = 0;
+function netSinceLastReport(): number {
+  const now = networkBytes();
+  const delta = now - reportedNetBytes;
+  reportedNetBytes = now;
+  return delta;
+}
+
 function ensureLoaded(device: "wasm" | "webgpu" = "wasm"): Promise<KokoroTTS> {
   if (tts) return Promise.resolve(tts);
   if (!loading) {
@@ -157,7 +167,7 @@ scope.onmessage = async (e: MessageEvent<ToWorker>) => {
       post({
         type: "loaded",
         maxTokens: model.max_tokens,
-        downloadedBytes: networkBytes(), // network only; cached files do not count (S1-10 cache_state)
+        downloadedBytes: netSinceLastReport(), // this load's network bytes only; cached files do not count (S1-10)
         isolated: typeof crossOriginIsolated !== "undefined" && crossOriginIsolated,
         threads: wasm?.numThreads ?? null,
         cores: typeof navigator !== "undefined" ? navigator.hardwareConcurrency : 0,

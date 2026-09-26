@@ -110,9 +110,10 @@ export function detectEnv(): StatsEnv {
  *  anywhere on `stats` can never end up on the row (Non-negotiable 1). */
 export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
   const level = stats.last?.level ?? "short";
+  // The voice's last Read-all row speaks only for a Read-all run; a summary never borrows it.
+  const voiceRow = level === "readall" ? stats.voice : null;
   const gen = stats.gen;
   const voiceRun = stats.voice_run;
-  const voiceRow = stats.voice;
 
   let model_id: string;
   let model_rev: string;
@@ -124,8 +125,8 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
     const voice = pinnedModels().web.voice;
     model_id = voice.id;
     model_rev = voice.revision;
-    dtype = voiceRun?.dtype ?? voiceRow?.dtype ?? voice.dtype;
-    device = (voiceRun?.device ?? voiceRow?.device ?? voice.device) as StatsRow["device"];
+    dtype = voiceRun ? voiceRun.dtype : (voiceRow?.dtype ?? voice.dtype);
+    device = (voiceRun ? voiceRun.device : (voiceRow?.device ?? voice.device)) as StatsRow["device"];
   } else {
     // Short / Caveman / One line: the row's model identity is whichever summarizer tier actually
     // loaded (gen.model_id), matched back to its pinned revision/dtype/device; unknown or not-yet-
@@ -140,7 +141,7 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
 
   // Cold only when this run fetched model bytes over the network: the voice (its stream or Read all
   // metrics) or, for a summary, the summarizer (Codex review, PR #27).
-  const voiceCold = (voiceRun?.cache_state ?? voiceRow?.cache_state) === "cold";
+  const voiceCold = (voiceRun ? voiceRun.cache_state : voiceRow?.cache_state) === "cold";
   const genCold = level !== "readall" && gen?.cache_cold === true;
   const cache_state: StatsRow["cache_state"] = voiceCold || genCold ? "cold" : "warm";
 
@@ -168,8 +169,10 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
     ttfa_ms: stats.ttfa_ms,
     gen_ms: gen?.gen_ms ?? null,
     tok_s: gen?.tok_s ?? null,
-    rtf: voiceRun?.rtf ?? voiceRow?.rtf ?? null,
-    gap_ms: voiceRun?.gap_ms ?? voiceRow?.gap_ms ?? null,
+    // This run's own voice metrics, even when null (a summary with nothing spoken); the voice's
+    // last Read-all row is only a fallback when there is no run metric at all (Codex review, PR #22).
+    rtf: voiceRun ? voiceRun.rtf : (voiceRow?.rtf ?? null),
+    gap_ms: voiceRun ? voiceRun.gap_ms : (voiceRow?.gap_ms ?? null),
     // A recorded run finished; stopped runs are never recorded. The orchestrator's stop_ms belongs
     // to whichever run was stopped before this one, so it never goes on this row (Codex review, PR #22).
     stop_ms: null,
@@ -183,7 +186,7 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
     halluc_flags: null,
     forbidden_hits: null,
     oneline_keyword_hit: null,
-    tts_overlimit: voiceRun?.tts_overlimit ?? voiceRow?.tts_overlimit ?? 0,
+    tts_overlimit: voiceRun ? voiceRun.tts_overlimit : (voiceRow?.tts_overlimit ?? 0),
     peak_mb: null, // Mac only (bench/README.md gate table)
     // Sampled when this row is recorded, for every level; the voice's own row is Read-all only
     // (Codex review, PR #22).
