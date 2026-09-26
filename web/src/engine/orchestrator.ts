@@ -453,6 +453,9 @@ export class Orchestrator {
     if (this.voice.phase === "failed") {
       this.gen = reduceGen(this.gen, "fail");
       this.error = this.voice.error;
+      // The voice stopped its queue: the panel must not keep a sentence "playing" (Codex review, PR #18).
+      this.play = reducePlay(this.play, "stop");
+      this.current = null;
       this.notice("error.voice");
       return;
     }
@@ -496,6 +499,9 @@ export class Orchestrator {
     if (!ok) {
       this.gen = reduceGen(this.gen, "fail");
       this.error = this.llm.error;
+      // The probe result is cached, so a retry on a device without WebGPU gets no new notice from
+      // the summarizer; say it again for this run (Codex review, PR #18).
+      if (this.llm.gpu?.ok === false && !this.notices.includes("notice.no_webgpu")) this.notice("notice.no_webgpu");
       // End the empty stream rather than voice.stop(), which would also cancel the failure notice
       // the summarizer just raised (Codex review, PR #18).
       void this.voice.endStream(streamId);
