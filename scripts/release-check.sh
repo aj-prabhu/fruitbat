@@ -156,10 +156,18 @@ fi
 
 # (h) bench rows valid for the commit (gate.py applies the same evidence rule), or a hand-filled gate file (cut list)
 if [ -n "${RELEASE_GATE_FILE:-}" ]; then
-  if [ -s "$RELEASE_GATE_FILE" ]; then
-    row bench-gate PASS "hand-filled gate file: $RELEASE_GATE_FILE"
-  else
+  # A hand-filled gate stands in for bench rows only if it is finished and passing: a
+  # "commit: <sha>" line for this commit and a "verdict: PASS" line, and no FAIL verdict
+  # (docs/release.md; Codex review, PR #6).
+  GATE_COMMIT="$(sed -n 's/^commit:[[:space:]]*\([0-9a-f]\{7,40\}\)[[:space:]]*$/\1/p' "$RELEASE_GATE_FILE" 2>/dev/null | head -1)"
+  if [ ! -s "$RELEASE_GATE_FILE" ]; then
     row bench-gate FAIL "RELEASE_GATE_FILE=$RELEASE_GATE_FILE missing or empty"
+  elif [ -z "$GATE_COMMIT" ] || [ "${COMMIT_FULL#"$GATE_COMMIT"}" = "$COMMIT_FULL" ]; then
+    row bench-gate FAIL "$RELEASE_GATE_FILE: no 'commit: <sha>' line for $COMMIT_FULL"
+  elif grep -qiE '^verdict:[[:space:]]*FAIL' "$RELEASE_GATE_FILE" || ! grep -qE '^verdict:[[:space:]]*PASS[[:space:]]*$' "$RELEASE_GATE_FILE"; then
+    row bench-gate FAIL "$RELEASE_GATE_FILE: needs 'verdict: PASS' and no FAIL verdict"
+  else
+    row bench-gate PASS "hand-filled gate file: $RELEASE_GATE_FILE (commit $GATE_COMMIT, verdict PASS)"
   fi
 elif [ -f bench/gate.py ]; then
   run_check bench-gate /tmp/release-check-bench-gate.log python3 bench/gate.py --release --commit "$COMMIT_FULL"
@@ -189,18 +197,18 @@ if [ -d bench/graded ]; then
     done
   }
   NEED=$(( $(echo "$GRADED_DOCS" | grep -c .) * 3 ))
-  # Candidate SHAs with valid evidence, newest commit first (not filename order); the first one
-  # whose whole matrix is complete and valid is used (Codex review, PR #6).
+  # Candidate SHAs with valid evidence, newest commit first (not filename order). The newest one
+  # decides: a failing or incomplete re-grade is not hidden by an older passing set (Codex review, PR #6).
   CANDIDATES="$(for f in bench/graded/*-*.json; do [ -e "$f" ] && basename "$f" | cut -d- -f1; done | sort -u \
     | while read -r sha; do evidence_valid "$sha" && echo "$(git log -1 --format=%ct "$sha" 2>/dev/null || echo 0) $sha"; done \
     | sort -rn | cut -d' ' -f2)" || true # an empty glob or no valid sha is an empty list, not an exit
   GRADED_SHA=""
   PROBLEMS=""
-  for sha in $CANDIDATES; do
-    p="$(graded_problems "$sha")"
-    if [ -z "$p" ]; then GRADED_SHA="$sha"; PROBLEMS=""; break; fi
-    [ -z "$PROBLEMS" ] && PROBLEMS="$sha: $(echo "$p" | head -5 | tr '\n' ';')"
-  done
+  NEWEST="$(echo "$CANDIDATES" | head -1)"
+  if [ -n "$NEWEST" ]; then
+    p="$(graded_problems "$NEWEST")"
+    if [ -z "$p" ]; then GRADED_SHA="$NEWEST"; else PROBLEMS="$NEWEST: $(echo "$p" | head -5 | tr '\n' ';')"; fi
+  fi
   if [ -n "$CANDIDATES" ]; then
     if [ -n "$GRADED_SHA" ] && [ "$NEED" -ge 18 ]; then
       row graded PASS "$NEED graded files for $GRADED_SHA (evidence valid for $COMMIT_FULL), all scores >= 4"

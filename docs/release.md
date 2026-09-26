@@ -57,5 +57,6 @@ yet) after `release-check.sh` passes.
 If the bench runner slips (docs/PLAN.md cut list), commit a hand-filled gate as
 `bench/release-gate-<tag>.md` (for example `bench/release-gate-web-v0.1.0.md`) in the tagged
 commit. The release workflow passes it to `release-check.sh` as `RELEASE_GATE_FILE`, which then
-accepts it in place of bench rows. Locally: `RELEASE_GATE_FILE=bench/release-gate-<tag>.md
+accepts it in place of bench rows only if it has a `commit: <sha>` line naming the commit under
+test and a `verdict: PASS` line (and no `verdict: FAIL`). Locally: `RELEASE_GATE_FILE=bench/release-gate-<tag>.md
 scripts/release-check.sh <commit>`.
