@@ -51,3 +51,13 @@ real release; `release.yml` never sets it.
 
 Mac (`mac-v*`) follows the same shape but hands off to `scripts/release.sh` (S2-12, not built
 yet) after `release-check.sh` passes.
+
+## Cut-list fallback: a hand-filled bench gate
+
+If the bench runner slips (docs/PLAN.md cut list), commit a hand-filled gate as
+`bench/release-gate-<tag>.md` (for example `bench/release-gate-web-v0.1.0.md`) in the tagged
+commit. The release workflow passes it to `release-check.sh` as `RELEASE_GATE_FILE`, which then
+accepts it in place of bench rows only if it has a `commit: <sha>` line naming the code commit
+that was measured (the gate file is evidence committed on top of it, so only evidence files may
+change in between) and a `verdict: PASS` line (and no `verdict: FAIL`). Locally: `RELEASE_GATE_FILE=bench/release-gate-<tag>.md
+scripts/release-check.sh <commit>`.
