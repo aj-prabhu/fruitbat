@@ -44,17 +44,6 @@
     right: var(--gutter);
     width: auto;
     max-height: 70vh;
-    /* On a short phone the header and controls alone can exceed 70vh: the sheet scrolls so every
-       control stays reachable (Pip may be clipped here) (Codex review, PR #25). */
-    overflow-y: auto;
-  }
-}
-
-/* A short, wide window (a laptop with the dock and bookmarks bar): the panel scrolls too, so every
-   control stays reachable (Codex review, PR #25). */
-@media (max-height: 640px) {
-  .panel {
-    overflow-y: auto;
   }
 }
 
@@ -72,6 +61,17 @@
 }
 
 /* ---------------------------------------------------------------- Pip (S1-08 replaces this) */
+/* Everything but Pip scrolls together once it is taller than the panel, at any window size, so no
+   control is ever out of reach (Codex review, PR #25). */
+.panel-scroll {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border-radius: inherit;
+}
+
 .panel-pip {
   position: absolute;
   top: 0;

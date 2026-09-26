@@ -369,31 +369,35 @@ export function Panel() {
       data-spacing={spacing}
     >
       <Pip />
-      <div class="panel-head">
-        <h2 class="panel-title">{t("panel.title")}</h2>
-      </div>
-      {/* tabIndex=0: panel-body scrolls (panel.css, max-height + overflow-y) once content grows
-          past it, and a scrollable region must be reachable by keyboard on its own (axe
-          scrollable-region-focusable) rather than only through buttons it happens to contain. */}
-      <div class="panel-body" tabIndex={0}>
-        {empty && <p class="panel-empty">{t("panel.empty")}</p>}
-        {cur?.kind === "sentence" && <ReadAllView cur={cur} />}
-        {s.bullets.length > 0 && <BulletList s={s} />}
-        <AllCutRows allCut={s.allCut} />
-        {s.lastNotice && (
-          <p class="panel-notice" role="status" aria-live="polite" data-notice={s.lastNotice}>
-            {t(s.lastNotice)}
-          </p>
-        )}
-      </div>
-      <div class="panel-controls">
-        <TransportRow s={s} />
-        <RateControl rate={rate} onChange={onRate} />
-        <VoiceControl voice={voice} onChange={onVoice} />
-        <SpeakToggle checked={s.speakMessages} onChange={(on) => orchestrator().setSpeakMessages(on)} />
-        <div class="panel-controls-row">
-          <TextSizeControl value={fontSize} onChange={onFontSize} />
-          <SpacingControl value={spacing} onChange={onSpacing} />
+      {/* One scroll container for everything but Pip: at any window size, whatever does not fit
+          scrolls, while Pip still pokes above the panel's edge (Codex review, PR #25). */}
+      <div class="panel-scroll">
+        <div class="panel-head">
+          <h2 class="panel-title">{t("panel.title")}</h2>
+        </div>
+        {/* tabIndex=0: panel-body scrolls (panel.css, max-height + overflow-y) once content grows
+            past it, and a scrollable region must be reachable by keyboard on its own (axe
+            scrollable-region-focusable) rather than only through buttons it happens to contain. */}
+        <div class="panel-body" tabIndex={0}>
+          {empty && <p class="panel-empty">{t("panel.empty")}</p>}
+          {cur?.kind === "sentence" && <ReadAllView cur={cur} />}
+          {s.bullets.length > 0 && <BulletList s={s} />}
+          <AllCutRows allCut={s.allCut} />
+          {s.lastNotice && (
+            <p class="panel-notice" role="status" aria-live="polite" data-notice={s.lastNotice}>
+              {t(s.lastNotice)}
+            </p>
+          )}
+        </div>
+        <div class="panel-controls">
+          <TransportRow s={s} />
+          <RateControl rate={rate} onChange={onRate} />
+          <VoiceControl voice={voice} onChange={onVoice} />
+          <SpeakToggle checked={s.speakMessages} onChange={(on) => orchestrator().setSpeakMessages(on)} />
+          <div class="panel-controls-row">
+            <TextSizeControl value={fontSize} onChange={onFontSize} />
+            <SpacingControl value={spacing} onChange={onSpacing} />
+          </div>
         </div>
       </div>
     </aside>
