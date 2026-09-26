@@ -274,12 +274,14 @@ export class Summarizer {
       const p = this.pending;
       this.pending = null;
       p?.reject(err);
-      for (const [k, w] of this.waiters) {
-        if (k.endsWith(`:${m.runId}`)) {
-          this.waiters.delete(k);
-          w.reject(err);
-        }
-      }
+      // After any worker error (a lost GPU device, a failed session) its model can't be trusted:
+      // settle every waiter, drop the worker, and let the next request reload from cache
+      // (Codex review, PR #16).
+      for (const w of this.waiters.values()) w.reject(err);
+      this.waiters.clear();
+      this.worker?.terminate();
+      this.worker = null;
+      this.loaded = false;
       return;
     }
     const w = this.waiters.get(`${m.type}:${m.runId}`);
