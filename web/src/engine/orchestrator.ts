@@ -462,7 +462,12 @@ export class Orchestrator {
   private async summarize(id: number, level: Exclude<Level, "readall">, fromChunk: number): Promise<void> {
     // On demand where there was no page-load warm-up (mobile / data saver): the summary is the demand.
     void this.voice.load().then(
-      () => this.markVoiceReady(),
+      () => {
+        this.markVoiceReady();
+        // No page-load warm-up on mobile / data saver: prewarm the dial notices now, so the next
+        // dial move still speaks within 500 ms (Codex review, PR #18).
+        void this.voice.prewarm(PREWARM_KEYS).catch(() => undefined);
+      },
       () => undefined, // a failed voice load surfaces through the stream's own end
     );
     const streamId = this.voice.beginStream({
@@ -516,6 +521,12 @@ export class Orchestrator {
     const { finished, metrics } = await this.voice.endStream(streamId);
     if (id !== this.runId) return;
     this.voiceRun = metrics;
+    if (!finished) {
+      // The stream ended without playing out (a failure stopped the queue): the panel must not
+      // keep showing a bullet as playing (Codex review, PR #18).
+      this.play = reducePlay(this.play, "stop");
+      this.current = null;
+    }
     if (!finished && this.gen === "done") {
       // the summary is complete but its speech failed (voice load, planning or synthesis):
       // say so instead of ending silently (Codex review, PR #18)
