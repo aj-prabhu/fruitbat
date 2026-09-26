@@ -514,6 +514,14 @@ def cmd_pr_head(args):
     if MALFORMED_ROWS:
         exit_code, updates = 1, []
         lines.append(f"FAIL | results.csv | {len(MALFORMED_ROWS)} malformed row(s) at line(s) {MALFORMED_ROWS[:10]}")
+    # Only a `baseline-reset` PR may change the approved baselines (Codex merge-gate review, PR #15).
+    if args.base and not allow_reset:
+        existed = subprocess.run(["git", "-C", str(repo_root), "cat-file", "-e", f"{args.base}:bench/baselines.json"],
+                                 capture_output=True).returncode == 0  # creating the file (bootstrap) is allowed
+        changed = existed and subprocess.run(["git", "-C", str(repo_root), "diff", "--quiet", args.base, args.head, "--", "bench/baselines.json"]).returncode != 0
+        if changed:
+            exit_code, updates = 1, []
+            lines.append("FAIL | bench/baselines.json | changed without the baseline-reset label")
     print("\n".join(lines))
     if updates:
         save_baselines(repo_root / "bench" / "baselines.json", baselines)
