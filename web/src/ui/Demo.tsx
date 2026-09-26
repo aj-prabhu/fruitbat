@@ -140,9 +140,18 @@ export function Demo() {
           data-testid="demo-audio"
           preload="auto"
           src={`/demo/${track.level}.wav`}
-          onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
-          onEnded={() => setPlaying(false)}
+          onPlay={() => {
+            setPlaying(true);
+            window.dispatchEvent(new CustomEvent("fruitbat:demo-playing", { detail: true })); // the panel's Stop can reach it
+          }}
+          onPause={() => {
+            setPlaying(false);
+            window.dispatchEvent(new CustomEvent("fruitbat:demo-playing", { detail: false }));
+          }}
+          onEnded={() => {
+            setPlaying(false);
+            window.dispatchEvent(new CustomEvent("fruitbat:demo-playing", { detail: false }));
+          }}
           onTimeUpdate={onTimeUpdate}
         />
       )}
