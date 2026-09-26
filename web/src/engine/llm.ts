@@ -57,6 +57,8 @@ export interface NoticeOut {
   end?: number;
 }
 export interface RunStats {
+  /** true only for the run whose model load fetched bytes over the network (S1-10 cache_state) */
+  cache_cold: boolean;
   level: Level | null;
   level_used: Level | null;
   chunks: number;
@@ -97,6 +99,7 @@ type Pending = {
 
 function emptyStats(): RunStats {
   return {
+    cache_cold: false,
     level: null,
     level_used: null,
     chunks: 0,
@@ -135,6 +138,8 @@ export class Summarizer {
   private drain: Promise<void> | null = null;
   /** A Stop pressed during the adapter probe, before anything reached the worker. */
   private stopDuringProbe = false;
+  /** Set by a load that fetched model bytes over the network; the next run reports cold, once. */
+  private coldPending = false;
   /** The current run's options, so its own onNotice hears the notices it raises. */
   private runOpts: SummarizeOptions | null = null;
   private waiters = new Map<string, { resolve: (m: WorkerToMain) => void; reject: (e: Error) => void }>();
@@ -354,6 +359,7 @@ export class Summarizer {
       this.runStats.role = loaded.role;
       this.runStats.downgraded = loaded.downgraded;
       this.runStats.load_ms = Math.round(performance.now() - t0);
+      this.coldPending = (loaded.netBytes ?? 0) > 1_000_000;
       if (loaded.downgraded) this.notice({ key: "notice.low_end_tier" });
       const probeP = this.waitFor("probe_result", runId);
       this.post({ type: "probe", runId });
@@ -526,6 +532,8 @@ export class Summarizer {
     const started = performance.now();
     const prev = this.runStats;
     this.runStats = { ...emptyStats(), model_id: prev.model_id, role: prev.role, downgraded: prev.downgraded, load_ms: prev.load_ms, probe_ms: prev.probe_ms, level };
+    this.runStats.cache_cold = this.coldPending;
+    this.coldPending = false;
     this.state = "running";
     this.error = null;
     const abort = () => this.abort();

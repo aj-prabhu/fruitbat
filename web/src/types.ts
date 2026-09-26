@@ -33,6 +33,9 @@ export interface FruitbatAPI {
   resume?(): void;
   skip?(): boolean;
   setSpeakMessages?(on: boolean): void;
+  // S1-10 (stats store)
+  rows?(): unknown[];
+  setDocId?(id: string): void;
 }
 
 export interface FruitbatRunEventDetail {
@@ -52,4 +55,6 @@ declare global {
     /** the orchestrator started a live run (any kind); the demo recording stops */
     "fruitbat:live": CustomEvent<undefined>;
   }
+  // vite.config.ts `define`s this from `git rev-parse --short HEAD` (S1-10, stats/store.ts).
+  const __FRUITBAT_COMMIT__: string;
 }

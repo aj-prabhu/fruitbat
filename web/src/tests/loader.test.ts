@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { env } from "@huggingface/transformers";
-import { configureRuntime, load, loadsSettled, pinUrl, type PretrainedOptions } from "../engine/loader";
+import { configureRuntime, load, loadsSettled, networkBytes, pinUrl, type PretrainedOptions } from "../engine/loader";
 import { pinnedModels } from "../engine/pins";
 import { tokenizerReady } from "../core/tokens";
 
@@ -89,6 +89,18 @@ describe("loader", () => {
     await loadsSettled(); // waits for the async dispose too
     expect(dispose).toHaveBeenCalledTimes(1);
     expect(disposed).toBe(true);
+  });
+
+  it("networkBytes() counts only GET bodies that came over the network (S1-10 cache_state)", async () => {
+    configureRuntime();
+    const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async () => new Response("x", { headers: { "content-length": "2000" } }));
+    const url = `https://huggingface.co/${summarizer.id}/resolve/${summarizer.revision}/config.json`;
+    const before = networkBytes();
+    await env.fetch(url);
+    expect(networkBytes() - before).toBe(2000);
+    spy.mockImplementation(async () => new Response("x")); // no length header: nothing is guessed
+    await env.fetch(url);
+    expect(networkBytes() - before).toBe(2000);
   });
 
   it("rejects immediately when the signal is already aborted", async () => {
