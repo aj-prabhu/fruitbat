@@ -310,6 +310,9 @@ export class VoiceEngine {
 
   // ---------------------------------------------------------------- read all
   private pendingDone: { resolve: (finished: boolean) => void } | null = null;
+  private readSeq = 0;
+  /** The stop time stop() measured, kept for the stats row of the run it stopped (Codex review, PR #17). */
+  private lastStop: { runId: number; ms: number } | null = null;
   private runTtfa: number | null = null;
   private runT0 = 0;
   private runSynthMs = 0;
@@ -324,6 +327,7 @@ export class VoiceEngine {
     // Stop/Esc while the model loads bumps runId; a read requested before that must not start
     // afterwards (Codex review, PR #17).
     const before = this.runId;
+    const ticket = ++this.readSeq; // several reads requested during the load: only the newest starts
     try {
       await this.load();
     } catch (e) {
@@ -331,7 +335,7 @@ export class VoiceEngine {
       this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
       return this.result(before, 0, 0, false);
     }
-    if (this.runId !== before) return this.result(before, 0, 0, false);
+    if (this.runId !== before || ticket !== this.readSeq) return this.result(before, 0, 0, false);
     const runId = ++this.runId;
     // A read already playing is replaced: settle its promise now, or its caller waits forever
     // (Codex review, PR #17).
@@ -391,17 +395,18 @@ export class VoiceEngine {
     const inflight = new Map<number, Promise<void>>();
     const pump = async (): Promise<void> => {
       while (nextSeq < segments.length && runId === this.runId && firstError === null) {
-        if (!queue.canAccept()) {
+        // The rate is read per request, so moving the dial changes the segments not yet sent.
+        // Admission counts this segment's estimated seconds, and each request reserves them until
+        // it settles, so the 30 s cap covers audio still being synthesized (Codex review, PR #17).
+        const seg = segments[nextSeq];
+        const speed = opts.rate ?? this.rate;
+        const est = estimateSeconds(seg, speed);
+        if (!queue.canAccept(est)) {
           await new Promise((r) => setTimeout(r, 50));
           continue;
         }
-        const seg = segments[nextSeq++];
-        // The rate is read per request, so moving the dial changes the segments not yet sent;
-        // each request reserves its estimated seconds so the 30 s cap counts audio still being
-        // synthesized (Codex review, PR #17).
-        const speed = opts.rate ?? this.rate;
-        const est = estimateSeconds(seg, speed);
-        queue.requestSent(est);
+        nextSeq++;
+        const ticket = queue.requestSent(est);
         // Every rejection is handled the moment it happens (no unhandled rejection while the
         // pump waits for capacity); the first one fails the run (Codex review, PR #17).
         const p = this.synthOne(runId, seg, voice, speed, queue)
@@ -409,7 +414,7 @@ export class VoiceEngine {
             if (firstError === null) firstError = e;
           })
           .finally(() => {
-            queue.requestSettled(est);
+            queue.requestSettled(ticket);
             inflight.delete(seg.seq);
           });
         inflight.set(seg.seq, p);
@@ -483,7 +488,7 @@ export class VoiceEngine {
       ttfa_ms: this.runTtfa === null ? null : Math.round(this.runTtfa),
       rtf: synthSeconds > 0 ? Math.round((seconds / synthSeconds) * 100) / 100 : null,
       gap_ms: Math.round(q.maxGapMs),
-      stop_ms: null, // set by stop(); a finished run has none until stop() is measured
+      stop_ms: this.lastStop?.runId === runId ? this.lastStop.ms : null, // a finished run has none
       coverage,
       tts_overlimit: this.runOverlimit,
     });
@@ -566,6 +571,7 @@ export class VoiceEngine {
     this.current = null;
     this.next = null;
     const stopMs = performance.now() - t0;
+    this.lastStop = { runId: stale, ms: Math.round(stopMs * 100) / 100 };
     if (this.lastStats) {
       this.lastStats = { ...this.lastStats, stop_ms: Math.round(stopMs * 100) / 100 };
       writeStored(STATS_KEY, JSON.stringify(this.lastStats));

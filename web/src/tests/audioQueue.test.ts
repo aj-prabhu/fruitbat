@@ -97,12 +97,32 @@ describe("AudioQueue", () => {
     q.beginRun(1);
     q.enqueue(item(1, 0, 20));
     expect(q.canAccept()).toBe(true);
-    q.requestSent(8);
+    const a = q.requestSent(8);
     expect(q.canAccept()).toBe(true); // 20 + 8 < 30
+    expect(q.canAccept(5)).toBe(false); // the next segment would not fit: 20 + 8 + 5 > 30
     q.requestSent(8);
     expect(q.canAccept()).toBe(false); // 20 + 16 >= 30
-    q.requestSettled(8);
+    q.requestSettled(a);
     expect(q.canAccept()).toBe(true);
+  });
+
+  it("a request from a replaced run does not touch the new run's counts", () => {
+    const q = new AudioQueue(ctx, { maxAheadSeconds: 30, maxInFlight: 3 });
+    q.beginRun(1);
+    const old = q.requestSent(10);
+    q.beginRun(2);
+    q.requestSent(10);
+    expect(q.requestsInFlight).toBe(1);
+    q.requestSettled(old); // the old run's request finishing late
+    expect(q.requestsInFlight).toBe(1);
+  });
+
+  it("a segment longer than the cap still goes once the queue is nearly empty", () => {
+    const q = new AudioQueue(ctx, { maxAheadSeconds: 30, maxInFlight: 3 });
+    q.beginRun(1);
+    expect(q.canAccept(45)).toBe(true); // nothing scheduled, nothing in flight
+    q.enqueue(item(1, 0, 20));
+    expect(q.canAccept(45)).toBe(false);
   });
 
   it("stop() silences every scheduled source, drops the rest, and invalidates the run quickly", () => {
