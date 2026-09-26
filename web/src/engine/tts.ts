@@ -13,6 +13,9 @@ export const RATE_MAX = 1.5;
 export const VOICES = ["af_heart", "af_bella"] as const;
 export type VoiceId = (typeof VOICES)[number];
 const RATE_KEY = "fruitbat.rate";
+/** Rough English speech rate at 1.0x, used only to reserve queue room for audio still being synthesized. */
+const CHARS_PER_SECOND = 14;
+const estimateSeconds = (seg: PlannedSegment, speed: number): number => Math.max(0, seg.end - seg.start) / CHARS_PER_SECOND / Math.max(speed, 0.1);
 const VOICE_KEY = "fruitbat.voice";
 const STATS_KEY = "fruitbat.stats.last";
 const LIMITS = { target: 300, limit: 510 }; // spec/chunking.md, measured in S1-00a
@@ -330,6 +333,11 @@ export class VoiceEngine {
     }
     if (this.runId !== before) return this.result(before, 0, 0, false);
     const runId = ++this.runId;
+    // A read already playing is replaced: settle its promise now, or its caller waits forever
+    // (Codex review, PR #17).
+    const replaced = this.pendingDone;
+    this.pendingDone = null;
+    replaced?.resolve(false);
     const queue = this.queue!;
     queue.beginRun(runId);
     this.phase = "planning";
@@ -341,7 +349,6 @@ export class VoiceEngine {
     this.runOverlimit = 0;
     this.runT0 = performance.now();
     const voice = opts.voice ?? this.voice;
-    const rate = opts.rate ?? this.rate;
     const onStart = opts.onStart;
     const onEnd = opts.onEnd;
     this.userOnStart = onStart ?? null;
@@ -368,11 +375,13 @@ export class VoiceEngine {
     this.phase = "reading";
     this.next = segments[0] ?? null;
 
-    const done = new Promise<boolean>((resolve) => (this.pendingDone = { resolve }));
+    let settle!: (finished: boolean) => void;
+    const done = new Promise<boolean>((resolve) => (settle = resolve));
+    this.pendingDone = { resolve: settle };
     if (segments.length === 0) {
       queue.close();
       this.phase = "done";
-      this.pendingDone?.resolve(true);
+      settle(true);
     }
 
     // The driver: keep <= maxInFlight requests out and <= 30 s scheduled; results arrive in
@@ -387,15 +396,20 @@ export class VoiceEngine {
           continue;
         }
         const seg = segments[nextSeq++];
-        queue.requestSent();
+        // The rate is read per request, so moving the dial changes the segments not yet sent;
+        // each request reserves its estimated seconds so the 30 s cap counts audio still being
+        // synthesized (Codex review, PR #17).
+        const speed = opts.rate ?? this.rate;
+        const est = estimateSeconds(seg, speed);
+        queue.requestSent(est);
         // Every rejection is handled the moment it happens (no unhandled rejection while the
         // pump waits for capacity); the first one fails the run (Codex review, PR #17).
-        const p = this.synthOne(runId, seg, voice, rate, queue)
+        const p = this.synthOne(runId, seg, voice, speed, queue)
           .catch((e: unknown) => {
             if (firstError === null) firstError = e;
           })
           .finally(() => {
-            queue.requestSettled();
+            queue.requestSettled(est);
             inflight.delete(seg.seq);
           });
         inflight.set(seg.seq, p);
@@ -574,11 +588,14 @@ export class VoiceEngine {
   /** Speak a panel message from spec/strings/en.json (rule 8). Resolves when it has played. */
   async speak(messageKey: string): Promise<{ seconds: number }> {
     const ctx = this.ensureContext();
+    // Taken before the load, so a Stop pressed while the model loads cancels this message too
+    // (Codex review, PR #17).
+    const epoch = this.messageEpoch;
     await this.load();
+    if (epoch !== this.messageEpoch) return { seconds: 0 };
     const text = t(messageKey);
     const seq = ++this.messageSeq;
     const runId = -seq; // negative: independent of playback runs, still cancelled by stop()
-    const epoch = this.messageEpoch;
     const p = this.wait(`${runId}:${seq}`);
     this.pendingMessages.add(seq);
     this.send({ type: "speak", runId, seq, text, voice: this.voice, speed: this.rate, limits: LIMITS });

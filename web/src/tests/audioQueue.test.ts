@@ -92,6 +92,19 @@ describe("AudioQueue", () => {
     expect(q.canAccept()).toBe(true);
   });
 
+  it("audio still being synthesized counts against the ahead cap until its request settles", () => {
+    const q = new AudioQueue(ctx, { maxAheadSeconds: 30, maxInFlight: 3 });
+    q.beginRun(1);
+    q.enqueue(item(1, 0, 20));
+    expect(q.canAccept()).toBe(true);
+    q.requestSent(8);
+    expect(q.canAccept()).toBe(true); // 20 + 8 < 30
+    q.requestSent(8);
+    expect(q.canAccept()).toBe(false); // 20 + 16 >= 30
+    q.requestSettled(8);
+    expect(q.canAccept()).toBe(true);
+  });
+
   it("stop() silences every scheduled source, drops the rest, and invalidates the run quickly", () => {
     const q = new AudioQueue(ctx);
     q.beginRun(1);

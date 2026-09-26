@@ -131,13 +131,20 @@ export class AudioQueue {
     this.maybeDrain();
   }
 
-  /** The driver calls these around each worker request so the in-flight bound holds. */
-  requestSent(): void {
+  /**
+   * The driver calls these around each worker request so the in-flight bound holds. `seconds`
+   * is the request's estimated audio, reserved against the ahead cap until it settles, so
+   * three requests sent at 29 s buffered cannot push the queue far past 30 s (Codex review, PR #17).
+   */
+  requestSent(seconds = 0): void {
     this.inFlight++;
+    this.reserved += seconds;
   }
-  requestSettled(): void {
+  requestSettled(seconds = 0): void {
     this.inFlight = Math.max(0, this.inFlight - 1);
+    this.reserved = Math.max(0, this.reserved - seconds);
   }
+  private reserved = 0;
   get requestsInFlight(): number {
     return this.inFlight;
   }
@@ -149,7 +156,7 @@ export class AudioQueue {
 
   /** Back-pressure: may the driver send another synthesis request? */
   canAccept(): boolean {
-    return this.inFlight < this.maxInFlight && this.aheadSeconds() < this.maxAheadSeconds;
+    return this.inFlight < this.maxInFlight && this.aheadSeconds() + this.reserved < this.maxAheadSeconds;
   }
 
   /** Analyser between the sources and the destination, for Pip (S1-08). Null on a fake context. */

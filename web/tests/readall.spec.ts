@@ -129,6 +129,25 @@ test("stop within 200 ms while reading", async () => {
   expect(r.ahead).toBe(0);
 });
 
+test("a second Read all replaces the first and settles it (Codex review, PR #17)", async () => {
+  const text = PARAGRAPHS_011.slice(0, 2).join("\n\n");
+  await page.evaluate((t) => {
+    (window as unknown as { __first: Promise<{ finished: boolean }> }).__first = window.__tts.readAll(t);
+  }, text);
+  await page.waitForFunction(() => window.__tts.state().enqueued > 0, null, { timeout: 120_000 });
+  const first = await page.evaluate(async (t) => {
+    void window.__tts.readAll(t);
+    const r = await Promise.race([
+      (window as unknown as { __first: Promise<{ finished: boolean }> }).__first,
+      new Promise<null>((res) => setTimeout(() => res(null), 5_000)),
+    ]);
+    window.__tts.stop();
+    return r;
+  }, PARAGRAPHS_011[0]);
+  expect(first).not.toBeNull();
+  expect(first!.finished).toBe(false);
+});
+
 test("stop during planning settles readAll; stop cancels a pending spoken message (Codex review, PR #17)", async () => {
   // 020 is one long unpunctuated paragraph: planning phonemizes it for a couple of seconds, so a
   // stop() issued right after readAll() lands while the worker is still planning.
