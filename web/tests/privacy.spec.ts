@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Request as PwRequest } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -337,14 +338,6 @@ interface Snapshot {
 type FruitbatWindow = { __fruitbat: { run(t: string, l: Level): void; state(): Snapshot } };
 
 async function waitReady(page: Page, prewarmTimeoutMs = 300_000): Promise<void> {
-  for (let i = 0; i < 3; i++) {
-    try {
-      await page.waitForFunction(() => crossOriginIsolated === true, null, { timeout: 15_000 });
-      break;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
   await page.waitForFunction(() => typeof (window as unknown as Partial<FruitbatWindow>).__fruitbat?.state === "function", null, {
     timeout: 20_000,
   });
@@ -449,7 +442,7 @@ test.describe("privacy: full sweep on the real app", () => {
     await installStubs(page);
     const { records, canaryHits, pageErrors } = await attachRecorder(page);
 
-    await page.goto("/?llm=fake");
+    await gotoIsolated(page, "/?llm=fake");
     await waitReady(page);
 
     for (const level of ["readall", "short", "caveman", "oneline"] as const) {
@@ -481,7 +474,7 @@ test.describe("privacy: full sweep on the real app", () => {
     await installStubs(page);
     const { records, canaryHits, pageErrors } = await attachRecorder(page);
 
-    await page.goto("/"); // no ?llm=fake: the real summarizer path, with WebGPU disabled by the project
+    await gotoIsolated(page, "/"); // no ?llm=fake: the real summarizer path, with WebGPU disabled by the project
     await waitReady(page);
 
     const snap = await runLevel(page, "short", 30_000);
@@ -526,7 +519,7 @@ test.describe("privacy: full sweep on the real app", () => {
     await installStubs(page);
     const { records, canaryHits, pageErrors } = await attachRecorder(page);
 
-    await page.goto("/"); // no ?llm=fake: real summarizer + real Kokoro
+    await gotoIsolated(page, "/"); // no ?llm=fake: real summarizer + real Kokoro
     await waitReady(page, 15 * 60_000); // Kokoro (~92 MB) under contended sandbox bandwidth
 
     for (const level of ["readall", "short", "caveman", "oneline"] as const) {
