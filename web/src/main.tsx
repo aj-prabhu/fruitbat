@@ -55,6 +55,7 @@ window.addEventListener("fruitbat:demo", () => {
   // synthesized) counts too (Codex review, PR #20).
   const speechPending = s.voice.pending > 0 || s.voice.inFlight > 0 || s.voice.enqueued > s.voice.ended;
   if (isActive(s.gen, s.play) || speechPending) o.stop({ quiet: true });
+  else o.silenceVoice(); // e.g. the "Stopped" an Esc just spoke must not play under the recording
 });
 // The dial (app.tsx) writes state/level; a move mid-run regenerates from the current chunk.
 subscribeLevel((level) => void o.setLevel(level));

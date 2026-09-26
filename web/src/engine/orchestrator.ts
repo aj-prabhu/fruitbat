@@ -123,13 +123,28 @@ export class Orchestrator {
     this.llm = llm;
     this.speakMessages = readStored(SPEAK_KEY) !== "off";
     llm.onNotice = (n) => this.onLlmNotice(n);
+    // Progress is per file in both engines; the Loading bars show each model's total, so bytes are
+    // summed across that model's files (Codex review, PR #20).
+    const summarizerFiles = new Map<string, { loaded: number; total: number }>();
+    const voiceFiles = new Map<string, { loaded: number; total: number }>();
+    const sum = (m: Map<string, { loaded: number; total: number }>) => {
+      let loaded = 0;
+      let total = 0;
+      for (const v of m.values()) {
+        loaded += v.loaded;
+        total += v.total;
+      }
+      return { loaded, total };
+    };
     llm.onProgress = (p) => {
-      this.progress = p;
+      if (p.file) summarizerFiles.set(p.file, { loaded: p.loaded ?? 0, total: p.total ?? 0 });
+      this.progress = { file: p.file, ...sum(summarizerFiles) };
       this.emit();
     };
-    // S1-09 Loading UX: the voice's own per-file MB progress, same shape as the summarizer's.
+    // S1-09 Loading UX: the voice's MB progress, same shape as the summarizer's.
     voice.onProgress((file, loaded, total) => {
-      this.voiceProgress = { file, loaded, total };
+      voiceFiles.set(file, { loaded, total });
+      this.voiceProgress = { file, ...sum(voiceFiles) };
       this.emit();
     });
     // Rule 11: the voice loads on page load, except on data saver / mobile. (No Worker = a unit
@@ -294,6 +309,12 @@ export class Orchestrator {
     this.regenFrom = null;
     const id = this.newRun();
     return this.begin(id, level, { fromChunk: 0, base: 0, end: text.length });
+  }
+
+  /** Silence spoken messages (a "Stopped" still playing, say) without touching any run or load:
+   *  the demo recording is about to play (Codex review, PR #20). */
+  silenceVoice(): void {
+    this.voice.stop();
   }
 
   /** Esc. Returns the measured stop time in ms. `quiet` skips the spoken "Stopped" (the demo
