@@ -4,6 +4,9 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Fruitbat walking skeleton</title>
+    <!-- csp:start -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https://huggingface.co https://us.aws.cdn.hf.co https://*.cdn.hf.co; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
+    <!-- csp:end -->
     <!-- Cross-origin isolation on a static host: the service worker adds COOP/COEP (S1-00a). -->
     <script src="/coi-serviceworker.js"></script>
   </head>
