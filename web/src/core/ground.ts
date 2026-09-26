@@ -90,6 +90,7 @@ const ORDINAL_WORDS: Record<string, number> = {
 /** "five" -> "5", "twenty-one"/"twenty one" -> "21", "a hundred"/"one hundred" -> "100", ordinal words -> digits. */
 function replaceSpelledOutNumbers(text: string): string {
   let s = text;
+  s = s.replace(/\b(?:a|an|one)\s+hundredth\b/gi, "100"); // one ordinal, not 1 and 100 (Codex merge-gate review, PR #14)
   s = s.replace(/\b(?:a|an|one)\s+hundred\b/gi, "100");
 
   const tensNames = Object.keys(TENS).join("|");
