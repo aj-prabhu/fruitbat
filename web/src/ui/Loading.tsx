@@ -78,7 +78,8 @@ function SummarizerSection({ s }: { s: Snapshot }) {
   // Ready is the summarizer's own state, however it was loaded (this button or a summary request).
   const done = isLoaded || phase === "ready";
   const loaded = mb(s.progress?.loaded);
-  const total = mb(s.progress?.total) || (started ? llm.sizeMb() : 0);
+  // Never below the model's pinned size: files report their totals only as each one starts.
+  const total = Math.max(mb(s.progress?.total), started ? llm.sizeMb() : 0);
 
   const onLoad = () => {
     if (started) return;
@@ -122,7 +123,7 @@ function VoiceLine({ s }: { s: Snapshot }) {
   if (s.voiceReady) return <p class="loading-line" data-phase="ready">{t("loading.ready")}</p>;
   if (s.voiceProgress) {
     const loaded = mb(s.voiceProgress.loaded);
-    const total = mb(s.voiceProgress.total);
+    const total = Math.max(mb(s.voiceProgress.total), Math.round(voice.files.reduce((a, f) => a + f.bytes, 0) / 1e6));
     return (
       <div class="loading-voice" data-phase="voice">
         <p class="loading-line">{t("loading.voice")}</p>
