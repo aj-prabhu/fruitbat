@@ -92,6 +92,52 @@ describe("AudioQueue", () => {
     expect(q.canAccept()).toBe(true);
   });
 
+  it("audio still being synthesized counts against the ahead cap until its request settles", () => {
+    const q = new AudioQueue(ctx, { maxAheadSeconds: 30, maxInFlight: 3 });
+    q.beginRun(1);
+    q.enqueue(item(1, 0, 20));
+    expect(q.canAccept()).toBe(true);
+    const a = q.requestSent(8);
+    expect(q.canAccept()).toBe(true); // 20 + 8 < 30
+    expect(q.canAccept(5)).toBe(false); // the next segment would not fit: 20 + 8 + 5 > 30
+    q.requestSent(8);
+    expect(q.canAccept()).toBe(false); // 20 + 16 >= 30
+    q.requestSettled(a);
+    expect(q.canAccept()).toBe(true);
+  });
+
+  it("nothing starts while the context is suspended (paused before the first audio)", () => {
+    const starts: number[] = [];
+    const q = new AudioQueue(ctx, { onStart: (e) => starts.push(e.seq) });
+    q.beginRun(1);
+    ctx.state = "suspended";
+    q.enqueue(item(1, 0, 1));
+    expect(starts).toEqual([]);
+    ctx.state = "running";
+    (q as unknown as { tick(): void }).tick();
+    expect(starts).toEqual([0]);
+    q.stop();
+  });
+
+  it("a request from a replaced run does not touch the new run's counts", () => {
+    const q = new AudioQueue(ctx, { maxAheadSeconds: 30, maxInFlight: 3 });
+    q.beginRun(1);
+    const old = q.requestSent(10);
+    q.beginRun(2);
+    q.requestSent(10);
+    expect(q.requestsInFlight).toBe(1);
+    q.requestSettled(old); // the old run's request finishing late
+    expect(q.requestsInFlight).toBe(1);
+  });
+
+  it("a segment longer than the cap still goes once the queue is nearly empty", () => {
+    const q = new AudioQueue(ctx, { maxAheadSeconds: 30, maxInFlight: 3 });
+    q.beginRun(1);
+    expect(q.canAccept(45)).toBe(true); // nothing scheduled, nothing in flight
+    q.enqueue(item(1, 0, 20));
+    expect(q.canAccept(45)).toBe(false);
+  });
+
   it("stop() silences every scheduled source, drops the rest, and invalidates the run quickly", () => {
     const q = new AudioQueue(ctx);
     q.beginRun(1);
