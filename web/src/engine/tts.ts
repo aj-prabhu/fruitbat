@@ -669,9 +669,14 @@ export class VoiceEngine {
    * chunk's range); `tag` comes back on the start/end events. Resolves once its PCM is
    * scheduled, or at once if the run was stopped.
    */
+  /** Pushes accepted but not yet scheduled (voice loading, planning, synthesizing). */
+  private streamPending = 0;
+
   pushText(runId: number, text: string, start: number, end: number, tag?: number): Promise<void> {
+    this.streamPending++;
     const work = this.streamChain.then(async () => {
-      if (runId !== this.runId) return;
+      // After a failure the stream is over: queued bullets are not planned or synthesized (Codex review, PR #18).
+      if (runId !== this.runId || this.phase === "failed") return;
       await this.load();
       if (runId !== this.runId) return;
       const planId = -++this.messageSeq; // per push, same allocator as plan()/speak() (Codex review, PR #17)
@@ -697,6 +702,10 @@ export class VoiceEngine {
         }
       }
     });
+    void work.then(
+      () => this.streamPending--,
+      () => this.streamPending--,
+    );
     this.streamChain = work.catch((e: unknown) => {
       if (runId === this.runId) {
         this.phase = "failed";
@@ -923,6 +932,7 @@ export class VoiceEngine {
       ctxState: this.ctx?.state ?? "none",
       aheadSeconds: this.queue?.aheadSeconds() ?? 0,
       inFlight: this.queue?.requestsInFlight ?? 0,
+      pending: this.streamPending,
       playing: this.queue?.playing() ?? null,
       enqueued: this.queue?.enqueued ?? 0,
       ended: this.queue?.ended ?? 0,

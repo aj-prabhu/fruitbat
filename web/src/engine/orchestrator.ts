@@ -342,7 +342,8 @@ export class Orchestrator {
     if (isActive(this.gen, this.play)) return true;
     if (this.play === "stopped") return false; // Esc'd audio is not a run to regenerate (Codex review, PR #20)
     const v = this.voice.state();
-    return v.inFlight > 0 || v.enqueued > v.ended;
+    // A bullet still loading the voice or being phonemized is speech on its way (Codex review, PR #18).
+    return v.pending > 0 || v.inFlight > 0 || v.enqueued > v.ended;
   }
 
   /** Rule 2: read an all-cut chunk aloud, on request only. */
