@@ -130,6 +130,10 @@ export class Summarizer {
   private loading: Promise<boolean> | null = null;
   /** Settles once the worker confirms the last Stop, so the next run never overlaps it. */
   private drain: Promise<void> | null = null;
+  /** A Stop pressed during the adapter probe, before anything reached the worker. */
+  private stopDuringProbe = false;
+  /** The current run's options, so its own onNotice hears the notices it raises. */
+  private runOpts: SummarizeOptions | null = null;
   private waiters = new Map<string, { resolve: (m: WorkerToMain) => void; reject: (e: Error) => void }>();
   private modelRequests = 0; // model files requested (one per Transformers.js "initiate")
   private runStats: RunStats = emptyStats();
@@ -169,6 +173,7 @@ export class Summarizer {
   private notice(n: NoticeOut): void {
     this.notices.push(n);
     this.onNotice?.(n);
+    this.runOpts?.onNotice?.(n);
   }
 
   /** Stage one: adapter + device only. Milliseconds; downloads nothing. */
@@ -298,9 +303,11 @@ export class Summarizer {
   }
 
   private async loadOnce(opts: { signal?: AbortSignal }): Promise<boolean> {
+    this.stopDuringProbe = false;
     const gpu = await this.probe();
     if (!gpu.ok) return false;
-    if (opts.signal?.aborted) {
+    if (opts.signal?.aborted || this.stopDuringProbe) {
+      this.stopDuringProbe = false;
       // Stopped while the adapter probe was running, before the abort listener existed.
       this.state = "stopped";
       this.error = "aborted";
@@ -381,6 +388,11 @@ export class Summarizer {
 
   /** Stop the current run: abort the worker, drop everything still queued. */
   abort(): void {
+    if (this.state === "probing") {
+      // Nothing is on the worker yet; loadOnce() sees this once the probe returns (Codex review, PR #16).
+      this.stopDuringProbe = true;
+      return;
+    }
     if (this.state !== "running" && this.state !== "loading") return;
     const runId = this.runId;
     this.state = "stopped";
@@ -455,6 +467,15 @@ export class Summarizer {
   }
 
   private async summarizeNow(text: string, level: Level, opts: SummarizeOptions = {}): Promise<RunStats> {
+    this.runOpts = opts;
+    try {
+      return await this.summarizeRun(text, level, opts);
+    } finally {
+      if (this.runOpts === opts) this.runOpts = null;
+    }
+  }
+
+  private async summarizeRun(text: string, level: Level, opts: SummarizeOptions): Promise<RunStats> {
     if (opts.signal?.aborted) {
       // Cancelled while queued behind another run: never start it (Codex review, PR #16).
       const prev = this.runStats;

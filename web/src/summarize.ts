@@ -23,7 +23,6 @@ const H = {
   ready: false,
 };
 engine.onNotice = (n) => {
-  H.notices.push(n);
   statusEl.textContent = `notice: ${n.key}`;
 };
 engine.onProgress = (p) => {
@@ -38,6 +37,7 @@ async function run(text: string, level: Level): Promise<{ bullets: BulletOut[]; 
   bulletsEl.replaceChildren();
   rawEl.textContent = "";
   const stats = await engine.summarize(text, level, {
+    onNotice: (n) => H.notices.push(n), // the per-run callback; the e2e notice checks read it
     onBullet: (b) => {
       H.bullets.push(b);
       const li = document.createElement("li");
