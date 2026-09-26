@@ -47,6 +47,12 @@ if (typeof window === 'undefined') {
                         newHeaders.set("Cross-Origin-Resource-Policy", "cross-origin");
                     }
                     newHeaders.set("Cross-Origin-Opener-Policy", "same-origin");
+                    // Fruitbat: a constructed Response has no `url`, which would blind the
+                    // after-the-fact redirect check in web/src/engine/net.ts. Carry the fetched
+                    // response's final URL in a header instead (Codex review, PR #9).
+                    if (response.url) {
+                        newHeaders.set("X-Fruitbat-Final-Url", response.url);
+                    }
 
                     return new Response(response.body, {
                         status: response.status,

@@ -2,16 +2,17 @@
 // Proves the pinned runtime (Transformers.js 4.x + vendored Kokoro loader) generates real text
 // and real audio in the browser with pinned model revisions. Everything after this packet
 // replaces this file; nothing here is product code.
-import { env, AutoTokenizer, AutoModelForCausalLM, TextStreamer } from "@huggingface/transformers";
+import { AutoTokenizer, AutoModelForCausalLM, TextStreamer } from "@huggingface/transformers";
 import type { PreTrainedModel, PreTrainedTokenizer } from "@huggingface/transformers";
 import { KokoroTTS } from "./vendor/kokoro/kokoro.js";
 import { loadVoice } from "./engine/net";
-import { PINS } from "./pins";
+import { configureRuntime, load, type LoadProgress } from "./engine/loader";
+import { pinnedModels } from "./engine/pins";
 
-env.allowLocalModels = false;
-env.useBrowserCache = true;
-// Serve onnxruntime's WASM from this origin, never from a CDN (rule 1). See scripts/copy-ort.mjs.
-if (env.backends.onnx.wasm) env.backends.onnx.wasm.wasmPaths = "/ort/";
+// S1-03a: the runtime (pinned template, caches, guarded fetch, same-origin ORT) is configured by
+// the loader; the model pins come from spec/models.json.
+configureRuntime();
+const PINS = { llm: pinnedModels().web.summarizer, tts: { ...pinnedModels().web.voice, voice: "af_heart" as const } };
 
 type Phase = "starting" | "idle" | "loading" | "generating" | "done" | "failed";
 
@@ -77,7 +78,7 @@ async function probe() {
   }
 }
 
-function progress(info: { status: string; file?: string; loaded?: number; total?: number }) {
+function progress(info: LoadProgress) {
   if (info.status === "progress" && info.file && typeof info.loaded === "number") {
     S.downloaded[info.file] = info.loaded;
     const mb = Object.values(S.downloaded).reduce((a, b) => a + b, 0) / 1e6;
@@ -89,23 +90,33 @@ async function loadAll() {
   S.state = "loading";
   mark("load_start");
   const [tokenizer, model] = await Promise.all([
-    AutoTokenizer.from_pretrained(PINS.llm.id, { revision: PINS.llm.revision, progress_callback: progress }),
-    AutoModelForCausalLM.from_pretrained(PINS.llm.id, {
-      dtype: PINS.llm.dtype,
-      device: PINS.llm.device,
-      revision: PINS.llm.revision,
-      progress_callback: progress,
-    }),
+    load(PINS.llm, (id, o) => AutoTokenizer.from_pretrained(id, { revision: o.revision, progress_callback: o.progress_callback }), progress),
+    load(
+      PINS.llm,
+      (id, o) =>
+        AutoModelForCausalLM.from_pretrained(id, {
+          dtype: o.dtype as "q4f16",
+          device: o.device as "webgpu",
+          revision: o.revision,
+          progress_callback: o.progress_callback,
+        }),
+      progress,
+    ),
   ]);
   llm = { tokenizer, model };
   mark("llm_loaded");
-  tts = await KokoroTTS.from_pretrained(PINS.tts.id, {
-    dtype: PINS.tts.dtype,
-    device: PINS.tts.device,
-    revision: PINS.tts.revision,
-    progress_callback: progress,
-    loadVoice,
-  });
+  tts = await load(
+    PINS.tts,
+    (id, o) =>
+      KokoroTTS.from_pretrained(id, {
+        dtype: o.dtype as "q8",
+        device: o.device as "wasm",
+        revision: o.revision,
+        progress_callback: o.progress_callback,
+        loadVoice,
+      }),
+    progress,
+  );
   S.ttsMaxTokens = tts.max_tokens;
   mark("tts_loaded");
 }

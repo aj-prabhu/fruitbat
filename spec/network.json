@@ -95,12 +95,15 @@
         "Policy",
         "Signature",
         "Key-Pair-Id",
-        "Hash-Algorithm"
+        "Hash-Algorithm",
+        "response-content-type",
+        "xip"
       ],
       "huggingface.co": [
         "etag",
         "<url-encoded original path as the parameter name>"
-      ]
+      ],
+      "$comment": "Keyed by host. A host that matches a redirect_host_pattern uses the parameters recorded for any listed host under the same pattern (region prefixes vary). S1-03a added response-content-type: the Hub sends it on small LFS files such as tokenizer.json (curl -sI 2026-09-24). 2026-09-25: the CDN began adding `xip`; without it every real-network model load was refused by net.ts. Redirect parameter names drift; the weekly health check should diff the observed names against this list."
     },
     "methods": [
       "GET"
