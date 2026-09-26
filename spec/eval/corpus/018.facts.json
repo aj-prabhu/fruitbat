@@ -1,0 +1,29 @@
+{
+  "id": "018",
+  "key_facts": [
+    "the brown old seaman with the sabre cut first took up his lodging under our roof",
+    "“Fifteen men on the dead man’s chest-- Yo-ho-ho, and a bottle of rum!”",
+    "he threw down three or four gold pieces on the threshold",
+    "promised me a silver fourpenny on the first of every month if I would only keep my “weather-eye open for a seafaring man with one leg”",
+    "the Dry Tortugas, and wild deeds and places on the Spanish Main",
+    "calling him a “true sea-dog” and a “real old salt”",
+    "One of the cocks of his hat having fallen down, he let it hang from that day forth",
+    "The great sea-chest none of us had ever seen open."
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "The captain promised the boy a golden sovereign twice yearly.",
+      "distinctive_tokens": ["sovereign", "yearly"]
+    },
+    {
+      "claim": "The one-legged seafaring man was searching for the captain to reward him.",
+      "distinctive_tokens": ["reward", "searching"]
+    },
+    {
+      "claim": "The captain kept his sea-chest unlocked and open on the table for guests to see.",
+      "distinctive_tokens": ["unlocked", "guests"]
+    }
+  ],
+  "expected_oneline_keywords": ["treasure island", "captain", "inn", "sailor"],
+  "notes": "The narrator fears the one-legged man on the captain's behalf, not the reverse; the sea-chest is explicitly never seen open."
+}
