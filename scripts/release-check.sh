@@ -39,7 +39,13 @@ missing() {
 run_check() {
   local name="$1" log="$2"
   shift 2
-  if "$@" >"$log" 2>&1; then row "$name" PASS "$*"; else row "$name" FAIL "see $log"; fi
+  if "$@" >"$log" 2>&1; then
+    row "$name" PASS "$*"
+  else
+    row "$name" FAIL "see $log (tail printed above)"
+    # The CI runner is discarded after the job, so the reason goes into the job log too (Codex review, PR #6).
+    { echo "---- $name FAILED: last 40 lines of $log ----"; tail -n 40 "$log"; echo "----"; } >&2
+  fi
   return 0
 }
 
@@ -175,7 +181,7 @@ if [ -d bench/graded ]; then
         if [ ! -s "$f" ]; then echo "$doc/$level missing"; continue; fi
         jq -e --arg d "$doc" --arg l "$level" --arg s "$sha" \
           '(type == "object") and (.doc == $d) and (.level == $l)
-           and ((.commit | tostring) as $c | ($c | startswith($s)) or ($s | startswith($c)))
+           and ((.commit | tostring) as $c | (($c | length) >= 7) and (($c | startswith($s)) or ($s | startswith($c))))
            and ((.score | type) == "number") and (.score >= 4)' "$f" >/dev/null 2>&1 \
           || echo "$doc/$level invalid or score < 4"
       done
@@ -219,7 +225,7 @@ fi
 # recorded request; "[]", "{}" or broken JSON is not evidence (Codex review, PR #6).
 privacy_log_ok() {
   jq -e --arg s "$2" '(type == "object")
-    and ((.commit | tostring) as $c | ($c | startswith($s)) or ($s | startswith($c)))
+    and ((.commit | tostring) as $c | (($c | length) >= 7) and (($c | startswith($s)) or ($s | startswith($c))))
     and ((.records | type) == "array") and ((.records | length) > 0)
     and (.requestCount == (.records | length))' "$1" >/dev/null 2>&1
 }

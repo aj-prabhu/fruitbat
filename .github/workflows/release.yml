@@ -27,14 +27,20 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # Tag values reach the shell only through env vars, never pasted into the script, so a tag
+      # or manual input holding $(...) or quotes is data, not code (Codex review, PR #6).
       - name: Resolve tag
         id: tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "tag=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
-          else
-            echo "tag=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
-          fi
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then tag="$INPUT_TAG"; else tag="$REF_NAME"; fi
+          case "$tag" in
+            *[!A-Za-z0-9._-]*|"") echo "release: refusing tag with unexpected characters: $tag" >&2; exit 1 ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v4
         with:
@@ -60,9 +66,11 @@ jobs:
 
       - name: Dry run (manual run, or tag contains -test)
         if: github.event_name != 'push' || contains(steps.tag.outputs.tag, '-test')
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
           echo "### DRY RUN: manual run or '-test' tag — nothing is deployed. ###"
-          case "${{ steps.tag.outputs.tag }}" in
+          case "$TAG" in
             web-v*) echo "would run: scripts/deploy-space.sh 2shay/fruitbat --allow-public" ;;
             mac-v*) echo "would hand off to scripts/release.sh (S2-12, not built yet)" ;;
             *) echo "tag matches neither web-v* nor mac-v*" ;;
