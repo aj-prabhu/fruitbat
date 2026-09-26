@@ -20,6 +20,8 @@ const STATS_KEY = "fruitbat.stats.last";
 // The TTS-safe split, from spec/models.json (measured in S1-00a), not a second copy (Codex review, PR #17).
 const LIMITS = { target: pinnedModels().web.voice.tts_phoneme_target, limit: pinnedModels().web.voice.tts_phoneme_limit };
 
+type RunMetrics = { runId: number; ttfa: number | null; synthMs: number; overlimit: number; gapMs: number; seconds: number };
+
 export interface LoadedInfo {
   maxTokens: number;
   downloadedBytes: number;
@@ -349,6 +351,7 @@ export class VoiceEngine {
     // (Codex review, PR #17).
     const replaced = this.pendingDone;
     this.pendingDone = null;
+    if (replaced) this.replacedMetrics = this.metricsNow(before);
     replaced?.resolve(false);
     // ...and cancel its work in the worker, as stop() does, so its queued synthesis does not run
     // ahead of this read (Codex review, PR #17).
@@ -495,20 +498,32 @@ export class VoiceEngine {
     this.pendingDone = null;
   }
 
+  /** This run's metrics as they stand, before anything resets them. */
+  private metricsNow(runId: number): RunMetrics {
+    return { runId, ttfa: this.runTtfa, synthMs: this.runSynthMs, overlimit: this.runOverlimit, gapMs: this.queue?.maxGapMs ?? 0, seconds: this.queue?.totalSeconds ?? 0 };
+  }
+
+  /** Metrics of a read that a newer read replaced, taken before the new read reset them. */
+  private replacedMetrics: RunMetrics | null = null;
+
   private result(runId: number, segments: number, coverage: number, finished: boolean, seconds = 0): ReadAllResult {
-    const q = this.queue!;
-    const synthSeconds = this.runSynthMs / 1000;
+    // A replaced read finishes after the new one has reset the shared counters: use the snapshot
+    // taken at replacement (Codex review, PR #17).
+    const snap = this.replacedMetrics?.runId === runId ? this.replacedMetrics : null;
+    const m = snap ?? this.metricsNow(runId);
+    const secs = snap ? snap.seconds : seconds;
+    const synthSeconds = m.synthMs / 1000;
     const row = this.buildRow({
-      ttfa_ms: this.runTtfa === null ? null : Math.round(this.runTtfa),
-      rtf: synthSeconds > 0 ? Math.round((seconds / synthSeconds) * 100) / 100 : null,
-      gap_ms: Math.round(q.maxGapMs),
+      ttfa_ms: m.ttfa === null ? null : Math.round(m.ttfa),
+      rtf: synthSeconds > 0 ? Math.round((secs / synthSeconds) * 100) / 100 : null,
+      gap_ms: Math.round(m.gapMs),
       stop_ms: this.lastStop?.runId === runId ? this.lastStop.ms : null, // a finished run has none
       coverage,
-      tts_overlimit: this.runOverlimit,
+      tts_overlimit: m.overlimit,
     });
     this.lastStats = row;
     writeStored(STATS_KEY, JSON.stringify(row));
-    return { runId, segments, coverage, ttsOverlimit: this.runOverlimit, seconds, finished };
+    return { runId, segments, coverage, ttsOverlimit: m.overlimit, seconds: secs, finished };
   }
 
   private buildRow(partial: Partial<RunStatsRow>): RunStatsRow {

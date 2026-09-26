@@ -229,6 +229,9 @@ export class AudioQueue {
 
   /** Fire onStart for every scheduled item whose start time the audio clock has reached. */
   private tick(): void {
+    // Paused (context suspended): nothing is audible, so nothing "starts", even a buffer
+    // scheduled at the frozen current time (Codex review, PR #17).
+    if (this.ctx.state === "suspended") return;
     const now = this.ctx.currentTime;
     for (const s of this.scheduled) {
       if (s.started || s.ended || s.item.runId !== this.runId) continue;

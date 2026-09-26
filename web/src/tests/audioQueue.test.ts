@@ -106,6 +106,19 @@ describe("AudioQueue", () => {
     expect(q.canAccept()).toBe(true);
   });
 
+  it("nothing starts while the context is suspended (paused before the first audio)", () => {
+    const starts: number[] = [];
+    const q = new AudioQueue(ctx, { onStart: (e) => starts.push(e.seq) });
+    q.beginRun(1);
+    ctx.state = "suspended";
+    q.enqueue(item(1, 0, 1));
+    expect(starts).toEqual([]);
+    ctx.state = "running";
+    (q as unknown as { tick(): void }).tick();
+    expect(starts).toEqual([0]);
+    q.stop();
+  });
+
   it("a request from a replaced run does not touch the new run's counts", () => {
     const q = new AudioQueue(ctx, { maxAheadSeconds: 30, maxInFlight: 3 });
     q.beginRun(1);
