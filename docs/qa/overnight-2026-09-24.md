@@ -29,7 +29,7 @@ _Updated Sat 2026-09-26 09:40 PDT._
 
 ## Not done yet
 
-- **Your two product ideas:** a fruit bat Wikipedia demo, and a "fruits eaten" counter. Next up after the open PRs, planned through the claudex loop as the build standard asks.
+- **Your two product ideas:** a fruit bat Wikipedia demo, and a "fruits eaten" counter. Recon and a draft plan are in `docs/plans/2026-09-26-fruit-bat-demo-and-fruits-eaten.md`, waiting on four answers from you.
 - **The S1-12 real-model privacy sweep:** it writes `docs/qa/privacy-requests-<sha>.json`. It needs a visible WebGPU browser, which takes window focus, so it's yours (see blocked.md).
 - **Bench baselines:** #27 has 36 proof rows. Setting baselines from them is your call.
 - **S1-14:** Safari. **S1-16:** live gate and `web-v0.1.0`. **S1-L1**, **S1-L4**, **S2-01/02**.

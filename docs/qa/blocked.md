@@ -4,6 +4,7 @@ _Overnight build 2026-09-23 → 24, updated 2026-09-26. Newest at the top. Each 
 
 ## New since the merge run (9/26)
 
+- **Your two ideas (fruit bat demo, "fruits eaten"):** recon and a draft plan are in `docs/plans/2026-09-26-fruit-bat-demo-and-fruits-eaten.md`. Four questions at the top, or say "accept all recommendations". Your build standard runs the claudex loop before code, so nothing is built until you answer.
 - **S1-12 real-model privacy sweep:** run `npx playwright test tests/privacy.spec.ts --project=webgpu-local` on a quiet network. It needs a visible WebGPU browser window, so it would take focus if I ran it. It writes `docs/qa/privacy-requests-<sha>.json`; commit that file on top of the tested commit. The release check wants it.
 - **Bench baselines (#27):** the runner produced 36 proof rows at 1.5x speech on a loaded machine. 025/caveman sits below the tok/s floor. Decide whether to set baselines from these or from a quiet re-run.
 - **FYI, no action:** I set the repo variable `HEALTH_SKIP_SPACE=1`, as `health.yml` asks, until `web-v0.1.0` makes the public Space public. Delete it then.
