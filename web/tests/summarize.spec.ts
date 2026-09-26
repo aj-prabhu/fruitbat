@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,15 +18,7 @@ const DOC025 = corpus("025");
 type Result = { bullets: { text: string; chunkIndex: number }[]; notices: { key: string }[]; raw: string; stats: Record<string, unknown> & { chunks: number; per_chunk_kept: number[]; level_used: string; reduce_calls: number }; state: string; error: string | null; aborted: boolean };
 
 async function open(page: Page, query: string) {
-  await page.goto(`/summarize.html${query}`);
-  for (let i = 0; i < 3; i++) {
-    try {
-      await page.waitForFunction(() => (window as unknown as { crossOriginIsolated: boolean }).crossOriginIsolated === true, null, { timeout: 15_000 });
-      break;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
+  await gotoIsolated(page, `/summarize.html${query}`);
   await page.waitForFunction(() => (window as unknown as { __llm?: { state(): { ready: boolean } } }).__llm?.state().ready === true, null, { timeout: 20_000 });
 }
 const summarize = (page: Page, text: string, level: string) =>
