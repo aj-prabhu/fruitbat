@@ -22,7 +22,7 @@ async function waitIsolated(page: Page) {
 }
 
 test("cross-origin isolation holds via the service worker", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/skeleton.html");
   await waitIsolated(page);
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
   expect(await page.evaluate(() => typeof SharedArrayBuffer)).toBe("function");
@@ -30,7 +30,7 @@ test("cross-origin isolation holds via the service worker", async ({ page }) => 
 
 test("real text -> real bullets -> real audio", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "webgpu-local", "needs WebGPU; wasm-ci gets ?llm=fake in S1-05");
-  await page.goto("/");
+  await page.goto("/skeleton.html");
   await waitIsolated(page);
   await page.waitForFunction(() => (window as unknown as { __skeleton?: { state: string } }).__skeleton?.state === "idle", null, {
     timeout: 20_000,

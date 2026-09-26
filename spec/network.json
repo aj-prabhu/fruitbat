@@ -11,7 +11,13 @@
         "/assets/*",
         "/ort/ort-wasm-simd-threaded.asyncify.mjs",
         "/ort/ort-wasm-simd-threaded.asyncify.wasm",
-        "/models/kokoro-voices/af_heart.bin"
+        "/models/kokoro-voices/af_heart.bin",
+        "/skeleton.html",
+        "/sample.txt",
+        "/fonts/AtkinsonHyperlegible-Regular.woff2",
+        "/fonts/AtkinsonHyperlegible-Bold.woff2",
+        "/fonts/AtkinsonHyperlegible-Italic.woff2",
+        "/fonts/AtkinsonHyperlegible-BoldItalic.woff2"
       ],
       "prefixes": [
         "/assets/",
@@ -20,7 +26,10 @@
         "/demo/",
         "/coi-serviceworker.js",
         "/",
-        "/index.html"
+        "/index.html",
+        "/fonts/",
+        "/skeleton.html",
+        "/sample.txt"
       ]
     },
     "hub_files": {

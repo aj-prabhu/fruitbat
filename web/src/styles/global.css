@@ -1,0 +1,254 @@
+/* Fruitbat web app shell (S1-01). Plain, quiet styling; the impeccable pass is S1-07.
+   All colors are CSS custom properties on :root (docs/PLAN.md S1-01) so dark mode and later
+   theming never touch component styles. */
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/fonts/AtkinsonHyperlegible-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/fonts/AtkinsonHyperlegible-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/fonts/AtkinsonHyperlegible-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/fonts/AtkinsonHyperlegible-BoldItalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  --gutter: 16px;
+  --measure: 65ch;
+  --border-radius: 8px;
+
+  --color-bg: #faf9f6;
+  --color-fg: #1a1a1a;
+  --color-muted: #5b5b5b;
+  --color-border: #d8d5cd;
+  --color-accent: #7a3b2e;
+  --color-accent-fg: #ffffff;
+  --color-panel-bg: #ffffff;
+  --color-input-bg: #ffffff;
+  --color-focus-ring: #7a3b2e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #17171a;
+    --color-fg: #eceae6;
+    --color-muted: #a8a49c;
+    --color-border: #3a3a3f;
+    --color-accent: #e0a893;
+    --color-accent-fg: #17171a;
+    --color-panel-bg: #201f23;
+    --color-input-bg: #201f23;
+    --color-focus-ring: #e0a893;
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #17171a;
+  --color-fg: #eceae6;
+  --color-muted: #a8a49c;
+  --color-border: #3a3a3f;
+  --color-accent: #e0a893;
+  --color-accent-fg: #17171a;
+  --color-panel-bg: #201f23;
+  --color-input-bg: #201f23;
+  --color-focus-ring: #e0a893;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: "Atkinson Hyperlegible", system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: var(--gutter);
+  padding-bottom: calc(var(--gutter) * 6); /* room for the fixed panel on narrow screens */
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gutter);
+  padding-bottom: var(--gutter);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--gutter);
+}
+
+.app-title {
+  font-size: 1.25rem;
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dial {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: 4px;
+  margin: 0;
+}
+
+.dial-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: calc(var(--border-radius) - 2px);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.dial-option:has(input:checked) {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+.dial-option input {
+  accent-color: var(--color-accent);
+}
+
+.dial-option input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.theme-toggle {
+  border: 1px solid var(--color-border);
+  background: var(--color-panel-bg);
+  color: var(--color-fg);
+  border-radius: var(--border-radius);
+  padding: 6px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.app-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gutter) * 1.5);
+  max-width: var(--measure);
+  width: 100%;
+  margin: 0 auto;
+}
+
+.article p {
+  margin: 0 0 1em;
+}
+
+.paste-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.paste-label {
+  font-weight: 700;
+}
+
+.paste-textarea {
+  width: 100%;
+  max-width: 100%;
+  min-height: 8em;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-input-bg);
+  color: var(--color-fg);
+  font: inherit;
+  resize: vertical;
+}
+
+.paste-textarea:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.word-count {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.panel {
+  position: fixed;
+  right: var(--gutter);
+  bottom: var(--gutter);
+  width: min(320px, calc(100% - var(--gutter) * 2));
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: var(--gutter);
+}
+
+.panel-empty {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+/* Narrow screens (390 px devices and up to a small-tablet breakpoint): panel drops to a
+   full-width bar pinned to the bottom instead of a floating bottom-right card. */
+@media (max-width: 640px) {
+  .panel {
+    left: var(--gutter);
+    right: var(--gutter);
+    width: auto;
+  }
+}

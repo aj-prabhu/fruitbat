@@ -18,11 +18,14 @@
     "$comment": "Wording the plan fixes (rules 2, 11, C3, C9, Architecture). S1-L0 keeps the meaning; it may tune words after the Voice Bank pass."
   },
   "strings": {
+    "app.title": "TODO(S1-L0)",
+    "theme.toggle": "TODO(S1-L0)",
     "dial.readall": "TODO(S1-L0)",
     "dial.short": "TODO(S1-L0)",
     "dial.caveman": "TODO(S1-L0)",
     "dial.oneline": "TODO(S1-L0)",
     "panel.title": "TODO(S1-L0)",
+    "panel.empty": "TODO(S1-L0)",
     "panel.read_chip": "TODO(S1-L0)",
     "panel.summarize": "TODO(S1-L0)",
     "panel.stop": "TODO(S1-L0)",
