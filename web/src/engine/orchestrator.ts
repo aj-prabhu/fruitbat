@@ -281,6 +281,7 @@ export class Orchestrator {
     this.chunks = null;
     this.notices = [];
     this.lastNotice = null;
+    this.regenFrom = null;
     const id = this.newRun();
     return this.begin(id, level, { fromChunk: 0, base: 0, end: text.length });
   }
@@ -339,6 +340,7 @@ export class Orchestrator {
     const chunkIndex = await this.currentChunkIndex();
     if (this.regenPending === id) this.regenPending = null;
     if (id !== this.runId) return;
+    this.regenFrom = chunkIndex;
     const c = this.chunks?.[chunkIndex];
     await this.begin(id, level, { fromChunk: chunkIndex, base: c?.start ?? 0, end: this.text.length });
   }
@@ -396,8 +398,14 @@ export class Orchestrator {
       return i >= 0 ? i : 0;
     }
     const lastBullet = this.bullets[this.bullets.length - 1];
-    return lastBullet ? lastBullet.chunkIndex : 0;
+    if (lastBullet) return lastBullet.chunkIndex;
+    // A regeneration that has not spoken yet still stands at the chunk it restarted from, so a
+    // second dial move does not fall back to chunk 0 (Codex review, PR #18).
+    return this.regenFrom ?? 0;
   }
+
+  /** The chunk the current dial regeneration restarted from; null for a fresh run. */
+  private regenFrom: number | null = null;
 
   private async begin(id: number, level: Level, o: { fromChunk: number; base: number; end: number; keep?: boolean }): Promise<void> {
     this.play = reducePlay(this.play, "reset");
