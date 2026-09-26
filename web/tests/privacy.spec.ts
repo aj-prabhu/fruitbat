@@ -200,6 +200,8 @@ interface Rec {
   redirectedFrom: string | null;
   status: number | null;
   finalUrlHeader: string | null;
+  /** made by the coi-serviceworker on the page's behalf (visible at context scope only) */
+  fromServiceWorker: boolean;
 }
 
 function scan(where: string, value: string, hits: string[]): void {
@@ -216,7 +218,10 @@ async function attachRecorder(page: Page) {
 
   page.on("pageerror", (e) => pageErrors.push(String(e)));
 
-  page.on("request", (req: PwRequest) => {
+  // Context scope, not page scope: after gotoIsolated the COI service worker fetches on the page's
+  // behalf, and those requests are reported on the context only (Codex review, PR #21).
+  const ctx = page.context();
+  ctx.on("request", (req: PwRequest) => {
     const rec: Rec = {
       url: req.url(),
       method: req.method(),
@@ -224,6 +229,7 @@ async function attachRecorder(page: Page) {
       redirectedFrom: req.redirectedFrom()?.url() ?? null,
       status: null,
       finalUrlHeader: null,
+      fromServiceWorker: req.serviceWorker() !== null,
     };
     records.push(rec);
     byUrl.set(rec.url, rec);
@@ -234,7 +240,7 @@ async function attachRecorder(page: Page) {
     if (body) scan(`request body on ${rec.url}`, body, canaryHits);
   });
 
-  page.on("response", async (res) => {
+  ctx.on("response", async (res) => {
     const req = res.request();
     const rec = byUrl.get(req.url());
     const headers = res.headers();
@@ -289,7 +295,9 @@ function evaluateAllowlist(records: Rec[], allow: Allowlist, baseOrigin: string)
       const v = validateRedirectTarget(u, allow);
       if (!v.ok) violations.push(`redirect hop ${rec.url}: ${v.reason}`);
     } else if (u.origin === baseOrigin) {
-      if (rec.resourceType === "document") {
+      if (rec.resourceType === "document" || (rec.fromServiceWorker && u.pathname.match(/^\/([\w-]+\.html)?$/))) {
+        // A navigation, or the coi-serviceworker re-fetching that same page to add its isolation
+        // headers: only the test harness's own flags may ride on it.
         const badParams = [...u.searchParams.keys()].filter((k) => !TEST_HARNESS_PARAMS.has(k));
         if (badParams.length) violations.push(`unexpected query param(s) on navigation ${rec.url}: ${badParams.join(",")}`);
       } else if (u.search !== "") {
