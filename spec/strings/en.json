@@ -102,6 +102,8 @@
     "report.copy": "Copy report",
     "report.copied": "Copied.",
     "report.privacy_note": "The report has numbers and settings only. Never your text, your audio or your file names.",
+    "panel.voice.af_heart": "Heart",
+    "panel.voice.af_bella": "Bella",
     "stats.title": "Stats",
     "stats.empty": "No runs yet.",
     "stats.export": "Export CSV",

@@ -216,6 +216,9 @@ function RateControl({ rate, onChange }: { rate: number; onChange: (r: number) =
   );
 }
 
+/** Picker labels from spec/strings, never the engine's voice ids (Codex review, PR #25). */
+const VOICE_LABEL: Record<VoiceId, string> = { af_heart: "panel.voice.af_heart", af_bella: "panel.voice.af_bella" };
+
 function VoiceControl({ voice, onChange }: { voice: VoiceId; onChange: (v: VoiceId) => void }) {
   return (
     <div class="panel-field">
@@ -231,7 +234,7 @@ function VoiceControl({ voice, onChange }: { voice: VoiceId; onChange: (v: Voice
       >
         {VOICES.map((v) => (
           <option key={v} value={v}>
-            {v}
+            {t(VOICE_LABEL[v])}
           </option>
         ))}
       </select>
