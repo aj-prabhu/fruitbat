@@ -221,7 +221,7 @@ async function attachRecorder(page: Page) {
   // Context scope, not page scope: after gotoIsolated the COI service worker fetches on the page's
   // behalf, and those requests are reported on the context only (Codex review, PR #21).
   const ctx = page.context();
-  ctx.on("request", (req: PwRequest) => {
+  ctx.on("request", async (req: PwRequest) => {
     const rec: Rec = {
       url: req.url(),
       method: req.method(),
@@ -234,7 +234,14 @@ async function attachRecorder(page: Page) {
     records.push(rec);
     byUrl.set(rec.url, rec);
     scan(`request url`, rec.url, canaryHits);
-    const headers = req.headers();
+    // allHeaders(), not headers(): the latter omits security-related headers such as Cookie, and a
+    // leak through a cookie on an allowed request must fail this test too (Codex review, PR #21).
+    let headers: Record<string, string>;
+    try {
+      headers = await req.allHeaders();
+    } catch {
+      headers = req.headers(); // the request was gone before its headers could be read
+    }
     for (const [k, v] of Object.entries(headers)) scan(`request header ${k} on ${rec.url}`, v, canaryHits);
     const body = req.postData();
     if (body) scan(`request body on ${rec.url}`, body, canaryHits);
