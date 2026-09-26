@@ -31,6 +31,20 @@ const SCHEMA_PATH = path.join(REPO_ROOT, "spec", "schemas", "run-stats.schema.js
 const LAST_RUN_DIR = path.join(BENCH_DIR, "last-run");
 
 const ALL_LEVELS = ["readall", "short", "caveman", "oneline"];
+// Maxes the product's own persisted speech-rate setting (web/src/engine/tts.ts, RATE_MAX = 1.5) on
+// every page load, cutting real playback wait time by a third. This is a supported dial control,
+// not a hack, but it does mean gap_ms/rtf on these rows reflect 1.5x speech rather than the
+// default 1.0x -- noted in the runner's report, doesn't affect ttfa_ms/tok_s/facts_token_hit.
+const BENCH_RATE = 1.5;
+async function primeRate(context) {
+  await context.addInitScript((rate) => {
+    try {
+      localStorage.setItem("fruitbat.rate", String(rate));
+    } catch {
+      // private mode / blocked storage: falls back to the default rate, just slower
+    }
+  }, BENCH_RATE);
+}
 const WEBGPU_ARGS = [
   "--enable-unsafe-webgpu",
   "--ignore-gpu-blocklist",
@@ -270,12 +284,34 @@ function validateAndAppend(csvFields, row) {
 // One measurement: trigger, wait for gen+voice idle (main.tsx's own record() condition), measure
 // --------------------------------------------------------------------------------------
 
+// The wait condition (voice.enqueued <= voice.ended) requires every spoken segment to actually
+// finish PLAYING, not just be synthesized -- the AudioContext clock runs in real time regardless
+// of --mute-audio, so a run's true duration is generation time plus the real-time length of
+// whatever gets spoken. That's the whole document for readall (proportional to word count) and a
+// handful of short bullets per chunk for short/caveman (bounded by dial.json's
+// max_bullets_per_chunk), or a single final line for oneline (dial.json: "only the final line is
+// spoken"). RUN_MJS_RATE below maxes the product's own speech-rate setting (0.7-1.5,
+// web/src/engine/tts.ts RATE_MAX) to cut real playback time by a third; timeouts still budget for
+// the unsped floor so a slower machine doesn't get killed early.
 function computeTimeoutMs(text, level, cold) {
   const words = text.trim().split(/\s+/).length;
-  let ms = 60_000 + words * 40; // generous: ~40ms/word of headroom on top of a 1-minute floor
-  if (level === "oneline" && words > 3000) ms += 120_000; // multi-chunk reduce pass
-  if (cold) ms += 180_000; // model download time, cold cache
-  return Math.min(Math.max(ms, 60_000), 20 * 60_000);
+  const chunks = Math.max(1, Math.ceil(words / 1200)); // spec/chunking.md's ~1600-token budget, ~1200 words/chunk
+  let ms;
+  if (level === "readall") {
+    // Real-time narration of the whole document dominates. 120 wpm is a conservative (slow) floor
+    // -- real speech is usually faster -- chosen so a legitimately slower run never gets killed.
+    ms = (words / 120) * 60_000 + 60_000;
+  } else if (level === "oneline") {
+    // Only the final line is spoken; generation is per-chunk one-liners plus a bounded reduce
+    // pass (dial.json: group size 10, depth <= 2), not proportional to bullet count.
+    ms = chunks * 20_000 + 60_000;
+  } else {
+    // short/caveman: up to max_bullets_per_chunk spoken bullets per chunk, each a few seconds of
+    // speech, plus that chunk's generation time.
+    ms = chunks * 90_000 + 60_000;
+  }
+  if (cold) ms += 240_000; // model download time, cold cache
+  return Math.min(Math.max(ms, 60_000), 150 * 60_000); // clamp 1..150 minutes
 }
 
 async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, discard = false }) {
@@ -441,6 +477,7 @@ async function main() {
       fs.mkdirSync(profileDir, { recursive: true });
       const context = await chromium.launchPersistentContext(profileDir, { headless: false, args: WEBGPU_ARGS });
       cleanupFns.push(() => context.close());
+      await primeRate(context);
       const page = context.pages()[0] ?? (await context.newPage());
       await page.goto(baseURL);
       await page.waitForFunction(() => !!window.__fruitbat, null, { timeout: 30_000 });
@@ -472,6 +509,7 @@ async function main() {
             const tmpProfile = fs.mkdtempSync(path.join(os.tmpdir(), "fruitbat-bench-cold-"));
             const context = await chromium.launchPersistentContext(tmpProfile, { headless: false, args: WEBGPU_ARGS });
             try {
+              await primeRate(context);
               const page = context.pages()[0] ?? (await context.newPage());
               await page.goto(baseURL);
               await page.waitForFunction(() => !!window.__fruitbat, null, { timeout: 30_000 });
