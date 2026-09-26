@@ -176,9 +176,20 @@ export class Summarizer {
     this.runOpts?.onNotice?.(n);
   }
 
-  /** Stage one: adapter + device only. Milliseconds; downloads nothing. */
-  async probe(): Promise<GpuProbe> {
-    if (this.gpu) return this.gpu;
+  private probeP: Promise<GpuProbe> | null = null;
+
+  /** Stage one: adapter + device only. Milliseconds; downloads nothing. Concurrent callers share one probe. */
+  probe(): Promise<GpuProbe> {
+    if (this.gpu) return Promise.resolve(this.gpu);
+    if (!this.probeP) {
+      this.probeP = this.probeOnce().finally(() => {
+        this.probeP = null;
+      });
+    }
+    return this.probeP;
+  }
+
+  private async probeOnce(): Promise<GpuProbe> {
     this.state = "probing";
     this.gpu = await probeWebGpu(this.flags.inject);
     if (this.flags.llm === "fake") this.gpu = { ...this.gpu, ok: true, reason: "ok" };

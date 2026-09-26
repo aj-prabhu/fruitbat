@@ -29,7 +29,18 @@ engine.onProgress = (p) => {
   statusEl.textContent = `loading ${p.file ?? ""} ${p.loaded && p.total ? Math.round((p.loaded / p.total) * 100) + "%" : ""}`;
 };
 
-async function run(text: string, level: Level): Promise<{ bullets: BulletOut[]; notices: NoticeOut[]; raw: string; stats: RunStats; state: string; error: string | null; aborted: boolean }> {
+type RunOut = { bullets: BulletOut[]; notices: NoticeOut[]; raw: string; stats: RunStats; state: string; error: string | null; aborted: boolean };
+
+// The engine serializes runs; the harness does too, so a second request never wipes the
+// output of the one still streaming (Codex review, PR #16).
+let queue: Promise<unknown> = Promise.resolve();
+function run(text: string, level: Level): Promise<RunOut> {
+  const p = queue.then(() => runNow(text, level));
+  queue = p.catch(() => undefined);
+  return p;
+}
+
+async function runNow(text: string, level: Level): Promise<RunOut> {
   H.bullets = [];
   H.notices = [];
   H.raw = "";
