@@ -29,9 +29,9 @@ describe("allowedUrl", () => {
     expect(allowedUrl(pinnedFileUrl(summarizer, "onnx/model_fp16.onnx")).ok).toBe(false);
   });
   it("allows the Hub's recorded redirect targets for a pinned file only", () => {
-    const lfs = `https://us.aws.cdn.hf.co/xet-bridge-us/abc/def?user_id=public&X-Xet-Cas-Uid=public&response-content-disposition=inline%3B%20filename*%3DUTF-8%27%27model_q4f16.onnx_data%3B%20filename%3D%22model_q4f16.onnx_data%22%3B&Expires=1&Policy=p&Signature=s&Key-Pair-Id=k&Hash-Algorithm=SHA256`;
+    const lfs = `https://us.aws.cdn.hf.co/xet-bridge-us/67a5e958d363dcc0e458b910/72db5d760d8920a2fbd09b5a5b109b29c71c5e525956e6166025d1146c851e15?user_id=public&X-Xet-Cas-Uid=public&response-content-disposition=inline%3B%20filename*%3DUTF-8%27%27model_q4f16.onnx_data%3B%20filename%3D%22model_q4f16.onnx_data%22%3B&Expires=1&Policy=p&Signature=s&Key-Pair-Id=k&Hash-Algorithm=SHA256`;
     expect(allowedUrl(lfs)).toMatchObject({ ok: true, kind: "redirect" });
-    expect(allowedUrl("https://eu.aws.cdn.hf.co/xet-bridge-eu/abc/def?response-content-disposition=filename%3D%22model_q4f16.onnx_data%22")).toMatchObject({ ok: true, kind: "redirect" });
+    expect(allowedUrl("https://eu.aws.cdn.hf.co/xet-bridge-eu/67a5e958d363dcc0e458b910/72db5d760d8920a2fbd09b5a5b109b29c71c5e525956e6166025d1146c851e15?response-content-disposition=filename%3D%22model_q4f16.onnx_data%22")).toMatchObject({ ok: true, kind: "redirect" });
     const notOurs = lfs.replace("model_q4f16.onnx_data", "model_fp16.onnx");
     expect(allowedUrl(notOurs).ok).toBe(false);
     const extraParam = `${lfs}&text=CANARY-7f3a`;
@@ -39,6 +39,20 @@ describe("allowedUrl", () => {
     const cache = `https://huggingface.co/api/resolve-cache/models/${summarizer.id}/${summarizer.revision}/config.json?${encodeURIComponent(`/${summarizer.id}/resolve/${summarizer.revision}/config.json`)}=&etag=%22abc%22`;
     expect(allowedUrl(cache)).toMatchObject({ ok: true, kind: "redirect" });
     expect(allowedUrl(`${cache}&x=1`).ok).toBe(false);
+  });
+  it("rejects an arbitrary CDN path even when a filename parameter names a pinned file", () => {
+    expect(
+      allowedUrl("https://us.aws.cdn.hf.co/arbitrary/CANARY?response-content-disposition=filename%3D%22config.json%22"),
+    ).toMatchObject({ ok: false });
+  });
+  it("allows only shipped same-origin asset paths", () => {
+    const base = "https://app.example";
+    vi.stubGlobal("location", { origin: base });
+    expect(allowedUrl(`${base}/models/kokoro-voices/af_heart.bin`)).toMatchObject({ ok: true, kind: "same-origin" });
+    expect(allowedUrl(`${base}/sample.txt`)).toMatchObject({ ok: true, kind: "same-origin" });
+    expect(allowedUrl(`${base}/CANARY-private-reading-text`)).toMatchObject({ ok: false });
+    expect(allowedUrl(`${base}/models/../CANARY`)).toMatchObject({ ok: false });
+    vi.unstubAllGlobals();
   });
   it("lists CSP connect-src hosts from the spec", () => {
     const csp = cspConnectSrc();
@@ -71,7 +85,11 @@ describe("guardedFetch", () => {
   });
   it("reads the final URL from the service worker's header when res.url is empty", async () => {
     const off = "https://evil.example/x";
-    const fake = vi.fn(async () => new Response("", { status: 200, headers: { "x-fruitbat-final-url": off } }));
+    const fake = vi.fn(async () => {
+      const r = new Response("", { status: 200, headers: { "x-fruitbat-final-url": off } });
+      Object.defineProperty(r, "url", { value: url }); // the browser fills url with the original request
+      return r;
+    });
     vi.stubGlobal("fetch", fake);
     const url = [...exactUrls()][0];
     await expect(guardedFetch(url)).rejects.toThrow(/redirected off-list/);

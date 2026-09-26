@@ -1,0 +1,30 @@
+{
+  "id": "021",
+  "key_facts": [
+    "conceived independently by two British naturalists, Charles Darwin and Alfred Russel Wallace, in the mid-19th century",
+    "All life on Earth—including humanity—shares a last universal common ancestor (LUCA), which lived approximately 3.5–3.8 billion years ago",
+    "The two-fold cost of sex was first described by John Maynard Smith",
+    "the earlier Permian–Triassic extinction event was even more severe, with approximately 96% of all marine species driven to extinction",
+    "Present-day extinction rates are 100–1000 times greater than the background rate and up to 30% of current species may be extinct by the mid 21st century",
+    "Defined by evolutionary biologist Ernst Mayr in 1942, the BSC states that \"species are groups of actually or potentially interbreeding natural populations, which are reproductively isolated from other such groups.\"",
+    "Othniel C. Marsh, America's first palaeontologist, was the first to provide solid fossil evidence to support Darwin's theory of evolution by unearthing the ancestors of the modern horse",
+    "The Scopes trial decision of 1925 caused the subject to become very rare in American secondary biology textbooks for a generation",
+    "to be excluded once again in the 2005 Kitzmiller v. Dover Area School District case"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "The Permian–Triassic extinction event wiped out about 42% of marine species.",
+      "distinctive_tokens": ["42", "wiped"]
+    },
+    {
+      "claim": "Alfred Russel Wallace plagiarized his theory of natural selection from a manuscript Darwin sent him in 1858.",
+      "distinctive_tokens": ["plagiarized", "manuscript"]
+    },
+    {
+      "claim": "The Scopes trial permanently banned the teaching of evolution nationwide starting in 1925.",
+      "distinctive_tokens": ["permanently", "nationwide"]
+    }
+  ],
+  "expected_oneline_keywords": ["evolution", "natural selection", "species", "darwin"],
+  "notes": "Long Wikipedia article spanning mechanisms, history of life, and history of the idea; Darwin received Wallace's independent theory (not the reverse), a classic reversal trap."
+}

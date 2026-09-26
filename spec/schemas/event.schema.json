@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "event.schema.json",
+  "title": "Event",
+  "$comment": "A structured log line inside a BugReport (docs/PLAN.md rule 1: no source text, bullets, audio, file names, or URLs). `fields` is a closed, numbers/enums-only bag reused across every event name; not every field applies to every event name, so none of them are required.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event", "t_ms", "fields"],
+  "properties": {
+    "event": {
+      "type": "string",
+      "enum": [
+        "run_start", "run_done", "run_failed", "run_stopped", "dial_change",
+        "model_load_start", "model_load_done", "tts_overlimit", "all_cut",
+        "input_limit", "probe_result", "cache_hit", "cache_miss", "quota_error"
+      ]
+    },
+    "t_ms": { "type": "number", "minimum": 0 },
+    "fields": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "level": { "$ref": "run-stats.schema.json#/$defs/level" },
+        "from_level": { "$ref": "run-stats.schema.json#/$defs/level" },
+        "to_level": { "$ref": "run-stats.schema.json#/$defs/level" },
+        "device": { "$ref": "run-stats.schema.json#/$defs/device" },
+        "model_id": { "$ref": "run-stats.schema.json#/$defs/model_id" },
+        "model_role": {
+          "type": "string",
+          "enum": ["default", "fallback-a", "fallback-b", "low-end", "voice"]
+        },
+        "reason": {
+          "type": "string",
+          "enum": ["abort", "model_error", "network_error", "oom", "timeout", "unknown"]
+        },
+        "probe_result": { "type": "string", "enum": ["ok", "fail"] },
+        "resource": { "type": "string", "enum": ["model", "voice", "tokenizer"] },
+        "store": { "type": "string", "enum": ["stats", "cache"] },
+        "chunk_count": { "type": "integer", "minimum": 0 },
+        "chunk_index": { "type": "integer", "minimum": 0 },
+        "bullets_total": { "type": "integer", "minimum": 0 },
+        "word_count": { "type": "integer", "minimum": 0 },
+        "phoneme_count": { "type": "integer", "minimum": 0 },
+        "bytes": { "type": "integer", "minimum": 0 },
+        "bytes_attempted": { "type": "integer", "minimum": 0 },
+        "duration_ms": { "type": "number", "minimum": 0 },
+        "latency_ms": { "type": "number", "minimum": 0 },
+        "at_ms": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}
