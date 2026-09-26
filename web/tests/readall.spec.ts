@@ -17,6 +17,11 @@ const PARAGRAPHS_011 = DOC011.split(/\n{2,}/).map((p) => p.trim()).filter(Boolea
 // punctuation, so the segmenter sees one long sentence (~600 phonemes) that the TTS-safe rule
 // must split; at target 300 it becomes ~3 pieces, at target 500 ~2 pieces.
 const EXCERPT_020 = DOC020.split(/\s+/).slice(0, 120).join(" ");
+// CI checks additivity on the excerpt (about 2.7 min on wasm-ci). FRUITBAT_FULL_ADDITIVITY=1 runs
+// the whole long-input fixture instead (about 10x longer), which is how the S1-04 proof on the
+// dev machine is recorded (Codex review, PR #17).
+const FULL_ADDITIVITY = process.env.FRUITBAT_FULL_ADDITIVITY === "1";
+const ADDITIVITY_TEXT = FULL_ADDITIVITY ? DOC020 : EXCERPT_020;
 const SENTENCE = "Bats are the only mammals that can truly fly, and more than 1,400 species live on every continent except Antarctica.";
 
 type Tts = {
@@ -80,11 +85,12 @@ test("coverage: TTS-safe segments tile doc 020 and none exceeds the limit", asyn
   console.log(`READALL_COVERAGE segments=${plan.segments.length} maxPhonemes=${plan.maxPhonemes} splitMs=${Math.round(plan.splitMs)}`);
 });
 
-test("additivity: segment durations on a 020 excerpt match larger pieces within 10 %", async () => {
+test(`additivity: segment durations on ${FULL_ADDITIVITY ? "all of" : "a 120-word excerpt of"} 020 match larger pieces within 10 %`, async () => {
+  if (FULL_ADDITIVITY) test.setTimeout(90 * 60 * 1000);
   // Definition: the same text synthesized as TTS-safe segments (target 300 phonemes) and as
   // larger pieces (target 500, still under the 510 limit); total audio seconds must agree within 10 %.
-  const small = await page.evaluate((t) => window.__tts.measure(t, 300), EXCERPT_020);
-  const large = await page.evaluate((t) => window.__tts.measure(t, 500), EXCERPT_020);
+  const small = await page.evaluate((t) => window.__tts.measure(t, 300), ADDITIVITY_TEXT);
+  const large = await page.evaluate((t) => window.__tts.measure(t, 500), ADDITIVITY_TEXT);
   expect(small.pieces).toBeGreaterThan(large.pieces);
   expect(small.seconds).toBeGreaterThan(20);
   const rel = Math.abs(small.seconds - large.seconds) / large.seconds;

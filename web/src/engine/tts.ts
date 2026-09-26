@@ -684,19 +684,28 @@ export class VoiceEngine {
 /** 1.0 when the segments tile the non-whitespace text with no gaps and no overlaps. */
 export function coverageOf(text: string, segments: { start: number; end: number }[]): number {
   if (segments.length === 0) return text.trim().length === 0 ? 1 : 0;
-  let covered = 0;
   let prevEnd = 0;
   let ok = true;
   for (const s of segments) {
     if (s.start < prevEnd) ok = false;
     if (text.slice(prevEnd, s.start).trim().length > 0) ok = false;
-    covered += s.end - s.start;
     prevEnd = s.end;
   }
   if (text.slice(prevEnd).trim().length > 0) ok = false;
   if (ok) return 1;
-  const nonWs = text.replace(/\s/g, "").length;
-  return nonWs === 0 ? 1 : Math.min(1, covered / nonWs);
+  // Not a tiling. Report the share of non-whitespace source characters that lie inside some
+  // segment (overlaps counted once), and never 1.0, so a gap or an overlap always fails the
+  // coverage floor (Codex review, PR #17).
+  const inside = new Uint8Array(text.length);
+  for (const s of segments) inside.fill(1, Math.max(0, s.start), Math.min(text.length, s.end));
+  let nonWs = 0;
+  let hit = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (/\s/.test(text[i])) continue;
+    nonWs++;
+    if (inside[i]) hit++;
+  }
+  return Math.min(nonWs === 0 ? 1 : hit / nonWs, 0.999);
 }
 
 let singleton: VoiceEngine | null = null;
