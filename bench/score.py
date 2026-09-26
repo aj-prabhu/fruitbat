@@ -85,6 +85,7 @@ def _replace_spelled_numbers(text):
     ord_tens_pat = "|".join(ORDINAL_TENS)
 
     text = re.sub(r"\b(a|one)\s+hundred\b", "100", text)
+    text = re.sub(r"\b(?:a|one)\s+hundredth\b", "100", text)  # "one hundredth" is one ordinal (Codex merge-gate review, PR #15)
     text = re.sub(r"\bhundredth\b", "100", text)
     # compounds first, so "twenty-one" doesn't degrade into separate "20" + "1"
     text = re.sub(

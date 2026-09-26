@@ -522,6 +522,18 @@ def cmd_pr_head(args):
         if changed:
             exit_code, updates = 1, []
             lines.append("FAIL | bench/baselines.json | changed without the baseline-reset label")
+    # A baseline-reset PR must commit the baselines its rows produce: compare every replaced
+    # identity against bench/baselines.json at the PR head (Codex merge-gate review, PR #15).
+    if allow_reset and updates and args.head:
+        head_baselines = load_baselines_at(repo_root, args.head)
+        for identity, medians in updates:
+            committed = find_baseline(head_baselines, identity)
+            if committed is None or any(
+                (committed.get(k) is None) != (v is None) or (v is not None and abs(float(committed.get(k)) - float(v)) > 1e-9)
+                for k, v in medians.items()
+            ):
+                exit_code = 1
+                lines.append(f"FAIL | {identity_str(identity)} | baseline-reset: bench/baselines.json at the PR head does not hold these medians; commit the regenerated file")
     print("\n".join(lines))
     if updates:
         save_baselines(repo_root / "bench" / "baselines.json", baselines)
