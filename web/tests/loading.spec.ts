@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -39,7 +40,7 @@ async function throttleHub(page: Page): Promise<{ urls: string[] }> {
 test.describe("loading UX (?llm=fake, route-throttled)", () => {
   test("summarizer size shown before download; no summarizer request before the click; progress bars reach 100 %; cache detection", async ({ page }) => {
     const { urls } = await throttleHub(page);
-    await page.goto("/?llm=fake");
+    await gotoIsolated(page, "/?llm=fake");
     await page.waitForSelector('[data-testid="loading"]');
 
     // Voice loads automatically (rule 11); the summarizer must not have been requested yet.
@@ -85,7 +86,7 @@ test.describe("loading UX (?llm=fake, route-throttled)", () => {
     await context.addInitScript(() => {
       Object.defineProperty(window.navigator, "connection", { value: { saveData: true }, configurable: true });
     });
-    await page.goto("/?llm=fake");
+    await gotoIsolated(page, "/?llm=fake");
     const line = page.locator('[data-phase="save_data"]');
     await expect(line).toHaveText(STRINGS["loading.save_data"]);
     await page.waitForTimeout(500);
@@ -96,7 +97,7 @@ test.describe("loading UX (?llm=fake, route-throttled)", () => {
 
 test.describe("canned demo (?llm=fake, ?inject=nogpu -- never touches the models)", () => {
   test('"Try it now" plays within 1 s; turning the dial switches the recording', async ({ page }) => {
-    await page.goto("/?llm=fake&inject=nogpu");
+    await gotoIsolated(page, "/?llm=fake&inject=nogpu");
     const demo = page.getByTestId("demo");
     await expect(demo).toBeVisible();
     await expect(page.getByTestId("demo-audio")).toHaveAttribute("src", "/demo/short.wav", { timeout: 15_000 });
