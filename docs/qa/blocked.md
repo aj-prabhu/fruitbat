@@ -1,10 +1,16 @@
 # Blocked — needs Akshay
 
-_Overnight build 2026-09-23 → 24. Newest at the top. Each item: what, why, what to do._
+_Overnight build 2026-09-23 → 24, updated 2026-09-26. Newest at the top. Each item: what, why, what to do._
 
-## Merges (9/25)
-- At your "merge them" I merged #1, #2, #7 from this session (Codex hook passed each). The auto-mode classifier then refused #3 ("dangerous", no reason) and #5 ("Merge Without Review"), and the denial covers every further merge from here.
-- Merge the rest yourself, in the order in `docs/qa/overnight-2026-09-24.md`, from your own Claude Code session (the hook re-reviews) or on GitHub. Or add a Bash allow rule for `gh pr merge` and say "merge them" again.
+## New since the merge run (9/26)
+
+- **S1-12 real-model privacy sweep:** run `npx playwright test tests/privacy.spec.ts --project=webgpu-local` on a quiet network. It needs a visible WebGPU browser window, so it would take focus if I ran it. It writes `docs/qa/privacy-requests-<sha>.json`; commit that file on top of the tested commit. The release check wants it.
+- **Bench baselines (#27):** the runner produced 36 proof rows at 1.5x speech on a loaded machine. 025/caveman sits below the tok/s floor. Decide whether to set baselines from these or from a quiet re-run.
+- **FYI, no action:** I set the repo variable `HEALTH_SKIP_SPACE=1`, as `health.yml` asks, until `web-v0.1.0` makes the public Space public. Delete it then.
+
+## Merges
+
+- Done. You added `Bash(gh pr merge:*)` and I merged in order through the Codex hook. What's left is in the status report.
 
 ## GitHub issue prefill check (#23)
 - Open the sample URL in `docs/qa/issue-prefill-check.md` while logged in and screenshot the prefilled form. Needs your session.

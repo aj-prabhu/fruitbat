@@ -1,64 +1,39 @@
-# Fruitbat build status (overnight 9/23 → 24, day 2 9/25)
+# Fruitbat build status (overnight 9/23 → 24, day 2 9/25, merge run 9/25 → 26)
 
-_Updated Fri 2026-09-25 18:10 PDT. Merged: #1, #2, #7 (by Claude at your "merge them", 13:21; then the auto-mode classifier refused further merges). Everything else is open._
+_Updated Sat 2026-09-26 09:40 PDT._
 
-## Merge order (all PRs target `main`; a stacked PR's body says what it sits on)
+## Where it stands
 
-| # | PR | Packet | Sits on | State |
-|---|---|---|---|---|
-| — | #1 ✓ | S0-02 house rules + CI | | merged |
-| — | #2 ✓ | S1-00a walking skeleton | | merged |
-| — | #7 ✓ | S0-04a eval corpus | | merged |
-| 1 | #3 | S1-00b dev Space deploy | | classifier refused this merge ("dangerous", no reason given) |
-| 2 | #4 | S1-03a tokenizer, loader, net | #3 | + `xip` Hub drift fix (57a1bb7) |
-| 3 | #8 | S0-03 shared spec | #3 | |
-| 4 | #13 | S0-04b facts, rubric, grader | | |
-| 5 | #15 | S0-05 schemas, bench gate | #13 | |
-| 6 | #9 | S1-01 web scaffold | #4, #8 | |
-| 7 | #10 | S1-L0 product copy | #9 | |
-| 8 | #12 | S1-02 intake | #9 | |
-| 9 | #14 | S1-03 core text ops | #9 | |
-| 10 | #16 | S1-05 summarizer engine | #14, #10 | |
-| 11 | #17 | S1-04 voice engine | #14, #10 | |
-| 12 | #18 | S1-06 orchestrator | #16, #17, #12 | real app works end to end here |
-| 13 | #20 | S1-09 loading UX + 4-level canned demo | #18 | |
-| 14 | #21 | S1-12 privacy proof + CSP + PRIVACY.md | #18 | webgpu-local sweep still to run on a quiet network |
-| 15 | #22 | S1-10 stats store | #18, #15 | |
-| 16 | #23 | S1-11 bug report + issue form | #22 | GitHub prefill screenshot is your step |
-| 17 | #24 | S1-13a test model cache (Playwright) | #18, #20, #21 | suite 20+ min with timeouts → ~11 min |
-| 18 | #25 | S1-07 panel UI | #20 | axe 0 serious/critical |
-| — | #5 | S2-00 Mac toolchain checklist | | |
-| — | #6 | S1-15 release.yml + release-check | #3 | |
-| — | #11 | S0-06 weekly health (NICE) | #6 | |
-| — | #19 | docs: this report + blocked items | | |
+- **Main has the real app end to end:** paste or highlight, pick a level, WebGPU summary, spoken bullets, Read all, dial regeneration, the 4-level canned demo, the loading screen, the stats store, and the privacy proof with its CSP.
+- **Merged since Friday night:** #16 S1-05 summarizer, #26 CI fix, #17 S1-04 voice, #6 S1-15 release, #5 S2-00 Mac checklist, #11 S0-06 health check, #18 S1-06 orchestrator, #21 S1-12 privacy, #22 S1-10 stats, #20 S1-09 loading + demo.
+- **Merged before that:** #1 #2 #7 (Thu), #3 #4 #8 #13 #15 #9 #10 #12 #14 (Fri).
+- **Still open, in merge order:** #23 S1-11 bug report, #24 S1-13a test model cache, #25 S1-07 panel UI, #28 strings-check fix, #27 S1-13 bench runner, #19 this report.
 
-Every PR got a Codex review on creation; every P1 and P2 was fixed and pushed, or declined with a reason (one, on #23) and tagged in the ledger. Nothing was re-reviewed; the merge hook re-runs it. Several fixes to shared engine files (`llm.ts`, `orchestrator.ts`, `tts.ts`) were applied on more than one stacked branch; merging in the order above should reconcile them, but expect a few trivial conflicts in those three files.
+## How the merges went
 
-`bench-gate` fails on #16 onward until S1-13's runner lands, or you apply the `bootstrap` label by hand.
+- Every merge re-ran the Codex review on the PR's own branch. Every PR had green CI before its merge from #17 on.
+- Since Friday night: about 127 findings fixed and 11 declined, each tagged in the ledger with a reason.
+- Rounds per PR: #18 took 13, #16 12, #17 11, #6 and #20 7 each, most others 1 to 5.
+- From 00:15 Saturday the rule was: fix every P1 and every P2 about honesty or a dead feature, and decline narrow repeats with a reason.
+- **One slip:** #16 merged with red CI. The red was the flake below plus a missing `bootstrap` label, not a code break.
 
-## Where the product is
+## Things found on the way (worth knowing)
 
-- On `pkt/S1-07-panel-ui` (top of the stack): paste or highlight, pick a level, it summarizes on WebGPU and speaks; the panel shows bullets as spoken with the current one marked, the rate slider, pause/skip/stop, Read-all's current sentence large. A 4-level canned demo ("Try it now") plays in under a second with no model download. Stats store and bug report built.
-- Dev Space live (skeleton); the app deploys there on the first push to `main` after #3 merges. `2shay/fruitbat` stays private until `web-v0.1.0`.
+1. **CI was flaky since #2.** Tests acted before the coi-serviceworker's one-time reload. Fixed in #26 with `tests/isolated.ts` (`gotoIsolated`); every spec now uses it.
+2. **The strings check was failing on main** once #20 merged, and nothing noticed because only `release-check.sh` ran it. The regex read TypeScript generics and `>=` as JSX text. #28 parses TSX with TypeScript and runs the check in CI.
+3. **`cache_state` was wrong on every bench row.** Cached files also fire progress events, so every load looked cold. The loader now counts real network bytes per load (#22).
+4. **Stats rows were recorded before the run's audio metrics were final.** They now record on an explicit "run settled" signal (#22). The bench runner in #27 waits on the same signal.
+5. **Notices used to play over bullets.** A notice raised during a summary now joins the ordered voice stream (#18).
+6. **The context-scope privacy recorder** now sees service-worker traffic. The only new request was the service worker re-fetching the page itself (#21).
+7. From Friday, still true: the Hub CDN adds redirect parameters over time (`xip` on 9/25); Fallback A (Qwen2.5-0.5B) outputs garbage; Kokoro on WASM runs at about RTF 1.15; the 0.8B model's One-line keyword hit is 25–50 % against an 80 % gate.
 
-## Findings worth reading before merging
+## Not done yet
 
-1. **Hub drift (found 9/25):** the CDN redirect gained a new query parameter `xip`; `net.ts` refused every real-network model load until it was added to `spec/network.json` (#4). Redirect parameter names will drift again; the weekly health check (#11) should diff them.
-2. **Fallback A (Qwen2.5-0.5B q4f16) decodes to garbage** on this runtime; out. SmolLM2-360M is the OOM tier. (#16)
-3. **Kokoro q8 on WASM runs at RTF ~1.15.** Read-all early gaps ~3.4 s; bullet streams ~0.5 s. WebGPU Kokoro didn't load in 10 min. An in-flight synthesis can't be aborted, so after Esc the next first audio waits up to one segment. (#17, #18)
-4. The 0.8B model ignores bullet counts; the parser cap enforces them. **One-line keyword hit 25–50 % vs the 80 % gate.** (#8, #16)
-5. Playwright's `route.fulfill()` crashes Chromium for ~90 MB bodies; the test cache serves big files through a same-origin dev proxy instead. `page.route()` misses Worker fetches; `context.route()` catches them. (#24)
-6. The whole `wasm-ci` suite only passes reliably when one agent runs tests at a time (shared CPU and network).
-7. GitHub still reads `LICENSE` as "other".
-
-## Not done yet (plan order)
-
-- S1-13 bench runner (second half): next, one agent.
-- S1-08 Pip: the static placeholder is in #25; animation is NICE.
-- S1-14 browser matrix + graded pass: Chrome is covered by the suites; Safari needs a real Safari run.
-- S1-16 live gate, `web-v0.1.0`: needs your sign-off, and the merges first.
-- S1-L1 application text (due Oct 2), S1-L4 demo-day runbook, S2-01/S2-02 (Mac, from Oct 1).
+- **Your two product ideas:** a fruit bat Wikipedia demo, and a "fruits eaten" counter. Next up after the open PRs, planned through the claudex loop as the build standard asks.
+- **The S1-12 real-model privacy sweep:** it writes `docs/qa/privacy-requests-<sha>.json`. It needs a visible WebGPU browser, which takes window focus, so it's yours (see blocked.md).
+- **Bench baselines:** #27 has 36 proof rows. Setting baselines from them is your call.
+- **S1-14:** Safari. **S1-16:** live gate and `web-v0.1.0`. **S1-L1**, **S1-L4**, **S2-01/02**.
 
 ## Blocked on you
 
-See `docs/qa/blocked.md`. Short version: the rest of the merges; the LICENSE call; Xcode 26 + the mlx skill copy (Oct 1); the GitHub prefill screenshot (#23).
+See `docs/qa/blocked.md`.
