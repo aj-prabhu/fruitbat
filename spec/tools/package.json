@@ -1,0 +1,10 @@
+{
+  "name": "fruitbat-spec-tools",
+  "private": true,
+  "type": "module",
+  "description": "Node tools for the shared spec: prompt try-outs on CPU (S0-03)",
+  "license": "AGPL-3.0-only",
+  "dependencies": {
+    "@huggingface/transformers": "4.3.0"
+  }
+}

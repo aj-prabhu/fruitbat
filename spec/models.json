@@ -1,5 +1,5 @@
 {
-  "$comment": "Pinned models, voices, and inference libraries per target (docs/PLAN.md rule 4). Every file URL is exact; the privacy test allows nothing else. S0-03 completes the fallback tiers; S1-00a pinned the web runtime and the two models the walking skeleton proved.",
+  "$comment": "Pinned models, voices, and inference libraries per target (docs/PLAN.md rule 4). Every file URL is exact (url_template filled with id, revision, path); spec/network.json is generated from this list and the privacy test allows nothing else. S1-00a pinned the web runtime and the two default models it proved; S0-03 added the fallback tiers, the WebGPU voice variant, and licenses. Licenses: the onnx-community conversion cards carry no license field; the value recorded is the base model's license from its card (checked 2026-09-23 via the Hub API).",
   "version": 1,
   "web": {
     "libraries": {
@@ -14,46 +14,206 @@
       "revision": "1e45daba048899e7f771657ada617ec49350aa91",
       "dtype": "q4f16",
       "device": "webgpu",
-      "license": "unknown-on-card (base model Qwen/Qwen3.5-0.8B; record before web-v0.1.0, S0-03)",
+      "license": "apache-2.0 (base model Qwen/Qwen3.5-0.8B; the onnx-community card has no license field)",
       "files": [
-        { "path": "config.json", "bytes": 1543 },
-        { "path": "generation_config.json", "bytes": 214 },
-        { "path": "tokenizer.json", "bytes": 19168000 },
-        { "path": "tokenizer_config.json", "bytes": 7900 },
-        { "path": "onnx/model_q4f16.onnx", "bytes": 600000 },
-        { "path": "onnx/model_q4f16.onnx_data", "bytes": 469300000 }
+        {
+          "path": "config.json",
+          "bytes": 1989
+        },
+        {
+          "path": "generation_config.json",
+          "bytes": 120
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 19226111
+        },
+        {
+          "path": "tokenizer_config.json",
+          "bytes": 9119
+        },
+        {
+          "path": "onnx/model_q4f16.onnx",
+          "bytes": 597442
+        },
+        {
+          "path": "onnx/model_q4f16.onnx_data",
+          "bytes": 469331968
+        }
       ],
-      "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}"
+      "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}",
+      "cpu_tryout": {
+        "$comment": "spec/tools/try-prompts.mjs uses model_q4 on CPU (q4f16 has no CPU kernels).",
+        "dtype": "q4",
+        "files": [
+          {
+            "path": "onnx/model_q4.onnx",
+            "bytes": 482783
+          },
+          {
+            "path": "onnx/model_q4.onnx_data",
+            "bytes": 550764544
+          }
+        ]
+      },
+      "cold_budget_with_voice_mb": 562
     },
     "voice": {
       "id": "onnx-community/Kokoro-82M-v1.0-ONNX",
       "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
       "dtype": "q8",
       "device": "wasm",
-      "license": "apache-2.0",
+      "license": "apache-2.0 (card and base model hexgrad/Kokoro-82M)",
       "files": [
-        { "path": "config.json", "bytes": 1000 },
-        { "path": "tokenizer.json", "bytes": 3000 },
-        { "path": "tokenizer_config.json", "bytes": 700 },
-        { "path": "onnx/model_quantized.onnx", "bytes": 92400000 }
+        {
+          "path": "config.json",
+          "bytes": 44
+        },
+        {
+          "path": "tokenizer.json",
+          "bytes": 3497
+        },
+        {
+          "path": "tokenizer_config.json",
+          "bytes": 113
+        },
+        {
+          "path": "onnx/model_quantized.onnx",
+          "bytes": 92361116
+        }
       ],
       "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}",
       "voices_vendored": {
         "path": "web/public/models/kokoro-voices/",
         "revision": "1939ad2a8e416c0acfeecc08a694d14ef25f2231",
-        "files": ["af_heart.bin"],
-        "bytes_each": 522240
+        "files": [
+          "af_heart.bin"
+        ],
+        "bytes_each": 522240,
+        "planned": [
+          "af_bella.bin (second voice for 9/29, S1-04)"
+        ]
       },
       "tts_phoneme_limit": 510,
-      "tts_phoneme_target": 300
+      "tts_phoneme_target": 300,
+      "variants": {
+        "q8f16": {
+          "$comment": "WebGPU voice tried in the S1-05 bake-off (Fable pass); not the default.",
+          "path": "onnx/model_q8f16.onnx",
+          "bytes": 86033585,
+          "device": "webgpu"
+        }
+      }
     },
     "runtime_assets_same_origin": {
       "path": "web/public/ort/",
       "from": "node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded*.{mjs,wasm}",
       "why": "Transformers.js otherwise loads the WASM runtime from a CDN, which rule 1 forbids"
-    }
+    },
+    "summarizer_fallbacks": [
+      {
+        "role": "fallback-a",
+        "id": "onnx-community/Qwen2.5-0.5B-Instruct",
+        "revision": "cc5cc01a65cc3ff17bdb73a7de33d879f62599b0",
+        "dtype": "q4f16",
+        "device": "webgpu",
+        "license": "apache-2.0 (base model Qwen/Qwen2.5-0.5B-Instruct)",
+        "cold_budget_with_voice_mb": 575,
+        "files": [
+          {
+            "path": "config.json",
+            "bytes": 678
+          },
+          {
+            "path": "generation_config.json",
+            "bytes": 242
+          },
+          {
+            "path": "tokenizer.json",
+            "bytes": 7031673
+          },
+          {
+            "path": "tokenizer_config.json",
+            "bytes": 7306
+          },
+          {
+            "path": "onnx/model_q4f16.onnx",
+            "bytes": 483003582
+          }
+        ],
+        "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}"
+      },
+      {
+        "role": "fallback-b",
+        "id": "onnx-community/Qwen3-0.6B-ONNX",
+        "revision": "da1453100cf3ff33ef56d17983fc7a8648706db6",
+        "dtype": "q4f16",
+        "device": "webgpu",
+        "license": "apache-2.0 (base model Qwen/Qwen3-0.6B)",
+        "cold_budget_with_voice_mb": 662,
+        "files": [
+          {
+            "path": "config.json",
+            "bytes": 912
+          },
+          {
+            "path": "generation_config.json",
+            "bytes": 219
+          },
+          {
+            "path": "tokenizer.json",
+            "bytes": 9117040
+          },
+          {
+            "path": "tokenizer_config.json",
+            "bytes": 9705
+          },
+          {
+            "path": "onnx/model_q4f16.onnx",
+            "bytes": 569789750
+          }
+        ],
+        "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}"
+      },
+      {
+        "role": "low-end",
+        "id": "HuggingFaceTB/SmolLM2-360M-Instruct",
+        "revision": "a10cc1512eabd3dde888204e902eca88bddb4951",
+        "dtype": "q4f16",
+        "device": "webgpu",
+        "license": "apache-2.0",
+        "cold_budget_with_voice_mb": 365,
+        "files": [
+          {
+            "path": "config.json",
+            "bytes": 846
+          },
+          {
+            "path": "generation_config.json",
+            "bytes": 132
+          },
+          {
+            "path": "tokenizer.json",
+            "bytes": 2104556
+          },
+          {
+            "path": "tokenizer_config.json",
+            "bytes": 3764
+          },
+          {
+            "path": "onnx/model_q4f16.onnx",
+            "bytes": 272737275
+          }
+        ],
+        "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}"
+      }
+    ],
+    "cold_budget_mb": 700
   },
   "mac": {
-    "$comment": "Pinned in S2-03a."
+    "$comment": "Pinned in S2-03a (mlx-community Qwen3.5-2B-4bit or Qwen3-1.7B-4bit; mlx-community/Kokoro-82M-bf16; G2P assets inventory).",
+    "libraries": {},
+    "summarizer": null,
+    "voice": null
   }
 }
