@@ -275,6 +275,8 @@ export class Summarizer {
    */
   async ensureLoaded(opts: { signal?: AbortSignal } = {}): Promise<boolean> {
     if (this.loaded) return true;
+    // An explicit load right after a Stop waits for the worker to finish unwinding (Codex review, PR #16).
+    if (this.drain) await this.drain;
     if (opts.signal?.aborted) return false;
     if (this.loading) {
       // A second caller joins the load already running; its signal can still stop it.

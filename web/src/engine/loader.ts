@@ -108,6 +108,13 @@ export async function load<T>(
   };
   void work.then(settle, settle);
   if (!signal) return work;
+  // A result that lands after its load was cancelled has no owner: free its sessions.
+  void work.then(
+    (v) => {
+      if (signal.aborted) void (v as { dispose?: () => unknown } | null)?.dispose?.();
+    },
+    () => undefined,
+  );
   return Promise.race([work, aborted]);
 }
 

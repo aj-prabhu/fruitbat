@@ -38,6 +38,12 @@ function isMemoryError(e: unknown): boolean {
 let loadAbort: AbortController | null = null;
 
 async function loadTier(spec: PinnedModel & { role: string }, runId: number): Promise<void> {
+  // Free the previous model first: a Stop or failed probe leaves the main thread "not loaded"
+  // while this worker still holds the GPU sessions (Codex review, PR #16).
+  const old = model;
+  model = null;
+  tokenizer = null;
+  if (old) await old.dispose().catch(() => undefined);
   loadAbort = new AbortController();
   const signal = loadAbort.signal;
   if (inject === "oom" && spec.role !== "low-end" && !oomFired) {

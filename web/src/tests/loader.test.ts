@@ -76,6 +76,20 @@ describe("loader", () => {
     expect(settled).toBe(true);
   });
 
+  it("a result that lands after its load was cancelled is disposed", async () => {
+    const ac = new AbortController();
+    const dispose = vi.fn(async () => undefined);
+    let finish!: () => void;
+    const factory = () => new Promise<{ dispose: () => Promise<undefined> }>((res) => (finish = () => res({ dispose })));
+    const p = load(summarizer, factory, undefined, ac.signal);
+    ac.abort();
+    await expect(p).rejects.toMatchObject({ name: "AbortError" });
+    finish();
+    await loadsSettled();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
   it("rejects immediately when the signal is already aborted", async () => {
     const ac = new AbortController();
     ac.abort();
