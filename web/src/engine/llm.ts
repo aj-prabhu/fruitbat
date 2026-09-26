@@ -371,6 +371,7 @@ export class Summarizer {
     if (this.state !== "running" && this.state !== "loading" && this.state !== "probing") return; // Esc during the probe counts (Codex review, PRs #21/#22/#24)
     const runId = this.runId;
     this.state = "stopped";
+    this.loading = null; // an aborted load is never handed to the next caller (Codex review, PR #25)
     this.post({ type: "abort", runId });
     // The worker's generate() keeps running until it sees the abort; the next serialized run must
     // not start on top of it. Hold the pending resolution until the worker acks (5 s cap), and let

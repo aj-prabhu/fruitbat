@@ -444,6 +444,9 @@ export class Orchestrator {
   }
 
   private async summarize(id: number, level: Exclude<Level, "readall">, fromChunk: number): Promise<void> {
+    // On mobile / data saver the voice was not warmed on load; the summary's speech loads it.
+    // Load it here too so readiness and the pending notices follow (Codex review, PRs #22/#25).
+    if (!this.voiceReady) void this.voice.load().then(() => this.markVoiceReady(), () => undefined);
     const streamId = this.voice.beginStream({
       onStart: (e) => {
         if (id !== this.runId) return;

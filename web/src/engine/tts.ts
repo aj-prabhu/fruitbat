@@ -627,7 +627,7 @@ export class VoiceEngine {
         const seq = this.streamSeq++;
         queue.requestSent();
         try {
-          await this.synthOne(runId, { seq, text: seg.text, start, end, phonemes: seg.phonemes }, this.streamVoice, this.streamRate, queue, tag);
+          await this.synthOne(runId, { seq, text: seg.text, start, end, phonemes: seg.phonemes }, this.voice, this.rate /* current settings per request (Codex review, PR #25) */, queue, tag);
         } finally {
           queue.requestSettled();
         }
@@ -711,6 +711,7 @@ export class VoiceEngine {
   private messageEpoch = 0;
 
   stop(): number {
+    this.userPaused = false;
     const t0 = performance.now();
     const stale = this.runId;
     this.runId++;
@@ -746,10 +747,14 @@ export class VoiceEngine {
     return stopMs;
   }
 
+  private userPaused = false;
+
   pause(): void {
+    this.userPaused = true;
     void this.queue?.pause();
   }
   resume(): void {
+    this.userPaused = false;
     void this.queue?.resume();
   }
   skip(): boolean {
@@ -761,7 +766,9 @@ export class VoiceEngine {
    *  the dial move; lastNoticeLatencyMs is ms from there to the first scheduled sample. */
   async speak(messageKey: string, sinceMs?: number): Promise<{ seconds: number }> {
     const t0 = sinceMs ?? performance.now();
-    const ctx = this.ensureContext();
+    // A notice while the user has paused must not resume playback: schedule it on the suspended
+    // context so it plays on resume (Codex review, PRs #21/#25).
+    const ctx = this.userPaused && this.ctx ? this.ctx : this.ensureContext();
     const ck = this.noticeKey(messageKey);
     const epoch = this.messageEpoch;
     let entry = this.noticeCache.get(ck) ?? null;
