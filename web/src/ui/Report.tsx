@@ -99,10 +99,12 @@ export function Report({ onClose }: { onClose: () => void }) {
               () => {
                 setCopyFailed(false);
                 setCopied(true);
+                orchestrator().speakMessage("report.copied"); // rule 8: messages are spoken too
               },
               () => {
                 setCopied(false);
                 setCopyFailed(true);
+                orchestrator().speakMessage("report.copy_failed");
                 const el = previewRef.current;
                 const sel = typeof window !== "undefined" ? window.getSelection() : null;
                 if (el && sel) {

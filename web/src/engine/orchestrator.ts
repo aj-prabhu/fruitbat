@@ -316,6 +316,14 @@ export class Orchestrator {
     return this.begin(id, level, { fromChunk: 0, base: 0, end: text.length });
   }
 
+  /** Speak a message raised outside the panel (the report dialog): same voice, same "Speak
+   *  messages" switch, not added to the panel's notices (rule 8; Codex review, PR #23). */
+  speakMessage(key: string): void {
+    if (!this.speakMessages) return;
+    this.spoken.push(key);
+    void this.voice.speak(key).catch(() => undefined);
+  }
+
   /** Silence spoken messages (a "Stopped" still playing, say) without touching any run or load:
    *  the demo recording is about to play (Codex review, PR #20). */
   silenceVoice(): void {
