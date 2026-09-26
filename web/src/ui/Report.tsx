@@ -9,7 +9,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { events } from "../engine/events";
 import { orchestrator } from "../engine/orchestrator";
-import { buildCopyText, buildIssueUrl, buildReport, type BugReport } from "../report/build";
+import { MAX_DESCRIPTION, buildCopyText, buildIssueUrl, buildReport, type BugReport } from "../report/build";
 import * as stats from "../stats/store";
 import { t } from "../strings";
 
@@ -62,6 +62,7 @@ export function Report({ onClose }: { onClose: () => void }) {
       <textarea
         id="report-describe"
         class="report-describe"
+        maxLength={MAX_DESCRIPTION} /* the report keeps this many characters; the box stops there too (Codex review, PR #23) */
         value={description}
         onInput={(e) => setDescription((e.target as HTMLTextAreaElement).value)}
       />
