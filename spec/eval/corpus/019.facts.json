@@ -1,0 +1,29 @@
+{
+  "id": "019",
+  "key_facts": [
+    "Winter storms including blizzards can bring extreme cold, freezing rain, snow, ice and high winds.",
+    "Winter Storm Warnings are usually issued 12 to 24 hours before the event is expected to begin.",
+    "Generators and fuel should always be used outdoors and at least 20 feet away from windows, doors and attached garages.",
+    "A temperature below 95 degrees is an emergency.",
+    "Extreme heat is a period of high heat and humidity with temperatures above 90 degrees for at least two to three days.",
+    "Extreme heat is responsible for the highest number of annual deaths among all weather-related hazards.",
+    "Extremely high body temperature (above 103 degrees F)",
+    "Never leave people or pets in a closed car on a warm day."
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Winter Storm Warnings are typically issued an entire week before a storm hits.",
+      "distinctive_tokens": ["week", "entire"]
+    },
+    {
+      "claim": "Using a fan alone is an effective way to lower your body temperature during extreme heat.",
+      "distinctive_tokens": ["effective", "lower"]
+    },
+    {
+      "claim": "Massaging frostbitten skin with a heating pad helps it heal faster.",
+      "distinctive_tokens": ["massaging", "faster"]
+    }
+  ],
+  "expected_oneline_keywords": ["winter weather", "extreme heat", "safety", "emergency"],
+  "notes": "Two combined guides (winter storms + heat); the fan and frostbite-massage lines are explicit negations a summary must keep."
+}
