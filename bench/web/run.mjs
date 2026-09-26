@@ -293,25 +293,37 @@ function validateAndAppend(csvFields, row) {
 // spoken"). RUN_MJS_RATE below maxes the product's own speech-rate setting (0.7-1.5,
 // web/src/engine/tts.ts RATE_MAX) to cut real playback time by a third; timeouts still budget for
 // the unsped floor so a slower machine doesn't get killed early.
-function computeTimeoutMs(text, level, cold) {
+// Measured empirically against this exact shared machine (2026-09-25): first model
+// instantiation in a fresh page (WebGPU pipeline/shader setup plus Cache-API-served weights, not
+// a network download) took ~108s on its own, on top of generation and playback -- and varied
+// noticeably run to run under concurrent load from other agent sessions on the same machine. That
+// cost is paid once per page (warm mode's warm-up call, or every rep in cold mode's fresh
+// contexts); the other 36 warm measured calls reuse the already-loaded in-memory engine and skip
+// it entirely (confirmed: the first smoke test's second, measured call had ttfa_ms=8234).
+const MODEL_LOAD_CUSHION_MS = 480_000;
+
+function computeTimeoutMs(text, level, cold, { warmup = false } = {}) {
   const words = text.trim().split(/\s+/).length;
   const chunks = Math.max(1, Math.ceil(words / 1200)); // spec/chunking.md's ~1600-token budget, ~1200 words/chunk
   let ms;
   if (level === "readall") {
-    // Real-time narration of the whole document dominates. 120 wpm is a conservative (slow) floor
+    // Real-time narration of the whole document dominates. 90 wpm is a conservative (slow) floor
     // -- real speech is usually faster -- chosen so a legitimately slower run never gets killed.
-    ms = (words / 120) * 60_000 + 60_000;
+    ms = (words / 90) * 60_000 + 120_000;
   } else if (level === "oneline") {
     // Only the final line is spoken; generation is per-chunk one-liners plus a bounded reduce
     // pass (dial.json: group size 10, depth <= 2), not proportional to bullet count.
-    ms = chunks * 20_000 + 60_000;
+    ms = chunks * 40_000 + 120_000;
   } else {
     // short/caveman: up to max_bullets_per_chunk spoken bullets per chunk, each a few seconds of
     // speech, plus that chunk's generation time.
-    ms = chunks * 90_000 + 60_000;
+    ms = chunks * 120_000 + 120_000;
   }
-  if (cold) ms += 240_000; // model download time, cold cache
-  return Math.min(Math.max(ms, 60_000), 150 * 60_000); // clamp 1..150 minutes
+  // The model-load cushion applies to the warm-up call (always a fresh page) and to every cold
+  // rep (always a fresh context/profile) -- not to warm mode's 36 measured calls, which reuse an
+  // already-loaded engine and would otherwise be given far more headroom than they need.
+  if (warmup || cold) ms += MODEL_LOAD_CUSHION_MS;
+  return Math.min(Math.max(ms, 60_000), 180 * 60_000); // clamp 1..180 minutes
 }
 
 async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, discard = false }) {
