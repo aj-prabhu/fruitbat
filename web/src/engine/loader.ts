@@ -34,12 +34,25 @@ export function configureRuntime(): void {
   // Transformers.js 4.3.0 probes `tokenizer_config.json` at `resolve/main/` without the revision
   // (get_tokenizer_files() passes empty options). pinUrl() rewrites that probe to the pinned
   // revision, so no unpinned URL ever leaves the page; net.ts still rejects any that would.
-  env.fetch = (input: string | URL, init?: RequestInit) => {
+  env.fetch = async (input: string | URL, init?: RequestInit) => {
     const signals = [...activeSignals];
     const merged: RequestInit = { ...init };
     if (signals.length) merged.signal = signals.length === 1 ? signals[0] : AbortSignal.any(signals);
-    return guardedFetch(pinUrl(input), merged);
+    const res = await guardedFetch(pinUrl(input), merged);
+    const len = Number(res.headers.get("content-length") ?? 0);
+    if (Number.isFinite(len) && len > 0) netBytes += len; // net.ts allows GET only
+    return res;
   };
+}
+
+let netBytes = 0;
+/**
+ * Model bytes this context actually fetched over the network. Transformers.js looks in the Cache
+ * API first and calls env.fetch only on a miss, so a warm load adds nothing: this, not the
+ * progress events (which also fire for cached files), is what makes a run "cold" (S1-10).
+ */
+export function networkBytes(): number {
+  return netBytes;
 }
 
 /** Options forwarded to a Transformers.js `from_pretrained` call. */

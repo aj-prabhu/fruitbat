@@ -8,7 +8,7 @@
 // progress | planned | pcm | overlimit | error. Every message carries the runId it belongs to;
 // the main thread drops anything stale (engine/audioQueue.ts).
 import { env } from "@huggingface/transformers";
-import { configureRuntime, load, type LoadProgress } from "../engine/loader";
+import { configureRuntime, load, networkBytes, type LoadProgress } from "../engine/loader";
 import { loadVoice } from "../engine/net";
 import { pinnedModels } from "../engine/pins";
 import { KokoroTTS, phonemize } from "../vendor/kokoro/kokoro.js";
@@ -157,7 +157,7 @@ scope.onmessage = async (e: MessageEvent<ToWorker>) => {
       post({
         type: "loaded",
         maxTokens: model.max_tokens,
-        downloadedBytes,
+        downloadedBytes: networkBytes(), // network only; cached files do not count (S1-10 cache_state)
         isolated: typeof crossOriginIsolated !== "undefined" && crossOriginIsolated,
         threads: wasm?.numThreads ?? null,
         cores: typeof navigator !== "undefined" ? navigator.hardwareConcurrency : 0,

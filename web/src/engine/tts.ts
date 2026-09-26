@@ -49,6 +49,7 @@ export interface ReadAllOptions {
 }
 
 export interface StreamMetrics {
+  cache_state: "cold" | "warm" | "unknown";
   ttfa_ms: number | null;
   rtf: number | null;
   gap_ms: number;
@@ -169,6 +170,18 @@ export class VoiceEngine {
   private rate: number;
   private voice: VoiceId;
   private downloadedBytes = 0;
+  /** A load that fetched the voice over the network makes the run it served cold, once (S1-10). */
+  private coldPending = false;
+  private runCold = false;
+  private takeCold(): void {
+    if (this.coldPending) {
+      this.runCold = true;
+      this.coldPending = false;
+    }
+  }
+  private cacheState(): "cold" | "warm" | "unknown" {
+    return !this.loaded ? "unknown" : this.runCold ? "cold" : "warm";
+  }
   /** `?tts=webgpu` loads the q8f16 variant on WebGPU (S1-06 measurement); default q8 on WASM. */
   readonly device: "wasm" | "webgpu";
   private loadedInfo: LoadedInfo | null = null;
@@ -271,6 +284,7 @@ export class VoiceEngine {
     }
     if (m.type === "loaded") {
       this.downloadedBytes = m.downloadedBytes;
+      this.coldPending = m.downloadedBytes > 1_000_000;
       this.loadedDevice = m.device;
       this.loadedDtype = m.dtype;
       this.loadedInfo = m;
@@ -379,6 +393,8 @@ export class VoiceEngine {
     }
     if (this.runId !== before || ticket !== this.readSeq) return this.result(before, 0, 0, false);
     const runId = ++this.runId;
+    this.runCold = false;
+    this.takeCold();
     // A read already playing is replaced: settle its promise now, or its caller waits forever
     // (Codex review, PR #17).
     const replaced = this.pendingDone;
@@ -548,6 +564,7 @@ export class VoiceEngine {
   metrics(seconds: number): StreamMetrics {
     const synthSeconds = this.runSynthMs / 1000;
     return {
+      cache_state: this.cacheState(),
       ttfa_ms: this.runTtfa === null ? null : Math.round(this.runTtfa),
       rtf: synthSeconds > 0 ? Math.round((seconds / synthSeconds) * 100) / 100 : null,
       gap_ms: Math.round(this.queue?.maxGapMs ?? 0),
@@ -602,7 +619,7 @@ export class VoiceEngine {
       browser_major: env.browser_major,
       os: env.os,
       os_major: env.os_major,
-      cache_state: this.loaded ? (this.downloadedBytes > 1_000_000 ? "cold" : "warm") : "unknown",
+      cache_state: this.cacheState(),
       model_id: spec.id,
       model_rev: spec.revision,
       dtype: this.loadedDtype,
@@ -660,6 +677,8 @@ export class VoiceEngine {
     this.streamChain = Promise.resolve();
     this.streamVoice = this.voice;
     this.streamRate = this.rate;
+    this.runCold = false;
+    this.takeCold(); // the voice may already have loaded (page-load warm-up) during this stream's setup
     this.pendingDone = null;
     return runId;
   }
@@ -680,6 +699,7 @@ export class VoiceEngine {
       if (runId !== this.runId || this.phase === "failed") return;
       await this.load();
       if (runId !== this.runId) return;
+      this.takeCold(); // a first bullet that had to fetch the voice makes this stream cold
       const planId = -++this.messageSeq; // per push, same allocator as plan()/speak() (Codex review, PR #17)
       const plannedP = this.wait(`planned:${planId}`);
       this.send({ type: "plan", runId: planId, text, limits: LIMITS, firstPieceTarget: 0 });
