@@ -86,6 +86,9 @@ jobs:
       - name: Generated files are current (CSP meta tags, PRIVACY.md)
         working-directory: web
         run: npm run check:generated
+      - name: UI text comes from spec/strings (rule 8)
+        working-directory: web
+        run: npm run check:strings
       - name: Unit tests
         working-directory: web
         run: npm test --if-present
