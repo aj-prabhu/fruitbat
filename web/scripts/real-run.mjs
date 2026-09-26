@@ -28,7 +28,10 @@ const t0 = Date.now();
 await page.evaluate((t) => window.__fruitbat.run(t, "short"), DOC011);
 await page.waitForFunction(() => {
   const s = window.__fruitbat.state();
-  return (s.gen === "done" || s.gen === "failed") && (s.play === "idle" || s.play === "stopped" || s.gen === "failed");
+  // Speech still on its way (loading, phonemizing, synthesizing or scheduled) is part of the run
+  // (Codex review, PR #18).
+  const voiceIdle = s.voice.pending === 0 && s.voice.inFlight === 0 && s.voice.enqueued <= s.voice.ended;
+  return (s.gen === "done" || s.gen === "failed") && (s.play === "idle" || s.play === "stopped" || s.gen === "failed") && (voiceIdle || s.gen === "failed");
 }, null, { timeout: 600_000 });
 const s = await page.evaluate(() => window.__fruitbat.state());
 const st = await page.evaluate(() => window.__fruitbat.stats());

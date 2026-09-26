@@ -1,0 +1,31 @@
+{
+  "id": "029",
+  "key_facts": [
+    "Within three seconds the reactor's output rose above 530 MW.",
+    "the reactor output jumped to around 30,000 MW thermal, 10 times its normal operational output",
+    "A second, more powerful explosion, estimated to have had the power equivalent of 225 tons of TNT, occurred two or three seconds after the first",
+    "A lethal dose is around 500 roentgens (~4.4 Gray (Gy) in modern radiation units) over five hours",
+    "By 15:00, 53,000 people were evacuated to the Kiev region",
+    "all three survived and were awarded the Order for Courage in May 2018",
+    "ISF-2 is the world's largest nuclear fuel storage facility, expected to hold more than 21,000 fuel assemblies for at least 100 years",
+    "two engineers killed by the explosions, and 28 more who died of acute radiation syndrome within three months",
+    "estimated to have cost between US$235 billion and US$700 billion",
+    "\"Pripyat Lights, or Chernobyl shadows\" that includes 30 oil paintings"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "The three volunteer divers who opened the bubbler pool valves died of radiation poisoning within days.",
+      "distinctive_tokens": ["divers", "poisoning"]
+    },
+    {
+      "claim": "Chernobyl released a mere 4,000 times more radioactive material than Hiroshima and Nagasaki combined.",
+      "distinctive_tokens": ["4000", "mere"]
+    },
+    {
+      "claim": "INSAG-1 faulted the reactor's design, while INSAG-7 pinned blame on the operators' actions.",
+      "distinctive_tokens": ["faulted", "pinned"]
+    }
+  ],
+  "expected_oneline_keywords": ["chernobyl", "reactor", "explosion", "radiation"],
+  "notes": "The doc explicitly debunks the 'divers died' myth (all three survived, medalled in 2018) and explicitly reverses which report (INSAG-1 vs INSAG-7) blamed which cause -- both are built-in reversal traps. Continues directly after doc 014's cutoff, non-overlapping."
+}
