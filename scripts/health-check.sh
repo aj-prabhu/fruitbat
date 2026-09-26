@@ -69,7 +69,7 @@ if [ -f spec/models.json ]; then
       url="${url_template//\{id\}/$id}"
       url="${url//\{revision\}/$revision}"
       url="${url//\{path\}/$path}"
-      code="$(curl -sIL -o /dev/null -w '%{http_code}' "$url" || echo "000")"
+      code="$(curl -sIL --connect-timeout 10 --max-time 60 -o /dev/null -w '%{http_code}' "$url" || echo "000")"
       if [ "$code" = "200" ]; then
         row "model:$role:$id:$path" PASS "$code $url"
       else
@@ -95,13 +95,13 @@ if [ "$SKIP_SPACE" = "1" ]; then
   row space-public SKIPPED "HEALTH_SKIP_SPACE=1 (public Space is private until web-v0.1.0)"
   row space-dev SKIPPED "HEALTH_SKIP_SPACE=1"
 else
-  PUBLIC_CODE="$(curl -sL -o /dev/null -w '%{http_code}' "$PUBLIC_SPACE_URL" || echo "000")"
+  PUBLIC_CODE="$(curl -sL --connect-timeout 10 --max-time 60 -o /dev/null -w '%{http_code}' "$PUBLIC_SPACE_URL" || echo "000")"
   if [ "$PUBLIC_CODE" = "200" ]; then
     row space-public PASS "$PUBLIC_CODE $PUBLIC_SPACE_URL"
   else
     row space-public FAIL "$PUBLIC_CODE $PUBLIC_SPACE_URL"
   fi
-  DEV_CODE="$(curl -sL -o /dev/null -w '%{http_code}' "$DEV_SPACE_URL" || echo "000")"
+  DEV_CODE="$(curl -sL --connect-timeout 10 --max-time 60 -o /dev/null -w '%{http_code}' "$DEV_SPACE_URL" || echo "000")"
   if [ "$DEV_CODE" = "200" ]; then
     row space-dev PASS "$DEV_CODE $DEV_SPACE_URL"
   else
