@@ -21,6 +21,8 @@ export interface PinnedModels {
     voice: PinnedModel & {
       voices_vendored: { path: string; files: string[] };
       variants?: Record<string, { path: string; bytes: number; device: string }>;
+      tts_phoneme_limit: number;
+      tts_phoneme_target: number;
     };
     libraries: Record<string, string>;
   };

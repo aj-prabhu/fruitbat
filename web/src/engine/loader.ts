@@ -34,12 +34,25 @@ export function configureRuntime(): void {
   // Transformers.js 4.3.0 probes `tokenizer_config.json` at `resolve/main/` without the revision
   // (get_tokenizer_files() passes empty options). pinUrl() rewrites that probe to the pinned
   // revision, so no unpinned URL ever leaves the page; net.ts still rejects any that would.
-  env.fetch = (input: string | URL, init?: RequestInit) => {
+  env.fetch = async (input: string | URL, init?: RequestInit) => {
     const signals = [...activeSignals];
     const merged: RequestInit = { ...init };
     if (signals.length) merged.signal = signals.length === 1 ? signals[0] : AbortSignal.any(signals);
-    return guardedFetch(pinUrl(input), merged);
+    const res = await guardedFetch(pinUrl(input), merged);
+    const len = Number(res.headers.get("content-length") ?? 0);
+    if (Number.isFinite(len) && len > 0) netBytes += len; // net.ts allows GET only
+    return res;
   };
+}
+
+let netBytes = 0;
+/**
+ * Model bytes this context actually fetched over the network. Transformers.js looks in the Cache
+ * API first and calls env.fetch only on a miss, so a warm load adds nothing: this, not the
+ * progress events (which also fire for cached files), is what makes a run "cold" (S1-10).
+ */
+export function networkBytes(): number {
+  return netBytes;
 }
 
 /** Options forwarded to a Transformers.js `from_pretrained` call. */
@@ -48,6 +61,18 @@ export interface PretrainedOptions {
   dtype?: string;
   device?: string;
   progress_callback?: (p: LoadProgress) => void;
+}
+
+/** Factories still running, including ones whose load() already rejected on abort. */
+const inflight = new Set<Promise<unknown>>();
+
+/**
+ * Resolves once every factory started by load() has settled. A cancelled load() rejects at
+ * once so Stop feels instant, but its download or session init may still be winding down;
+ * callers that must not overlap it (the LLM worker's Stop confirmation) wait here.
+ */
+export function loadsSettled(): Promise<void> {
+  return Promise.allSettled([...inflight]).then(() => undefined);
 }
 
 /**
@@ -90,6 +115,15 @@ export async function load<T>(
     }
   };
   void work.then(cleanup, cleanup);
+  // Tracked until the factory settles and, when its result lands after the load was cancelled,
+  // until that ownerless result's sessions are freed; loadsSettled() waits on both (Codex review, PR #16).
+  const tracked: Promise<unknown> = work
+    .then(async (v) => {
+      if (signal?.aborted) await (v as { dispose?: () => unknown } | null)?.dispose?.();
+    })
+    .catch(() => undefined)
+    .finally(() => inflight.delete(tracked));
+  inflight.add(tracked);
   if (!signal) return work;
   return Promise.race([work, aborted]);
 }

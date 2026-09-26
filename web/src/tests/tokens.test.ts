@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import fixture from "../../../spec/fixtures/tokens.web.json";
-import { countTokens, tokenizerReady } from "../core/tokens";
+import { countTokens, countTokensWith, tokenizerReady } from "../core/tokens";
+import { summarizerTiers } from "../engine/pins";
 
 describe("tokens", () => {
   it("loads the pinned tokenizer through net.ts with no unpinned URL", async () => {
@@ -33,4 +34,13 @@ describe("tokens", () => {
   it("counts an empty string as 0 without special tokens", async () => {
     expect(await countTokens("")).toBe(0);
   });
+
+  it("a fallback tier gets its own tokenizer, so budgets match the model that reads them", async () => {
+    const low = summarizerTiers().find((t) => t.role === "low-end")!;
+    const [def, lowTok] = await Promise.all([tokenizerReady(), tokenizerReady(low)]);
+    expect(lowTok).not.toBe(def);
+    expect(await tokenizerReady(low)).toBe(lowTok); // cached per model
+    const text = "Fruit bats pollinate figs and disperse seeds across 30 kilometres of forest.";
+    expect(await countTokens(text, low)).toBe(countTokensWith(lowTok, text));
+  }, 120_000);
 });

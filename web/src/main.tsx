@@ -58,7 +58,10 @@ let lastRecordedRunId = 0;
 o.subscribe((snap) => {
   // gen turns terminal before the summary's speech has played; record once the voice has drained
   // too, so the row carries the voice metrics (Codex review, PR #22).
-  const voiceIdle = snap.play !== "playing" && snap.play !== "paused" && snap.voice.inFlight === 0 && snap.voice.enqueued <= snap.voice.ended;
+  // Speech still loading or phonemizing (voice.pending) is part of the run: recording before it
+  // plays would store a row without its audio metrics (Codex review, PR #27).
+  const voiceIdle =
+    snap.play !== "playing" && snap.play !== "paused" && snap.voice.pending === 0 && snap.voice.inFlight === 0 && snap.voice.enqueued <= snap.voice.ended;
   if ((snap.gen === "done" || snap.gen === "failed") && voiceIdle && snap.runId !== lastRecordedRunId) {
     lastRecordedRunId = snap.runId;
     stats.record(o.stats());

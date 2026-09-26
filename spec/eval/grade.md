@@ -42,8 +42,9 @@ without the source text in front of you.
 
 ## Output row
 
-Append exactly this JSON object (one line, or pretty-printed — either is fine) to
-`bench/graded/<commit>-<doc>-<level>.json`:
+Write exactly this JSON object (one line, or pretty-printed) as the whole content of
+`bench/graded/<commit>-<doc>-<level>.json`, replacing the file if it exists. One file holds one
+row; a re-grade overwrites it:
 
 ```json
 {

@@ -9,23 +9,37 @@
     "the earliest known record of pigeons is in the fifth Aegyptian dynasty, about 3000 B.C.",
     "never less than 20,000 pigeons were taken with the court",
     "The fantail has thirty or even forty tail-feathers, instead of twelve or fourteen, the normal number",
-    "all our domestic breeds have descended from the Columba livia with its geographical sub-species",
+    "I can feel no doubt that all our domestic breeds have descended from the Columba livia with its geographical sub-species",
     "the hybrids or mongrels from between all the domestic breeds of pigeons are perfectly fertile"
   ],
   "forbidden_claims": [
     {
       "claim": "Akber Khan traveled with a court of at least 200,000 pigeons.",
-      "distinctive_tokens": ["200000", "traveled"]
+      "distinctive_tokens": [
+        "200000",
+        "traveled"
+      ]
     },
     {
       "claim": "Darwin observed that cats with golden eyes are invariably mute.",
-      "distinctive_tokens": ["golden", "mute"]
+      "distinctive_tokens": [
+        "golden",
+        "mute"
+      ]
     },
     {
       "claim": "The fantail pigeon has only six tail feathers, far fewer than other breeds.",
-      "distinctive_tokens": ["six", "fewer"]
+      "distinctive_tokens": [
+        "six",
+        "fewer"
+      ]
     }
   ],
-  "expected_oneline_keywords": ["origin of species", "darwin", "natural selection", "variation"],
+  "expected_oneline_keywords": [
+    "origin of species",
+    "darwin",
+    "natural selection",
+    "variation"
+  ],
   "notes": "Darwin's own introduction plus the pigeon-breeding chapter; the blue-eyed-cats/deafness correlation is a real, specific, easily reversed claim."
 }

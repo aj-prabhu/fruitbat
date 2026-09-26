@@ -134,7 +134,11 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
     device = tier.device as StatsRow["device"];
   }
 
-  const cache_state: StatsRow["cache_state"] = voiceRow?.cache_state === "warm" ? "warm" : "cold";
+  // Cold only when this run fetched model bytes over the network: the voice (its stream or Read all
+  // metrics) or, for a summary, the summarizer (Codex review, PR #27).
+  const voiceCold = (voiceRun?.cache_state ?? voiceRow?.cache_state) === "cold";
+  const genCold = level !== "readall" && gen?.cache_cold === true;
+  const cache_state: StatsRow["cache_state"] = voiceCold || genCold ? "cold" : "warm";
 
   const bulletsTotal = gen?.bullets_total ?? null;
   const bulletsCut = gen?.bullets_cut ?? null;

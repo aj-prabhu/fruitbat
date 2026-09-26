@@ -5,7 +5,7 @@
     "on the shore of Walden Pond, in Concord, Massachusetts",
     "I lived there two years and two months",
     "At present I am a sojourner in civilized life again",
-    "particular inquiries had not been made by my townsmen concerning my mode of life",
+    "I should not obtrude my affairs so much on the notice of my readers if very particular inquiries had not been made by my townsmen concerning my mode of life",
     "In most books, the I, or first person, is omitted; in this it will be retained",
     "I, on my side, require of every writer, first or last, a simple and sincere account of his own life",
     "Perhaps these pages are more particularly addressed to poor students"
@@ -13,17 +13,31 @@
   "forbidden_claims": [
     {
       "claim": "Thoreau spent five full years living at Walden Pond.",
-      "distinctive_tokens": ["five", "full"]
+      "distinctive_tokens": [
+        "five",
+        "full"
+      ]
     },
     {
       "claim": "Thoreau follows the convention of omitting himself from the narrative entirely.",
-      "distinctive_tokens": ["convention", "entirely"]
+      "distinctive_tokens": [
+        "convention",
+        "entirely"
+      ]
     },
     {
       "claim": "Thoreau built his cabin on the shore of Walden Pond near Boston, Massachusetts, not Concord.",
-      "distinctive_tokens": ["boston", "cabin"]
+      "distinctive_tokens": [
+        "boston",
+        "cabin"
+      ]
     }
   ],
-  "expected_oneline_keywords": ["walden pond", "alone", "woods", "writer"],
+  "expected_oneline_keywords": [
+    "walden pond",
+    "alone",
+    "woods",
+    "writer"
+  ],
   "notes": "Thoreau explicitly breaks convention by keeping the first person -- a reversal trap if a summary says he omits himself."
 }

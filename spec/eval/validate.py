@@ -34,6 +34,13 @@ MAX_ORIGINAL_CC0 = 5
 MAX_DUPLICATE_PARAGRAPHS = 2
 
 
+
+def claim_words(claim):
+    """Lowercase letter/digit words of a claim, with separators inside numbers removed."""
+    import re as _re
+    text = _re.sub(r"(?<=\d)[,.](?=\d)", "", str(claim).lower())
+    return set(_re.findall(r"[a-z0-9]+", text))
+
 def load_manifest(problems):
     if not MANIFEST_PATH.exists():
         problems.append(f"missing {MANIFEST_PATH}")
@@ -263,6 +270,10 @@ def check_facts(manifest, problems):
                     problems.append(f"{did}: distinctive_token not lowercase letters/digits: {tok!r}")
                 elif tok in words:
                     problems.append(f"{did}: distinctive_token {tok!r} appears in the doc (must be absent)")
+                elif tok not in claim_words(claim.get("claim", "")):
+                    # A token the claim itself never uses can't identify that claim in a summary
+                    # (Codex merge-gate review, PR #13). Digit separators are normalized: $52,750 -> 52750.
+                    problems.append(f"{did}: distinctive_token {tok!r} is not in its own claim")
         total_forbidden += len(forbidden)
 
         # expected_oneline_keywords: 3-5.

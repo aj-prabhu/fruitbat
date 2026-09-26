@@ -35,6 +35,7 @@ afterEach(() => {
 
 // ---------------------------------------------------------------- fixtures
 const GEN_FIXTURE: GenStats = {
+  cache_cold: false,
   level: "short",
   level_used: "short",
   chunks: 2,
