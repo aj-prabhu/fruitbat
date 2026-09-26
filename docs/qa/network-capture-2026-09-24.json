@@ -1,0 +1,260 @@
+{
+  "base": "https://2shay-fruitbat-dev.static.hf.space",
+  "capturedAt": "2026-09-24T06:31:41.722Z",
+  "result": {
+    "state": "done",
+    "error": null,
+    "bullets": [
+      "More than 1,400 species live on every continent except Antarctica.",
+      "A single little brown bat can eat up to 1,000 insects in one hour.",
+      "Most bats find their way in the dark by echolocation.",
+      "Since 2006 white-nose syndrome has killed millions of bats in North America."
+    ],
+    "isolated": true,
+    "timings": {
+      "click": 413,
+      "load_start": 594,
+      "llm_loaded": 24783,
+      "tts_loaded": 30117,
+      "gen_start": 30117,
+      "first_token": 30387,
+      "first_bullet": 30701,
+      "first_audio_scheduled": 37648,
+      "gen_done": 53136
+    }
+  },
+  "hosts": {
+    "2shay-fruitbat-dev.static.hf.space": 13,
+    "huggingface.co": 19
+  },
+  "redirectHosts": [
+    "2shay-fruitbat-dev.static.hf.space"
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/",
+      "status": 302,
+      "from": null,
+      "type": "document"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/index.html",
+      "status": 200,
+      "from": "https://2shay-fruitbat-dev.static.hf.space/",
+      "type": "document"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/coi-serviceworker.js",
+      "status": 200,
+      "from": null,
+      "type": "script"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/assets/index-V5nVoh5U.js",
+      "status": 200,
+      "from": null,
+      "type": "script"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/index.html",
+      "status": 200,
+      "from": null,
+      "type": "document"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/coi-serviceworker.js",
+      "status": 200,
+      "from": null,
+      "type": "script"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/assets/index-V5nVoh5U.js",
+      "status": 200,
+      "from": null,
+      "type": "script"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/config.json",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/main/tokenizer_config.json",
+      "status": 206,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/config.json",
+      "status": 206,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/tokenizer_config.json",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/generation_config.json",
+      "status": 206,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/tokenizer_config.json",
+      "status": 206,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/tokenizer.json",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/onnx/model_q4f16.onnx_data",
+      "status": 206,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/onnx/model_q4f16.onnx",
+      "status": 206,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/generation_config.json",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/onnx/model_q4f16.onnx",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Qwen3.5-0.8B-Text-ONNX/resolve/1e45daba048899e7f771657ada617ec49350aa91/onnx/model_q4f16.onnx_data",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/ort/ort-wasm-simd-threaded.asyncify.mjs",
+      "status": 200,
+      "from": null,
+      "type": "script"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/ort/ort-wasm-simd-threaded.asyncify.mjs",
+      "status": 200,
+      "from": null,
+      "type": "script"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/ort/ort-wasm-simd-threaded.asyncify.wasm",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/ort/ort-wasm-simd-threaded.asyncify.mjs",
+      "status": 200,
+      "from": null,
+      "type": "script"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/ort/ort-wasm-simd-threaded.asyncify.mjs",
+      "status": 200,
+      "from": null,
+      "type": "script"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/config.json",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/main/tokenizer_config.json",
+      "status": 206,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer.json",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer_config.json",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/onnx/model_quantized.onnx",
+      "status": 206,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/tokenizer.json",
+      "status": 206,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://huggingface.co/onnx-community/Kokoro-82M-v1.0-ONNX/resolve/1939ad2a8e416c0acfeecc08a694d14ef25f2231/onnx/model_quantized.onnx",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    },
+    {
+      "method": "GET",
+      "url": "https://2shay-fruitbat-dev.static.hf.space/models/kokoro-voices/af_heart.bin",
+      "status": 200,
+      "from": null,
+      "type": "fetch"
+    }
+  ],
+  "note": "Page-level Playwright capture on the dev Space. The coi-serviceworker sits between page and network, so Hub redirects are NOT visible here; the real chains were checked with curl -sI and are recorded in spec/network.json (web.redirect_hosts, web.redirect_query_params). Two requests hit resolve/main/tokenizer_config.json (unpinned): handed to S1-03a."
+}

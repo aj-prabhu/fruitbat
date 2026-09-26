@@ -1,0 +1,140 @@
+[
+  {
+    "name": "single_chunk_doc",
+    "input": {
+      "text": "Bats fly at night. They eat insects. Some bats live in caves.",
+      "countTokens": { "kind": "wordcount", "factor": 1.3 },
+      "chunk_input_tokens": 1000,
+      "max_chunks": 100
+    },
+    "expect": {
+      "chunks": [
+        { "index": 0, "start": 0, "end": 61, "text": "Bats fly at night. They eat insects. Some bats live in caves.", "tokens": 16, "segmentCount": 3 }
+      ]
+    },
+    "why": "spec/chunking.md rule 5: a doc that fits under the budget entirely is exactly one chunk, even though it has several sentences."
+  },
+  {
+    "name": "three_chunk_doc_built_from_corpus_style_text",
+    "input": {
+      "text": "Alice paid Bob five dollars. Bob bought a sandwich with it. Carla watched them both. Dev arrived late to the shop. The shop closed at noon that day. Everyone went home after that. It was a quiet afternoon in town. Nothing else happened worth noting.",
+      "countTokens": { "kind": "wordcount", "factor": 1.3 },
+      "chunk_input_tokens": 25,
+      "max_chunks": 100
+    },
+    "expect": {
+      "chunks": [
+        { "index": 0, "start": 0, "end": 84, "text": "Alice paid Bob five dollars. Bob bought a sandwich with it. Carla watched them both.", "tokens": 20, "segmentCount": 3 },
+        { "index": 1, "start": 85, "end": 179, "text": "Dev arrived late to the shop. The shop closed at noon that day. Everyone went home after that.", "tokens": 24, "segmentCount": 3 },
+        { "index": 2, "start": 180, "end": 249, "text": "It was a quiet afternoon in town. Nothing else happened worth noting.", "tokens": 16, "segmentCount": 2 }
+      ]
+    },
+    "why": "8 sentences (relational/negation prose in the style of spec/eval/corpus/005.txt) pack into exactly 3 chunks under a 25-token budget, each chunk ending on a sentence boundary."
+  },
+  {
+    "name": "chunk_boundaries_never_split_a_sentence",
+    "input": {
+      "text": "Alice paid Bob five dollars. Bob bought a sandwich with it. Carla watched them both. Dev arrived late to the shop. The shop closed at noon that day. Everyone went home after that. It was a quiet afternoon in town. Nothing else happened worth noting.",
+      "countTokens": { "kind": "wordcount", "factor": 1.3 },
+      "chunk_input_tokens": 15,
+      "max_chunks": 100
+    },
+    "expect": {
+      "chunks": [
+        { "index": 0, "start": 0, "end": 59, "text": "Alice paid Bob five dollars. Bob bought a sandwich with it.", "tokens": 15, "segmentCount": 2 },
+        { "index": 1, "start": 60, "end": 114, "text": "Carla watched them both. Dev arrived late to the shop.", "tokens": 13, "segmentCount": 2 },
+        { "index": 2, "start": 115, "end": 148, "text": "The shop closed at noon that day.", "tokens": 10, "segmentCount": 1 },
+        { "index": 3, "start": 149, "end": 179, "text": "Everyone went home after that.", "tokens": 7, "segmentCount": 1 },
+        { "index": 4, "start": 180, "end": 213, "text": "It was a quiet afternoon in town.", "tokens": 10, "segmentCount": 1 },
+        { "index": 5, "start": 214, "end": 249, "text": "Nothing else happened worth noting.", "tokens": 7, "segmentCount": 1 }
+      ]
+    },
+    "why": "a tighter budget on the same doc produces more chunks, but every chunk still starts and ends exactly on a sentence boundary -- no chunk ever contains a sentence fragment."
+  },
+  {
+    "name": "oversized_sentence_pre_split_by_tts_safe_rule",
+    "input": {
+      "text": "This sentence is somewhat long and uses several words to fill space nicely. Short one here. This next sentence is also fairly long and uses several words to fill space nicely too.",
+      "countTokens": { "kind": "wordcount", "factor": 1.3 },
+      "chunk_input_tokens": 15,
+      "max_chunks": 100
+    },
+    "expect": {
+      "chunks": [
+        { "index": 0, "start": 0, "end": 62, "text": "This sentence is somewhat long and uses several words to fill ", "tokens": 15, "segmentCount": 1 },
+        { "index": 1, "start": 62, "end": 91, "text": "space nicely. Short one here.", "tokens": 7, "segmentCount": 2 },
+        { "index": 2, "start": 92, "end": 154, "text": "This next sentence is also fairly long and uses several words ", "tokens": 15, "segmentCount": 1 },
+        { "index": 3, "start": 154, "end": 179, "text": "to fill space nicely too.", "tokens": 7, "segmentCount": 1 }
+      ]
+    },
+    "why": "spec/chunking.md rule 2: the first and third sentences each individually exceed the 15-token budget, so each is pre-split at word boundaries (the same rule split.ts uses) before packing; the leftover tail of a split sentence still packs normally with the next real sentence."
+  },
+  {
+    "name": "two_sentences_each_individually_oversized_both_pre_split",
+    "input": {
+      "text": "Alice paid Bob five dollars today. Bob bought a sandwich with it later on.",
+      "countTokens": { "kind": "wordcount", "factor": 1.3 },
+      "chunk_input_tokens": 6,
+      "max_chunks": 100
+    },
+    "expect": {
+      "chunks": [
+        { "index": 0, "start": 0, "end": 20, "text": "Alice paid Bob five ", "tokens": 6, "segmentCount": 1 },
+        { "index": 1, "start": 20, "end": 34, "text": "dollars today.", "tokens": 3, "segmentCount": 1 },
+        { "index": 2, "start": 35, "end": 57, "text": "Bob bought a sandwich ", "tokens": 6, "segmentCount": 1 },
+        { "index": 3, "start": 57, "end": 74, "text": "with it later on.", "tokens": 6, "segmentCount": 1 }
+      ]
+    },
+    "why": "with a very small budget both sentences need pre-splitting; each sentence's pieces still tile that sentence's own span, and a leftover piece with nothing left to merge with becomes its own chunk."
+  },
+  {
+    "name": "exactly_at_budget_stays_one_chunk",
+    "input": {
+      "text": "Alice paid Bob five dollars today.",
+      "countTokens": { "kind": "wordcount", "factor": 1.3 },
+      "chunk_input_tokens": 8,
+      "max_chunks": 100
+    },
+    "expect": { "chunks": [{ "index": 0, "start": 0, "end": 34, "text": "Alice paid Bob five dollars today.", "tokens": 8, "segmentCount": 1 }] },
+    "why": "the budget check is <=, not <: a doc whose token count exactly equals chunk_input_tokens is still a single chunk, not split."
+  },
+  {
+    "name": "max_chunks_exactly_at_cap_is_fine",
+    "input": {
+      "text": "One sentence. Two sentence. Three sentence.",
+      "countTokens": { "kind": "wordcount", "factor": 1.3 },
+      "chunk_input_tokens": 3,
+      "max_chunks": 3
+    },
+    "expect": {
+      "chunks": [
+        { "index": 0, "start": 0, "end": 13, "text": "One sentence.", "tokens": 3, "segmentCount": 1 },
+        { "index": 1, "start": 14, "end": 27, "text": "Two sentence.", "tokens": 3, "segmentCount": 1 },
+        { "index": 2, "start": 28, "end": 43, "text": "Three sentence.", "tokens": 3, "segmentCount": 1 }
+      ]
+    },
+    "why": "exactly max_chunks chunks is allowed; the cap only rejects going OVER it."
+  },
+  {
+    "name": "over_limit_input_refused",
+    "input": {
+      "text": "One sentence. Two sentence. Three sentence. Four sentence. Five sentence.",
+      "countTokens": { "kind": "wordcount", "factor": 1.3 },
+      "chunk_input_tokens": 5,
+      "max_chunks": 2
+    },
+    "expect": { "error": "input_limit", "chunks": 5 },
+    "why": "spec/chunking.md's max_chunks rule: 5 sentences need 5 chunks under this budget, which is over the max_chunks cap of 2, so chunkSentences refuses with input_limit and reports how many chunks it would have needed."
+  },
+  {
+    "name": "one_more_than_the_cap_also_refused",
+    "input": {
+      "text": "One sentence. Two sentence. Three sentence.",
+      "countTokens": { "kind": "wordcount", "factor": 1.3 },
+      "chunk_input_tokens": 3,
+      "max_chunks": 2
+    },
+    "expect": { "error": "input_limit", "chunks": 3 },
+    "why": "the same doc as max_chunks_exactly_at_cap_is_fine, but with the cap one lower, now fails -- confirms the boundary is exact."
+  }
+]

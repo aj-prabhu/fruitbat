@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/aj-prabhu/fruitbat/spec/dial.schema.json",
+  "title": "Fruitbat dial",
+  "type": "object",
+  "required": ["version", "default", "levels"],
+  "additionalProperties": false,
+  "properties": {
+    "$comment": { "type": "string" },
+    "version": { "type": "integer", "minimum": 1 },
+    "default": { "type": "string" },
+    "levels": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["id", "label_key", "uses_llm", "spoken", "description"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z]+$" },
+          "label_key": { "type": "string", "pattern": "^dial\\.[a-z]+$" },
+          "uses_llm": { "type": "boolean" },
+          "spoken": { "type": "boolean" },
+          "description": { "type": "string" },
+          "prompt": { "type": "string", "pattern": "^prompts/[a-z-]+\\.md$" },
+          "reduce_prompt": { "type": "string", "pattern": "^prompts/[a-z-]+\\.md$" },
+          "max_bullets_per_chunk": { "type": "integer", "minimum": 1, "maximum": 10 },
+          "min_bullets_per_chunk": { "type": "integer", "minimum": 1 },
+          "max_words_per_bullet": { "type": "integer", "minimum": 3, "maximum": 40 },
+          "max_new_tokens": { "type": "integer", "minimum": 16, "maximum": 512 },
+          "reduce": {
+            "type": "object",
+            "required": ["group_size", "max_depth", "fallback_level", "max_cut_fraction"],
+            "additionalProperties": false,
+            "properties": {
+              "group_size": { "type": "integer", "minimum": 2, "maximum": 10 },
+              "max_depth": { "type": "integer", "minimum": 1, "maximum": 2 },
+              "fallback_level": { "type": "string" },
+              "max_cut_fraction": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+            }
+          }
+        },
+        "if": { "properties": { "uses_llm": { "const": true } } },
+        "then": { "required": ["prompt", "max_bullets_per_chunk", "max_words_per_bullet", "max_new_tokens"] }
+      }
+    }
+  }
+}

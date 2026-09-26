@@ -1,0 +1,158 @@
+[
+  {
+    "name": "basic_dash_bullets_streamed_across_pushes",
+    "input": {
+      "max_bullets_per_chunk": 3,
+      "max_words_per_bullet": 4,
+      "pushes": ["- Bats fly at night\n- They ", "eat insects\nnot a bullet line\n", "* Third bullet here\n1. Fourth bullet dropped by cap\n", "- Fifth also dropped by cap\n"],
+      "flush": true
+    },
+    "expect": {
+      "pushResults": [
+        [{ "text": "Bats fly at night", "index": 0 }],
+        [{ "text": "They eat insects", "index": 1 }],
+        [{ "text": "Third bullet here", "index": 2 }],
+        []
+      ],
+      "flushResult": [],
+      "dropped": 2,
+      "overlength": 0
+    },
+    "why": "a bullet line can be split across two push() calls (a '- Bats fly at night' line completed, then 'They ' + 'eat insects' joined by the parser before the newline arrives); non-bullet lines are ignored; the cap (3) drops the 4th and 5th bullets and counts them in `dropped`."
+  },
+  {
+    "name": "overlength_bullet_kept_and_counted",
+    "input": {
+      "max_bullets_per_chunk": 5,
+      "max_words_per_bullet": 3,
+      "pushes": ["- this bullet has way too many words in it\n"],
+      "flush": false
+    },
+    "expect": {
+      "pushResults": [[{ "text": "this bullet has way too many words in it", "index": 0 }]],
+      "dropped": 0,
+      "overlength": 1
+    },
+    "why": "spec/chunking.md rule 4: the parser enforces the length cap by COUNTING an over-long bullet, not by dropping it -- the prompt asks for short bullets, the parser only ever drops for exceeding the per-chunk bullet COUNT."
+  },
+  {
+    "name": "think_block_stripped_across_pushes",
+    "input": {
+      "max_bullets_per_chunk": 5,
+      "max_words_per_bullet": 10,
+      "pushes": ["<think>reasoning about the ", "bats\n- hidden bullet inside think\n</think>- real bullet\n"],
+      "flush": false
+    },
+    "expect": {
+      "pushResults": [[], [{ "text": "real bullet", "index": 0 }]],
+      "dropped": 0,
+      "overlength": 0
+    },
+    "why": "docs/PLAN.md 'Thinking off': everything between <think> and </think> is discarded before lines are considered, even though the opening tag arrives in one push and the closing tag in the next -- the bullet hidden inside the think block never gets an index, and the real bullet after it is index 0, not 1."
+  },
+  {
+    "name": "streamed_partial_line_flushed_as_bullet",
+    "input": {
+      "max_bullets_per_chunk": 5,
+      "max_words_per_bullet": 10,
+      "pushes": ["- Bats fly at night\n- no newline yet though"],
+      "flush": true
+    },
+    "expect": {
+      "pushResults": [[{ "text": "Bats fly at night", "index": 0 }]],
+      "flushResult": [{ "text": "no newline yet though", "index": 1 }],
+      "dropped": 0,
+      "overlength": 0
+    },
+    "why": "the stream can end mid-line (no trailing newline ever arrives); flush() checks whatever is left in the buffer and, since it looks like a bullet line, emits it as the final bullet."
+  },
+  {
+    "name": "trailing_partial_non_bullet_not_emitted",
+    "input": {
+      "max_bullets_per_chunk": 5,
+      "max_words_per_bullet": 10,
+      "pushes": ["- Bats fly at night\nsome trailing prose with no marker"],
+      "flush": true
+    },
+    "expect": {
+      "pushResults": [[{ "text": "Bats fly at night", "index": 0 }]],
+      "flushResult": [],
+      "dropped": 0,
+      "overlength": 0
+    },
+    "why": "flush() only emits the trailing partial line when it IS a bullet; stray trailing prose is silently ignored, same as any other non-bullet line."
+  },
+  {
+    "name": "numbered_and_symbol_bullet_variants",
+    "input": {
+      "max_bullets_per_chunk": 10,
+      "max_words_per_bullet": 10,
+      "pushes": ["- dash bullet\n* star bullet\n• dot bullet\n1. numbered dot\n2) numbered paren\n"],
+      "flush": false
+    },
+    "expect": {
+      "pushResults": [
+        [
+          { "text": "dash bullet", "index": 0 },
+          { "text": "star bullet", "index": 1 },
+          { "text": "dot bullet", "index": 2 },
+          { "text": "numbered dot", "index": 3 },
+          { "text": "numbered paren", "index": 4 }
+        ]
+      ],
+      "dropped": 0,
+      "overlength": 0
+    },
+    "why": "'-', '*', '•', '1.' and '1)' are all accepted bullet markers."
+  },
+  {
+    "name": "cap_enforcement_drops_extras",
+    "input": {
+      "max_bullets_per_chunk": 2,
+      "max_words_per_bullet": 10,
+      "pushes": ["- one\n- two\n- three\n- four\n- five\n"],
+      "flush": false
+    },
+    "expect": {
+      "pushResults": [
+        [
+          { "text": "one", "index": 0 },
+          { "text": "two", "index": 1 }
+        ]
+      ],
+      "dropped": 3,
+      "overlength": 0
+    },
+    "why": "spec/chunking.md rule 4: on doc 011 Caveman returned 7 bullets where the prompt asked for 2-5, so the parser cap is not optional -- everything past max_bullets_per_chunk is dropped and counted, never shown or spoken."
+  },
+  {
+    "name": "empty_and_whitespace_only_pushes_are_inert",
+    "input": {
+      "max_bullets_per_chunk": 5,
+      "max_words_per_bullet": 10,
+      "pushes": ["", "   \n", "\n", "- real one\n"],
+      "flush": false
+    },
+    "expect": {
+      "pushResults": [[], [], [], [{ "text": "real one", "index": 0 }]],
+      "dropped": 0,
+      "overlength": 0
+    },
+    "why": "blank lines and empty pushes never produce a bullet and never advance the count."
+  },
+  {
+    "name": "marker_with_no_following_space_is_not_a_bullet",
+    "input": {
+      "max_bullets_per_chunk": 5,
+      "max_words_per_bullet": 10,
+      "pushes": ["-notabullet\n- a real bullet\n"],
+      "flush": false
+    },
+    "expect": {
+      "pushResults": [[{ "text": "a real bullet", "index": 0 }]],
+      "dropped": 0,
+      "overlength": 0
+    },
+    "why": "a bare hyphen glued to a word (a minus sign, a hyphenated word at line start) is not a bullet marker; the parser requires the marker to be followed by whitespace."
+  }
+]

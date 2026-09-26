@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "run-stats.schema.json",
+  "title": "RunStats",
+  "$comment": "One bench measurement (docs/PLAN.md rule 3, C11, S0-05). Numbers, enums, and validated metadata only — no free-text field. Metrics are nullable when a dial level doesn't produce them (readall has no LLM metrics; only readall has `coverage`). Bench identity = target, model_id, model_rev, dtype, device, browser(+major), os(+major), machine_id, cache_state, doc_id, level (bench/identity.md). Field order here is the fixed column order of bench/results.csv.",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "level": {
+      "type": "string",
+      "enum": ["readall", "short", "caveman", "oneline"]
+    },
+    "device": {
+      "type": "string",
+      "enum": ["webgpu", "wasm", "mlx"]
+    },
+    "model_id": {
+      "type": "string",
+      "$comment": "Closed set sourced from spec/models.json. Add a value here (small PR) whenever a new model_id is pinned there.",
+      "enum": [
+        "onnx-community/Qwen3.5-0.8B-Text-ONNX",
+        "onnx-community/Qwen2.5-0.5B-Instruct",
+        "onnx-community/Qwen3-0.6B-ONNX",
+        "HuggingFaceTB/SmolLM2-360M-Instruct",
+        "onnx-community/Kokoro-82M-v1.0-ONNX",
+        "mlx-community/Qwen3.5-2B-4bit",
+        "mlx-community/Qwen3-1.7B-4bit",
+        "mlx-community/Kokoro-82M-bf16"
+      ]
+    }
+  },
+  "required": [
+    "schema_version", "target", "device", "level", "browser", "browser_major",
+    "os", "os_major", "cache_state", "model_id", "model_rev", "dtype", "doc_id",
+    "commit", "date", "machine_id",
+    "ttfa_ms", "gen_ms", "tok_s", "rtf", "gap_ms", "stop_ms", "coverage",
+    "bullets_total", "bullets_cut", "cut_rate", "facts_token_hit", "halluc_flags",
+    "forbidden_hits", "oneline_keyword_hit", "tts_overlimit", "peak_mb", "heap_mb"
+  ],
+  "properties": {
+    "schema_version": { "type": "integer", "enum": [1] },
+    "target": { "type": "string", "enum": ["web", "mac"] },
+    "device": { "$ref": "#/$defs/device" },
+    "level": { "$ref": "#/$defs/level" },
+    "browser": { "type": "string", "enum": ["chrome", "safari", "firefox", "none"] },
+    "browser_major": { "type": ["integer", "null"], "minimum": 0 },
+    "os": { "type": "string", "enum": ["macos", "windows", "linux", "ios", "android"] },
+    "os_major": { "type": "integer", "minimum": 0 },
+    "cache_state": { "type": "string", "enum": ["cold", "warm"] },
+    "model_id": { "$ref": "#/$defs/model_id" },
+    "model_rev": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "dtype": { "type": "string", "enum": ["q4f16", "q8", "q8f16", "q4", "fp32", "bf16", "fp16", "4bit", "8bit"], "$comment": "q8f16: the WebGPU voice variant (?tts=webgpu, spec/models.json)." },
+    "doc_id": { "type": "string", "pattern": "^([0-9]{3}|paste)$", "$comment": "S1-10: bench rows use the 3-digit eval corpus id; every other row (real usage, not the corpus) is 'paste' unless window.__fruitbat.setDocId(id) overrides it." },
+    "commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}(T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})?)?$"
+    },
+    "machine_id": { "type": "string", "pattern": "^(web|[0-9a-f]{12})$" },
+
+    "ttfa_ms": { "type": ["number", "null"], "minimum": 0 },
+    "gen_ms": { "type": ["number", "null"], "minimum": 0 },
+    "tok_s": { "type": ["number", "null"], "minimum": 0 },
+    "rtf": { "type": ["number", "null"], "minimum": 0 },
+    "gap_ms": { "type": ["number", "null"], "minimum": 0 },
+    "stop_ms": { "type": ["number", "null"], "minimum": 0 },
+    "coverage": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "bullets_total": { "type": ["integer", "null"], "minimum": 0 },
+    "bullets_cut": { "type": ["integer", "null"], "minimum": 0 },
+    "cut_rate": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "facts_token_hit": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "halluc_flags": { "type": ["integer", "null"], "minimum": 0 },
+    "forbidden_hits": { "type": ["integer", "null"], "minimum": 0 },
+    "oneline_keyword_hit": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "tts_overlimit": { "type": ["integer", "null"], "minimum": 0 },
+    "peak_mb": { "type": ["number", "null"], "minimum": 0 },
+    "heap_mb": { "type": ["number", "null"], "minimum": 0 }
+  }
+}

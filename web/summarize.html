@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fruitbat summarizer harness</title>
+    <!-- csp:start -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' https://huggingface.co https://us.aws.cdn.hf.co https://*.cdn.hf.co; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'; media-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'">
+    <!-- csp:end -->
+    <script src="/coi-serviceworker.js"></script>
+  </head>
+  <body>
+    <h1>Summarizer harness (S1-05)</h1>
+    <p>Test page for the summarizer engine. Nothing downloads until you press Summarize (rule 11).</p>
+    <p id="status">starting</p>
+    <textarea id="text" rows="10" cols="90"></textarea>
+    <p>
+      <select id="level"><option value="short">Short</option><option value="caveman">Caveman</option><option value="oneline">One line</option></select>
+      <button id="go" type="button">Summarize</button>
+      <button id="stop" type="button">Stop</button>
+    </p>
+    <ul id="bullets"></ul>
+    <pre id="raw"></pre>
+    <script type="module" src="/src/summarize.ts"></script>
+  </body>
+</html>

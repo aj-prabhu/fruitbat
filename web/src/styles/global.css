@@ -1,0 +1,435 @@
+/* Fruitbat web app shell (S1-01). Plain, quiet styling; the impeccable pass is S1-07.
+   All colors are CSS custom properties on :root (docs/PLAN.md S1-01) so dark mode and later
+   theming never touch component styles. */
+
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/fonts/AtkinsonHyperlegible-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/fonts/AtkinsonHyperlegible-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/fonts/AtkinsonHyperlegible-Italic.woff2") format("woff2");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  src: url("/fonts/AtkinsonHyperlegible-BoldItalic.woff2") format("woff2");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  --gutter: 16px;
+  --measure: 65ch;
+  --border-radius: 8px;
+
+  --color-bg: #faf9f6;
+  --color-fg: #1a1a1a;
+  --color-muted: #5b5b5b;
+  --color-border: #d8d5cd;
+  --color-accent: #7a3b2e;
+  --color-accent-fg: #ffffff;
+  --color-panel-bg: #ffffff;
+  --color-input-bg: #ffffff;
+  --color-focus-ring: #7a3b2e;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #17171a;
+    --color-fg: #eceae6;
+    --color-muted: #a8a49c;
+    --color-border: #3a3a3f;
+    --color-accent: #e0a893;
+    --color-accent-fg: #17171a;
+    --color-panel-bg: #201f23;
+    --color-input-bg: #201f23;
+    --color-focus-ring: #e0a893;
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #17171a;
+  --color-fg: #eceae6;
+  --color-muted: #a8a49c;
+  --color-border: #3a3a3f;
+  --color-accent: #e0a893;
+  --color-accent-fg: #17171a;
+  --color-panel-bg: #201f23;
+  --color-input-bg: #201f23;
+  --color-focus-ring: #e0a893;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: "Atkinson Hyperlegible", system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: var(--gutter);
+  padding-bottom: calc(var(--gutter) * 6); /* room for the fixed panel on narrow screens */
+}
+
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gutter);
+  padding-bottom: var(--gutter);
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--gutter);
+}
+
+.app-title {
+  font-size: 1.25rem;
+  margin: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.dial {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: 4px;
+  margin: 0;
+}
+
+.dial-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: calc(var(--border-radius) - 2px);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.dial-option:has(input:checked) {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+
+.dial-option input {
+  accent-color: var(--color-accent);
+}
+
+.dial-option input:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.theme-toggle {
+  border: 1px solid var(--color-border);
+  background: var(--color-panel-bg);
+  color: var(--color-fg);
+  border-radius: var(--border-radius);
+  padding: 6px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.app-main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--gutter) * 1.5);
+  max-width: var(--measure);
+  width: 100%;
+  margin: 0 auto;
+}
+
+.article p {
+  margin: 0 0 1em;
+}
+
+.paste-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.paste-label {
+  font-weight: 700;
+}
+
+.paste-textarea {
+  width: 100%;
+  max-width: 100%;
+  min-height: 8em;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-input-bg);
+  color: var(--color-fg);
+  font: inherit;
+  resize: vertical;
+}
+
+.paste-textarea:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.paste-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--gutter);
+}
+
+.word-count {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.read-button {
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border-radius: var(--border-radius);
+  padding: 6px 14px;
+  cursor: pointer;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.read-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.read-button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The selection "Read" chip (S1-02): a small floating button positioned in JS (ReadChip.tsx)
+   near the current selection's bounding rect, so left/top are set inline per instance. */
+.read-chip {
+  position: fixed;
+  z-index: 10;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.read-chip:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.panel {
+  position: fixed;
+  right: var(--gutter);
+  bottom: var(--gutter);
+  width: min(320px, calc(100% - var(--gutter) * 2));
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: var(--gutter);
+}
+
+.panel-empty {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+/* Narrow screens (390 px devices and up to a small-tablet breakpoint): panel drops to a
+   full-width bar pinned to the bottom instead of a floating bottom-right card. */
+@media (max-width: 640px) {
+  .panel {
+    left: var(--gutter);
+    right: var(--gutter);
+    width: auto;
+  }
+}
+
+/* S1-06: minimal panel contents (S1-07 owns the real styling) */
+.bullets {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.bullets li {
+  margin: 0.35em 0;
+}
+.bullets li[aria-current="true"] {
+  background: var(--color-accent-soft, rgba(120, 90, 200, 0.15));
+  border-radius: 4px;
+}
+.now-label,
+.next-label {
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+.now-text {
+  font-size: 1.35em;
+  line-height: 1.4;
+  margin: 0.2em 0 0.6em;
+}
+.next-text {
+  opacity: 0.6;
+}
+.read-part {
+  font: inherit;
+  padding: 0.4em 0.8em;
+}
+.panel-notice {
+  font-size: 0.95em;
+  opacity: 0.85;
+}
+
+/* S1-09: minimal styling for the loading line and the canned demo (S1-07's impeccable pass owns
+   the real look). Kept plain on purpose so the state is easy to read at a glance. */
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--gutter);
+  max-width: var(--measure);
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+.loading-line {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+.loading-bar {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--color-accent);
+}
+.loading-cache {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+.loading-notice {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+.loading-summarizer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.loading-summarizer-button {
+  align-self: flex-start;
+  border: 1px solid var(--color-accent);
+  background: var(--color-panel-bg);
+  color: var(--color-fg);
+  border-radius: var(--border-radius);
+  padding: 6px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+.loading-summarizer-button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.demo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: var(--gutter);
+}
+.demo-recording-label,
+.demo-excerpt-note,
+.demo-switch-level {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+.demo-try-it-now {
+  align-self: flex-start;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border-radius: var(--border-radius);
+  padding: 6px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+.demo-try-it-now:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.demo-try-it-now:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.demo-items {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.demo-items li {
+  margin: 0.35em 0;
+}
+.demo-items li[aria-current="true"] {
+  background: var(--color-accent-soft, rgba(120, 90, 200, 0.15));
+  border-radius: 4px;
+}

@@ -1,0 +1,30 @@
+{
+  "id": "013",
+  "key_facts": [
+    "Subject to section 107 and independent of the exclusive rights provided in section 106, the author of a work of visual art-",
+    "to prevent any intentional distortion, mutilation, or other modification of that work which would be prejudicial to his or her honor or reputation",
+    "Only the author of a work of visual art has the rights conferred by subsection (a) in that work, whether or not the author is the copyright owner",
+    "The modification of a work of visual art which is a result of the passage of time or the inherent nature of the materials is not a distortion, mutilation, or other modification",
+    "the rights conferred by subsection (a) shall endure for a term consisting of the life of the author",
+    "the rights conferred by subsection (a) shall endure for a term consisting of the life of the last surviving author",
+    "The rights conferred by subsection (a) may not be transferred, but those rights may be waived if the author expressly agrees to such waiver in a written instrument signed by the author",
+    "it is not an infringement of copyright for an authorized entity to reproduce or to distribute in the United States copies or phonorecords of a previously published literary work",
+    "(A) is blind;"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Selling a painting automatically waives the artist's rights of attribution and integrity.",
+      "distinctive_tokens": ["automatically", "selling"]
+    },
+    {
+      "claim": "The rights under section 106A last for 70 years after the author's death.",
+      "distinctive_tokens": ["70", "death"]
+    },
+    {
+      "claim": "Section 121 lets any teacher freely copy textbooks for a classroom of sighted students.",
+      "distinctive_tokens": ["teacher", "sighted"]
+    }
+  ],
+  "expected_oneline_keywords": ["attribution", "visual art", "accessible formats", "copyright"],
+  "notes": "Two unrelated code sections (visual-artist moral rights + disability-accessible reproduction) back to back -- a one-line summary must not conflate them or invent a duration."
+}

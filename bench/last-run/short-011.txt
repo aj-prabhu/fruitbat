@@ -1,0 +1,35 @@
+default 011 short 
+state=done error= chunks=2 bullets_total=12 cut=0 kept=12 ttfa_ms=2102 gen_ms=8809 tok_s=38 wall_ms=8950 per_chunk_kept=[6,6]
+
+- The park hosts 17 bat species, including free-tailed bats and cave myotis.
+- Free-tailed bats roost in the caverns and fly 1.5 miles before exiting the Natural Entrance.
+- Other species like eastern red bats and hoary bats roost in trees or rock cliffs.
+- Bats are mammals that give live birth, are warm-blooded, and have fur.
+- All area bats are insectivores and weigh about 1/2 ounce.
+- The resident colony was around 400,000 in summer of 2005.
+- Bats often hibernate or raise young in caves to rest and raise their offspring.
+- Decontaminate before entering a cave to prevent disease spread.
+- Humans may spread WNS from one cave into another if they visit another one.
+- If you have visited another cave, decontaminate your shoes, clothes, and gear before entering.
+- Leave bats alone and do not disturb them if they are acting strangely.
+- Rangers can take steps to protect both bats and people if a bat is behaving in an unusual way.
+
+RAW:
+- The park hosts 17 bat species, including free-tailed bats and cave myotis.
+- Free-tailed bats roost in the caverns and fly 1.5 miles before exiting the Natural Entrance.
+- Other species like eastern red bats and hoary bats roost in trees or rock cliffs.
+- Bats are mammals that give live birth, are warm-blooded, and have fur.
+- All area bats are insectivores and weigh about 1/2 ounce.
+- The resident colony was around 400,000 in summer of 2005.
+- Numbers fluctuated as high as 793,000 in 2005 during migration.
+- Researchers use thermal infrared cameras to count bats.
+- The colony should not be called the maternity colony because it is greater than 50% male.
+- Males and females mix in the same site.
+- Large colonies are mostly female and males roost separately.
+- White-nose Syndrome (WNS)- Bats often hibernate or raise young in caves to rest and raise their offspring.
+- Decontaminate before entering a cave to prevent disease spread.
+- Humans may spread WNS from one cave into another if they visit another one.
+- If you have visited another cave, decontaminate your shoes, clothes, and gear before entering.
+- Leave bats alone and do not disturb them if they are acting strangely.
+- Rangers can take steps to protect both bats and people if a bat is behaving in an unusual way.
+

@@ -1,0 +1,31 @@
+{
+  "id": "027",
+  "key_facts": [
+    "Neutrophils are normally found in the bloodstream and are the most abundant type of phagocyte, representing 50% to 60% of total circulating leukocytes.",
+    "It contains over 20 different proteins and is named for its ability to \"complement\" the killing of pathogens by antibodies.",
+    "IgG, is transported from mother to baby directly through the placenta",
+    "immune responses beginning to decline at around 50 years of age due to immunosenescence",
+    "Type IV hypersensitivity (also known as cell-mediated or delayed type hypersensitivity) usually takes between two and three days to develop",
+    "The earliest known reference to immunity was during the plague of Athens in 430 BC.",
+    "Robert Koch's 1891 proofs, for which he was awarded a Nobel Prize in 1905",
+    "Viruses were confirmed as human pathogens in 1901, with the discovery of the yellow fever virus by Walter Reed.",
+    "In 1974, Niels Kaj Jerne developed the immune network theory",
+    "Ten toll-like receptors have been described in humans."
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "The complement system contains just 5 isolated proteins.",
+      "distinctive_tokens": ["5", "isolated"]
+    },
+    {
+      "claim": "Louis Pasteur discovered the yellow fever virus in 1901 and received the inaugural Nobel Prize for it.",
+      "distinctive_tokens": ["inaugural", "received"]
+    },
+    {
+      "claim": "Type IV hypersensitivity develops within minutes, the quickest of the four types.",
+      "distinctive_tokens": ["minutes", "quickest"]
+    }
+  ],
+  "expected_oneline_keywords": ["immune system", "pathogens", "white blood cells", "infection"],
+  "notes": "Walter Reed, not Pasteur, gets credit for confirming the yellow fever virus in 1901; Koch (not Pasteur or Ehrlich) got the 1905 Nobel Prize."
+}

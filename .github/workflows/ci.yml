@@ -1,0 +1,154 @@
+name: CI
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [main]
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      has_web: ${{ steps.probe.outputs.has_web }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: probe
+        run: |
+          if [ -f web/package.json ]; then
+            echo "has_web=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_web=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  check-logs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run check-logs.sh
+        run: scripts/check-logs.sh
+
+  check-network:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run check-network.sh
+        run: scripts/check-network.sh
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  spec-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate eval corpus
+        run: |
+          if [ -f spec/eval/validate.py ]; then
+            python3 spec/eval/validate.py --corpus-only
+          else
+            echo "no corpus yet"
+          fi
+
+  web-lint-unit:
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.has_web == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+      - name: Lint
+        working-directory: web
+        run: npm run lint --if-present
+      - name: Generated files are current (CSP meta tags, PRIVACY.md)
+        working-directory: web
+        run: npm run check:generated
+      - name: Unit tests
+        working-directory: web
+        run: npm test --if-present
+      - name: Build
+        working-directory: web
+        run: npm run build
+
+  wasm-ci:
+    runs-on: ubuntu-latest
+    needs: detect
+    if: needs.detect.outputs.has_web == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+      - name: Install Playwright browsers
+        working-directory: web
+        run: npx playwright install --with-deps chromium
+      - name: Run wasm-ci e2e
+        working-directory: web
+        run: npx playwright test --project=wasm-ci
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: web/playwright-report
+
+  bench-gate:
+    runs-on: ubuntu-latest
+    env:
+      HAS_BOOTSTRAP_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'bootstrap') }}
+      HAS_BASELINE_RESET_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'baseline-reset') }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run bench gate
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            echo "bench-gate: push to main, rows were checked on the PR"
+            exit 0
+          fi
+
+          if [ "$HAS_BOOTSTRAP_LABEL" = "true" ]; then
+            echo "bench-gate: runner not yet available (bootstrap label)"
+            exit 0
+          elif [ -f bench/gate.py ]; then
+            pip install jsonschema
+            ARGS=(--pr-head --base "${{ github.event.pull_request.base.sha }}" --head "${{ github.event.pull_request.head.sha }}")
+            if [ "$HAS_BASELINE_RESET_LABEL" = "true" ]; then
+              ARGS+=(--allow-baseline-reset)
+            fi
+            python3 bench/gate.py "${ARGS[@]}"
+          else
+            echo "bench-gate: no bench runner and no bootstrap label"
+            exit 1
+          fi

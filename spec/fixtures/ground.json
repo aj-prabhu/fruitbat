@@ -1,0 +1,205 @@
+[
+  {
+    "name": "wrong_number_cut",
+    "kind": "ground",
+    "input": {
+      "bullet": "Bats eat 100 insects an hour",
+      "source": "Bats eat up to 1000 insects in one hour"
+    },
+    "expect": {
+      "ok": false,
+      "reasons": [
+        "number_not_in_source:100"
+      ]
+    },
+    "why": "spec/grounding.md worked example: 100 does not normalize to anything in the source's number set ({1000, 1}), so the bullet is cut even though every name in it is fine."
+  },
+  {
+    "name": "wrong_name_cut",
+    "kind": "ground",
+    "input": {
+      "bullet": "Zeb built the shelter",
+      "source": "Someone built the shelter using scrap wood"
+    },
+    "expect": {
+      "ok": false,
+      "reasons": [
+        "name_not_in_source:Zeb"
+      ]
+    },
+    "why": "'Zeb' is sentence-initial but not a common word and not in the stoplist, so it is a name candidate; it never appears in the source at all, invented or not."
+  },
+  {
+    "name": "invented_name_carol_vs_alice",
+    "kind": "ground",
+    "input": {
+      "bullet": "Carol paid Bob $5",
+      "source": "Alice paid Bob $5"
+    },
+    "expect": {
+      "ok": false,
+      "reasons": [
+        "name_not_in_source:Carol"
+      ]
+    },
+    "why": "spec/grounding.md's own example: the invented name is caught even though the source has other capitalized names (Bob), because grounding checks each candidate independently, not just 'some capitalized word matched'."
+  },
+  {
+    "name": "paraphrase_they_for_bats_kept",
+    "kind": "ground",
+    "input": {
+      "bullet": "They feed at night",
+      "source": "Bats feed at night"
+    },
+    "expect": {
+      "ok": true,
+      "reasons": []
+    },
+    "why": "'They' is sentence-initial and in the stoplist, so it is never a name candidate; a pronoun paraphrase of the subject survives grounding."
+  },
+  {
+    "name": "spelled_out_percent_in_source_kept",
+    "kind": "ground",
+    "input": {
+      "bullet": "5% of bats roost here",
+      "source": "five percent of bats roost in this cave"
+    },
+    "expect": {
+      "ok": true,
+      "reasons": []
+    },
+    "why": "v4 addition: 'five percent' in the source normalizes to '5', matching the bullet's '5%'."
+  },
+  {
+    "name": "thousands_separator_both_sides_kept",
+    "kind": "ground",
+    "input": {
+      "bullet": "Bats eat 1,000 insects an hour",
+      "source": "Bats eat up to 1000 insects in one hour"
+    },
+    "expect": {
+      "ok": true,
+      "reasons": []
+    },
+    "why": "spec/grounding.md worked example: 1,000 and 1000 normalize to the same number."
+  },
+  {
+    "name": "reversed_relation_not_caught",
+    "kind": "ground",
+    "input": {
+      "bullet": "Bob paid Alice $5",
+      "source": "Alice paid Bob $5"
+    },
+    "expect": {
+      "ok": true,
+      "reasons": []
+    },
+    "why": "spec/grounding.md is explicit that this is the failure mode the deterministic filter cannot see: both names and the number are present in the source, so it passes despite the relation being backwards. The graded rubric (spec/eval/grade.md) is what catches this, not grounding."
+  },
+  {
+    "name": "hyphenated_and_lowercase_split_source_form_kept",
+    "kind": "ground",
+    "input": {
+      "bullet": "White-nose syndrome killed many bats",
+      "source": "A disease called white nose killed many bats"
+    },
+    "expect": {
+      "ok": true,
+      "reasons": []
+    },
+    "why": "spec/grounding.md: a hyphenated candidate is compared on its base AND its hyphen-split parts, so 'White-nose' matches a source that spells it as two separate lowercase words."
+  },
+  {
+    "name": "all_caps_common_acronym_excluded_uncommon_one_kept",
+    "kind": "nameCandidates",
+    "input": {
+      "bullet": "The USA and the NPS said OK on TV"
+    },
+    "expect": {
+      "candidates": [
+        "NPS"
+      ]
+    },
+    "why": "spec/grounding.md: 2-5 letter all-caps tokens are candidates unless their lowercase form is a common word; spec/common-words.txt actually contains 'usa', 'ok' and 'tv' but not 'nps', so only NPS survives as a candidate here."
+  },
+  {
+    "name": "all_bullets_cut_signal",
+    "kind": "groundChunk",
+    "input": {
+      "bullets": [
+        "Carol paid Bob $5",
+        "Zeb owes Dev $9000"
+      ],
+      "chunkText": "Alice paid Bob $5. Dev owes nothing."
+    },
+    "expect": {
+      "kept": [],
+      "cut": [
+        "Carol paid Bob $5",
+        "Zeb owes Dev $9000"
+      ],
+      "allCut": true
+    },
+    "why": "spec/grounding.md all_cut: when every bullet of a chunk is cut (an invented name in each), groundChunk signals allCut so the caller can show/speak notice.all_cut and offer Read this part."
+  },
+  {
+    "name": "mixed_chunk_one_survivor",
+    "kind": "groundChunk",
+    "input": {
+      "bullets": [
+        "Bats feed at night",
+        "Carol paid Bob $5"
+      ],
+      "chunkText": "Bats feed at night. Alice paid Bob $5."
+    },
+    "expect": {
+      "kept": [
+        "Bats feed at night"
+      ],
+      "cut": [
+        "Carol paid Bob $5"
+      ],
+      "allCut": false
+    },
+    "why": "a chunk with at least one grounded bullet is not all-cut, even though a sibling bullet in the same chunk failed."
+  },
+  {
+    "name": "date_comma_not_a_thousands_separator",
+    "kind": "ground",
+    "input": {
+      "bullet": "The report came out in 2026",
+      "source": "The report came out on May 3, 2026 after a long delay"
+    },
+    "expect": {
+      "ok": true,
+      "reasons": []
+    },
+    "why": "spec/grounding.md (PR #8): a comma joins digits only when exactly three follow it, so the source holds 3 and 2026, not 32026."
+  },
+  {
+    "name": "list_of_numbers_stays_separate",
+    "kind": "ground",
+    "input": {
+      "bullet": "The winners were 4 and 6",
+      "source": "The winners were numbers 2, 4 and 6"
+    },
+    "expect": {
+      "ok": true,
+      "reasons": []
+    },
+    "why": "spec/grounding.md: '2, 4 and 6' is three numbers; the old run-based regex glued '2, 4' into 24."
+  },
+  {
+    "name": "currency_code_is_not_a_name",
+    "kind": "ground",
+    "input": {
+      "bullet": "It costs 5 GBP.",
+      "source": "It costs £5."
+    },
+    "expect": {
+      "ok": true,
+      "reasons": []
+    },
+    "why": "Currency codes are units, not names; the number check already covers the fact."
+  }
+]
