@@ -30,11 +30,15 @@ const uiFiles = [
 ];
 const usedKeys = new Set();
 for (const f of uiFiles) {
-  const src = readFileSync(f, "utf8");
+  // Comments are not UI: drop block and line comments before scanning (a `->` in a comment
+  // otherwise reads as a JSX tag boundary).
+  const src = readFileSync(f, "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
   const rel = path.relative(root, f);
   for (const m of src.matchAll(/\bt\(\s*["'`]([^"'`]+)["'`]\s*\)/g)) usedKeys.add(m[1]);
   // JSX text nodes with letters, outside expressions (multiline too): `>Some words<`
-  for (const m of src.matchAll(/>([^<>{}]*[A-Za-z][^<>{}]*)</g)) {
+  for (const m of src.matchAll(/(?<![=-])>([^<>{}]*[A-Za-z][^<>{}]*)</g)) {
     const text = m[1].trim();
     if (text && !/^[\s\S]*=>/.test(text)) problems.push(`${rel}: JSX text literal "${text.replace(/\s+/g, " ").slice(0, 40)}"`);
   }
