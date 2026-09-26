@@ -53,6 +53,8 @@ export interface Snapshot {
   lastNotice: string | null;
   chunks: number;
   voiceReady: boolean;
+  /** The summarizer has nothing queued, running or still draining (llm.isIdle()). */
+  llmIdle: boolean;
   prewarmed: boolean;
   speakMessages: boolean;
   /** Summarizer download progress (S1-09 Loading UX: per-file MB while the summarizer loads). */
@@ -203,6 +205,7 @@ export class Orchestrator {
       lastNotice: this.lastNotice,
       chunks: this.chunks?.length ?? 0,
       voiceReady: this.voiceReady,
+      llmIdle: this.llm.isIdle(),
       prewarmed: this.voice.prewarmed,
       speakMessages: this.speakMessages,
       progress: this.progress,
