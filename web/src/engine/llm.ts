@@ -365,7 +365,12 @@ export class Summarizer {
   }
 
   private countTokens = (text: string): Promise<number> | number =>
-    this.flags.llm === "fake" ? Math.ceil(text.split(/\s+/).filter(Boolean).length * 1.3) : countTokens(text);
+    this.flags.llm === "fake" ? Math.ceil(text.split(/\s+/).filter(Boolean).length * 1.3) : countTokens(text, this.activeTier());
+
+  /** The tier the worker actually loaded (a memory fallback may have replaced the requested one). */
+  private activeTier(): PinnedModel & { role: string } {
+    return summarizerTiers().find((t) => t.role === this.runStats.role) ?? this.modelSpec ?? this.tier();
+  }
 
   private levelCfg(level: Level): Required<Pick<DialLevel, "max_bullets_per_chunk" | "max_words_per_bullet" | "max_new_tokens">> & DialLevel {
     const l = LEVELS.get(level);
@@ -594,6 +599,8 @@ export class Summarizer {
       });
       if (r.aborted) return false;
       for (const b of parser.flush()) lines.push(b.text);
+      this.runStats.parser_dropped += parser.dropped;
+      this.runStats.parser_overlength += parser.overlength;
       this.runStats.tokens += r.tokens;
       this.runStats.gen_ms += r.ms;
       this.runStats.bullets_total += lines.length;
@@ -631,6 +638,8 @@ export class Summarizer {
         });
         if (r.aborted) return false;
         for (const b of parser.flush()) out.push(b.text);
+        this.runStats.parser_dropped += parser.dropped;
+        this.runStats.parser_overlength += parser.overlength;
         this.runStats.tokens += r.tokens;
         this.runStats.gen_ms += r.ms;
         // Same accounting as the per-chunk lines above: a reduce output counts toward the total,
