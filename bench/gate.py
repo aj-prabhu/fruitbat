@@ -121,12 +121,40 @@ def _parse_value(field, raw):
     return raw
 
 
-def load_results_csv(path):
+def _row_problems(row):
+    """Schema + finiteness check for one parsed row (Codex merge-gate review, PR #15)."""
+    import math
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from schema_check import Validator  # noqa: E402  (sibling module, stdlib only)
+    schema_path = REPO_ROOT_FALLBACK / "spec" / "schemas" / "run-stats.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    errors = []
+    Validator(schema_path.parent).validate(row, schema, "$", schema, schema_path, errors)
+    for k, v in row.items():
+        if isinstance(v, float) and not math.isfinite(v):
+            errors.append(f"$.{k}: not a finite number")
+    return errors
+
+
+def load_results_csv(path, strict=True):
+    """Parsed rows from results.csv. With strict=True (the default) a row that fails the RunStats
+    schema or carries a non-finite number is dropped and reported on stderr, so it can never be
+    aggregated or gated."""
     if not path.exists():
         return []
     with path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        return [{f: _parse_value(f, raw.get(f)) for f in CSV_FIELDS} for raw in reader]
+        rows = [{f: _parse_value(f, raw.get(f)) for f in CSV_FIELDS} for raw in reader]
+    if not strict:
+        return rows
+    kept = []
+    for i, row in enumerate(rows, start=2):
+        errs = _row_problems(row)
+        if errs:
+            print(f"bench-gate: results.csv line {i} rejected: {'; '.join(errs[:3])}", file=sys.stderr)
+        else:
+            kept.append(row)
+    return kept
 
 
 def load_baselines(path):
@@ -250,7 +278,10 @@ def evaluate_floors(target, level, cache_state, m):
     just because the environment "legitimately changed"."""
     fails = []
 
-    for field in REQUIRED_METRICS.get(level, []):
+    required = list(REQUIRED_METRICS.get(level, []))
+    if target == "mac":
+        required.append("peak_mb")  # the Mac memory ceiling is a gate, so the number must be there (Codex merge-gate review, PR #15)
+    for field in required:
         if m.get(field) is None:
             fails.append(f"{field} missing: required for level {level}")
 
@@ -281,7 +312,7 @@ def evaluate_floors(target, level, cache_state, m):
         fails.append(f"stop_ms {m['stop_ms']} exceeds floor {STOP_MS_FLOOR}ms")
 
     if level == "readall":
-        if m.get("coverage") is not None and m["coverage"] < 0.999:
+        if m.get("coverage") is not None and m["coverage"] < 1.0:  # the requirement is 100 % (Codex merge-gate review, PR #15)
             fails.append(f"coverage {m['coverage']} below 1.0 floor (readall)")
         if m.get("tts_overlimit") is not None and m["tts_overlimit"] > 0:
             fails.append(f"tts_overlimit {m['tts_overlimit']} > 0 (readall)")
