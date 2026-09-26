@@ -301,9 +301,10 @@ export class Orchestrator {
     return this.begin(id, level, { fromChunk: 0, base: 0, end: text.length });
   }
 
-  /** Esc. Returns the measured stop time in ms. */
-  stop(): number {
-    const active = isActive(this.gen, this.play);
+  /** Esc. Returns the measured stop time in ms. `quiet` skips the spoken "Stopped" (the demo
+   *  recording is about to play and must not be talked over; Codex review, PR #20). */
+  stop(opts: { quiet?: boolean } = {}): number {
+    const active = isActive(this.gen, this.play) && !opts.quiet;
     this.newRun();
     this.current = null;
     this.progress = null;
@@ -426,6 +427,9 @@ export class Orchestrator {
 
   private async begin(id: number, level: Level, o: { fromChunk: number; base: number; end: number; keep?: boolean }): Promise<void> {
     this.last = { level, chars: o.end - o.base }; // dial regeneration and "Read this part" are runs too (Codex review, PR #22)
+    // Every live run (a new read, a dial regeneration, "Read this part") silences the demo
+    // recording, which listens for this without importing the engine (Codex review, PR #20).
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("fruitbat:live"));
     this.play = reducePlay(this.play, "reset");
     if (!o.keep) {
       this.bullets = [];

@@ -50,6 +50,10 @@ declare global {
   interface WindowEventMap {
     "fruitbat:run": CustomEvent<FruitbatRunEventDetail>;
     "fruitbat:stop": CustomEvent<undefined>;
+    /** the demo recording is about to play (main.tsx stops a live run, never a model download) */
+    "fruitbat:demo": CustomEvent<undefined>;
+    /** the orchestrator started a live run (any kind); the demo recording stops */
+    "fruitbat:live": CustomEvent<undefined>;
   }
   // vite.config.ts `define`s this from `git rev-parse --short HEAD` (S1-10, stats/store.ts).
   const __FRUITBAT_COMMIT__: string;

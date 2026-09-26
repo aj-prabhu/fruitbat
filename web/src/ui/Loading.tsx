@@ -70,8 +70,13 @@ function SummarizerSection({ s }: { s: Snapshot }) {
   // a button that only knows about clicks on itself).
   // Readiness comes from the summarizer's own state, not from `s.gen`: a Read-all run moves gen
   // through loading/running/done without ever loading the summarizer (Codex review, PR #20).
-  const started = phase !== "idle" || s.progress !== null || llm.state === "loading";
-  const done = phase === "ready" || (s.progress !== null && llm.state !== "loading" && llm.state !== "failed" && !llm.error);
+  // A failed or stopped load is not "started": the button comes back so the user can retry
+  // (Codex review, PR #20). A loaded model always counts as started.
+  const isLoaded = llm.isLoaded();
+  const failed = !isLoaded && (phase === "failed" || llm.state === "failed" || llm.state === "stopped");
+  const started = isLoaded || (!failed && (phase !== "idle" || s.progress !== null || llm.state === "loading"));
+  // Ready is the summarizer's own state, however it was loaded (this button or a summary request).
+  const done = isLoaded || phase === "ready";
   const loaded = mb(s.progress?.loaded);
   const total = mb(s.progress?.total) || (started ? llm.sizeMb() : 0);
 

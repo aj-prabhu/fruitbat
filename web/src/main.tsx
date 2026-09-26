@@ -6,6 +6,7 @@
 import { render } from "preact";
 import { App } from "./app";
 import { orchestrator } from "./engine/orchestrator";
+import { isActive } from "./engine/state";
 import { subscribeLevel } from "./state/level";
 import * as stats from "./stats/store";
 import type { FruitbatAPI, FruitbatStats, Level } from "./types";
@@ -61,6 +62,15 @@ o.subscribe((snap) => {
     lastRecordedRunId = snap.runId;
     stats.record(o.stats());
   }
+});
+// The demo recording is about to play: silence a live read or summary, but leave a summarizer
+// download the user started from the Loading panel alone (Codex review, PR #20).
+window.addEventListener("fruitbat:demo", () => {
+  const s = o.snapshot();
+  // Speech still on its way (a summary whose generation finished before its first bullet was
+  // synthesized) counts too (Codex review, PR #20).
+  const speechPending = s.voice.pending > 0 || s.voice.inFlight > 0 || s.voice.enqueued > s.voice.ended;
+  if (isActive(s.gen, s.play) || speechPending) o.stop({ quiet: true });
 });
 // The dial (app.tsx) writes state/level; a move mid-run regenerates from the current chunk.
 subscribeLevel((level) => void o.setLevel(level));
