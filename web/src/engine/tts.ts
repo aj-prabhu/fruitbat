@@ -442,7 +442,15 @@ export class VoiceEngine {
       if (runId !== this.runId) return; // stopped: not a failure
       this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
       this.phase = "failed";
+      // A failed read goes quiet: silence what was already scheduled and drop anything the worker
+      // still holds for it, so a "failed" read never keeps talking (Codex review, PR #17).
+      queue.stop();
+      this.send({ type: "cancel", runId });
+      this.settleWaiters(runId, "failed");
+      this.current = null;
+      this.next = null;
       this.pendingDone?.resolve(false);
+      this.pendingDone = null;
     });
 
     const finished = await done;
