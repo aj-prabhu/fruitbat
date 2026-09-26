@@ -101,20 +101,17 @@ export async function load<T>(
       if (onAbort) signal.removeEventListener("abort", onAbort);
     }
   };
-  inflight.add(work);
-  const settle = () => {
-    cleanup();
-    inflight.delete(work);
-  };
-  void work.then(settle, settle);
+  void work.then(cleanup, cleanup);
+  // Tracked until the factory settles and, when its result lands after the load was cancelled,
+  // until that ownerless result's sessions are freed; loadsSettled() waits on both (Codex review, PR #16).
+  const tracked: Promise<unknown> = work
+    .then(async (v) => {
+      if (signal?.aborted) await (v as { dispose?: () => unknown } | null)?.dispose?.();
+    })
+    .catch(() => undefined)
+    .finally(() => inflight.delete(tracked));
+  inflight.add(tracked);
   if (!signal) return work;
-  // A result that lands after its load was cancelled has no owner: free its sessions.
-  void work.then(
-    (v) => {
-      if (signal.aborted) void (v as { dispose?: () => unknown } | null)?.dispose?.();
-    },
-    () => undefined,
-  );
   return Promise.race([work, aborted]);
 }
 
