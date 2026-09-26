@@ -41,7 +41,7 @@ export interface BugReport {
 
 const MAX_RUN_STATS = 5;
 const MAX_EVENTS = 50;
-const MAX_DESCRIPTION = 2000;
+export const MAX_DESCRIPTION = 2000;
 /** GitHub's own issue-form field-param URLs comfortably support far more than this; the packet's
  *  own ceiling (docs/PLAN.md S1-11 v3) is the one enforced here. */
 const MAX_URL_LENGTH = 8000;
