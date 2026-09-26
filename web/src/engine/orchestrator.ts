@@ -397,12 +397,14 @@ export class Orchestrator {
       const i = chunks.findIndex((c) => cur.start >= c.start && cur.start < c.end);
       return i >= 0 ? i : 0;
     }
-    const lastBullet = this.bullets[this.bullets.length - 1];
-    if (lastBullet) return lastBullet.chunkIndex;
-    // A regeneration that has not spoken yet still stands at the chunk it restarted from, so a
-    // second dial move does not fall back to chunk 0 (Codex review, PR #18).
+    // Nothing playing right now: the last chunk actually heard, else the chunk this run started
+    // from. Never the newest generated bullet, which may not have been heard (Codex review, PR #18).
+    if (this.heardChunk !== null) return this.heardChunk;
     return this.regenFrom ?? 0;
   }
+
+  /** The chunk of the last bullet that started playing in this run. */
+  private heardChunk: number | null = null;
 
   /** The chunk the current dial regeneration restarted from; null for a fresh run. */
   private regenFrom: number | null = null;
@@ -412,6 +414,7 @@ export class Orchestrator {
     if (!o.keep) {
       this.bullets = [];
       this.allCut = [];
+      this.heardChunk = null;
     }
     this.current = null;
     this.error = null;
@@ -493,7 +496,10 @@ export class Orchestrator {
         if (id !== this.runId) return;
         this.markAudio();
         const b = e.tag === undefined ? undefined : this.bullets[e.tag];
-        if (b) this.current = { kind: "bullet", chunkIndex: b.chunkIndex, index: e.tag as number };
+        if (b) {
+          this.current = { kind: "bullet", chunkIndex: b.chunkIndex, index: e.tag as number };
+          this.heardChunk = b.chunkIndex;
+        }
         this.emit();
       },
     });
