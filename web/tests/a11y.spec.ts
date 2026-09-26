@@ -1,4 +1,5 @@
 import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { AxeBuilder } from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -15,15 +16,7 @@ const DOC011 = readFileSync(path.join(ROOT, "spec/eval/corpus/011.txt"), "utf8")
 type W = { __fruitbat: { run(t: string, l: string): void; state(): { bullets: unknown[]; prewarmed: boolean } } };
 
 async function openPopulated(page: Page): Promise<void> {
-  await page.goto("/?llm=fake&delay=40");
-  for (let i = 0; i < 3; i++) {
-    try {
-      await page.waitForFunction(() => crossOriginIsolated === true, null, { timeout: 15_000 });
-      break;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
+  await gotoIsolated(page, "/?llm=fake&delay=40");
   await page.waitForFunction(() => typeof (window as unknown as Partial<W>).__fruitbat?.state === "function", null, { timeout: 20_000 });
   await page.waitForFunction(() => (window as unknown as W).__fruitbat.state().prewarmed, null, { timeout: 300_000 });
   await page.evaluate((t) => (window as unknown as W).__fruitbat.run(t, "short"), DOC011);

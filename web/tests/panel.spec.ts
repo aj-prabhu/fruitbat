@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,15 +40,7 @@ type W = { __fruitbat: Api };
 const snap = (page: Page) => page.evaluate(() => (window as unknown as W).__fruitbat.state());
 
 async function open(page: Page, query: string) {
-  await page.goto(`/${query}`);
-  for (let i = 0; i < 3; i++) {
-    try {
-      await page.waitForFunction(() => crossOriginIsolated === true, null, { timeout: 15_000 });
-      break;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
+  await gotoIsolated(page, `/${query}`);
   await page.waitForFunction(() => typeof (window as unknown as Partial<W>).__fruitbat?.state === "function", null, { timeout: 20_000 });
   // Same as dial.spec.ts: the voice loads on page load and prewarms; wait for it so control
   // interactions (rate/voice/speak) act on a ready engine, matching the product.
