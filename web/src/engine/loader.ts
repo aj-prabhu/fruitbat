@@ -4,7 +4,7 @@
 // (rule 11), and turns an AbortSignal into a rejected load with in-flight downloads cancelled.
 import { env, type ProgressInfo } from "@huggingface/transformers";
 import { guardedFetch } from "./net";
-import { pinnedModels, type PinnedModel } from "./pins";
+import { pinnedModels, summarizerTiers, type PinnedModel } from "./pins";
 
 /** Transformers.js's own progress events (initiate, download, progress, progress_total, done, ready). */
 export type LoadProgress = ProgressInfo;
@@ -50,6 +50,18 @@ export interface PretrainedOptions {
   progress_callback?: (p: LoadProgress) => void;
 }
 
+/** Factories still running, including ones whose load() already rejected on abort. */
+const inflight = new Set<Promise<unknown>>();
+
+/**
+ * Resolves once every factory started by load() has settled. A cancelled load() rejects at
+ * once so Stop feels instant, but its download or session init may still be winding down;
+ * callers that must not overlap it (the LLM worker's Stop confirmation) wait here.
+ */
+export function loadsSettled(): Promise<void> {
+  return Promise.allSettled([...inflight]).then(() => undefined);
+}
+
 /**
  * Load a pinned model through a Transformers.js factory.
  * - `factory` receives the pinned id and options (revision, dtype, device, progress callback).
@@ -90,6 +102,15 @@ export async function load<T>(
     }
   };
   void work.then(cleanup, cleanup);
+  // Tracked until the factory settles and, when its result lands after the load was cancelled,
+  // until that ownerless result's sessions are freed; loadsSettled() waits on both (Codex review, PR #16).
+  const tracked: Promise<unknown> = work
+    .then(async (v) => {
+      if (signal?.aborted) await (v as { dispose?: () => unknown } | null)?.dispose?.();
+    })
+    .catch(() => undefined)
+    .finally(() => inflight.delete(tracked));
+  inflight.add(tracked);
   if (!signal) return work;
   return Promise.race([work, aborted]);
 }
@@ -99,8 +120,8 @@ export function pinUrl(input: string | URL): string {
   const s = typeof input === "string" ? input : input.href;
   const m = /^(https:\/\/huggingface\.co\/)(.+?)\/resolve\/main\/(.+)$/.exec(s);
   if (!m) return s;
-  const { summarizer, voice } = pinnedModels().web;
-  const rev = [summarizer, voice].find((p) => p.id === m[2])?.revision;
+  const { voice } = pinnedModels().web;
+  const rev = [...summarizerTiers(), voice].find((p) => p.id === m[2])?.revision; // fallback tiers too (S1-05)
   return rev ? `${m[1]}${m[2]}/resolve/${rev}/${m[3]}` : s;
 }
 

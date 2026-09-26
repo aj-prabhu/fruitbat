@@ -21,6 +21,7 @@ export default defineConfig({
       input: {
         index: fileURLToPath(new URL("./index.html", import.meta.url)),
         skeleton: fileURLToPath(new URL("./skeleton.html", import.meta.url)),
+        summarize: fileURLToPath(new URL("./summarize.html", import.meta.url)), // S1-05 harness
       },
     },
   },

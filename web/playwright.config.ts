@@ -6,7 +6,10 @@ import { defineConfig, devices } from "@playwright/test";
 //   webgpu-local headed bundled Chromium with WebGPU, audio muted. Run by hand on the dev machine
 //                and by the bench. Never the agent Chrome profile.
 // BASE_URL=https://… runs the same specs against a deployed Space (S1-00b) instead of `vite preview`.
-const baseURL = process.env.BASE_URL ?? "http://localhost:4173";
+// PW_PORT lets parallel worktrees each run their own preview server; a server is never reused,
+// because reusing another worktree's build silently tests the wrong code (found 2026-09-24).
+const port = Number(process.env.PW_PORT ?? 4173);
+const baseURL = process.env.BASE_URL ?? `http://localhost:${port}`;
 const commonArgs = ["--autoplay-policy=no-user-gesture-required", "--mute-audio"];
 
 export default defineConfig({
@@ -21,9 +24,9 @@ export default defineConfig({
   webServer: process.env.BASE_URL
     ? undefined
     : {
-        command: "npm run build && npm run preview",
-        url: "http://localhost:4173",
-        reuseExistingServer: !process.env.CI,
+        command: `npm run build && npx vite preview --port ${port} --strictPort`,
+        url: `http://localhost:${port}`,
+        reuseExistingServer: false,
         timeout: 180_000,
       },
   projects: [
