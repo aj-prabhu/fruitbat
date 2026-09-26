@@ -14,17 +14,36 @@
         "- Brazilian free-tailed bats fly out every evening.",
         "- They fly about 1.5 miles to the exit."
       ],
-      "oneline": ["- The park hosts 17 bat species and the Brazilian free-tailed bats fly out every evening from spring through fall."]
+      "oneline": [
+        "- The park hosts 17 bat species and the Brazilian free-tailed bats fly out every evening from spring through fall."
+      ]
     },
     "cutall": {
       "$comment": "Every one-liner carries an invented number and name, so grounding cuts them all and One line must fall back to Short (which derives from the text and passes).",
       "short": null,
       "caveman": null,
-      "oneline": ["- In 1999 Zorblatt paid 7,777 dollars for the whole thing."]
+      "oneline": [
+        "- In 1999 Zorblatt paid 7,777 dollars for the whole thing."
+      ]
     },
     "think": {
       "$comment": "A stray thinking block that the parser must strip.",
-      "short": ["<think>", "planning the summary", "</think>", "- The park hosts 17 different bat species.", "- They fly about 1.5 miles before exiting the Natural Entrance."],
+      "short": [
+        "<think>",
+        "planning the summary",
+        "</think>",
+        "- The park hosts 17 different bat species.",
+        "- They fly about 1.5 miles before exiting the Natural Entrance."
+      ],
+      "caveman": null,
+      "oneline": null
+    },
+    "cutshort": {
+      "$comment": "Every Short bullet carries an invented name and number, so grounding cuts the whole chunk: the all-cut notice must be shown and spoken and 'Read this part' offered, never auto-played (rule 2; S1-06 dial.spec).",
+      "short": [
+        "- In 1999 Zorblatt paid 7,777 dollars for the whole thing.",
+        "- Quexley counted 42 of them."
+      ],
       "caveman": null,
       "oneline": null
     }

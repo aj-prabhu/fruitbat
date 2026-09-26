@@ -14,6 +14,8 @@ export interface PcmItem {
   /** source offsets of the spoken segment, or -1/-1 for a spoken message */
   start: number;
   end: number;
+  /** opaque caller tag (S1-06: the bullet index this PCM belongs to) */
+  tag?: number;
 }
 
 export interface QueueEvent {
@@ -21,6 +23,7 @@ export interface QueueEvent {
   seq: number;
   start: number;
   end: number;
+  tag?: number;
   /** AudioContext clock (seconds) */
   at: number;
   /** seconds of audio in this item */
@@ -212,7 +215,7 @@ export class AudioQueue {
       if (i >= 0) this.scheduled.splice(i, 1);
       if (item.runId === this.runId) {
         this.ended++;
-        this.opts.onEnd?.({ runId: item.runId, seq: item.seq, start: item.start, end: item.end, at: this.ctx.currentTime, seconds: s.seconds });
+        this.opts.onEnd?.({ runId: item.runId, seq: item.seq, start: item.start, end: item.end, tag: item.tag, at: this.ctx.currentTime, seconds: s.seconds });
         this.maybeDrain();
       }
     };
@@ -237,7 +240,7 @@ export class AudioQueue {
       if (s.started || s.ended || s.item.runId !== this.runId) continue;
       if (now + EPS >= s.startAt) {
         s.started = true;
-        this.opts.onStart?.({ runId: s.item.runId, seq: s.item.seq, start: s.item.start, end: s.item.end, at: s.startAt, seconds: s.seconds });
+        this.opts.onStart?.({ runId: s.item.runId, seq: s.item.seq, start: s.item.start, end: s.item.end, tag: s.item.tag, at: s.startAt, seconds: s.seconds });
       }
     }
     if (this.scheduled.length === 0 && this.ticker !== null) {
@@ -313,7 +316,7 @@ export class AudioQueue {
     }
     this.scheduled = this.scheduled.slice(0, idx);
     this.ended++;
-    this.opts.onEnd?.({ runId: current.item.runId, seq: current.item.seq, start: current.item.start, end: current.item.end, at: now, seconds: current.seconds });
+    this.opts.onEnd?.({ runId: current.item.runId, seq: current.item.seq, start: current.item.start, end: current.item.end, tag: current.item.tag, at: now, seconds: current.seconds });
     let at = now;
     for (const s of rest) {
       const re = this.schedule(s.item, s.buffer, at);

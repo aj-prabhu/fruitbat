@@ -9,6 +9,7 @@ import dialSpec from "../../spec/dial.json";
 import { guardedFetch } from "./engine/net";
 import { PasteBox } from "./intake/paste";
 import { ReadChip } from "./intake/ReadChip";
+import { orchestrator, type Snapshot } from "./engine/orchestrator";
 import { setLevel as setSharedLevel } from "./state/level";
 import { t } from "./strings";
 import type { Level } from "./types";
@@ -111,6 +112,58 @@ function useSampleArticle(): string[] {
   return paragraphs;
 }
 
+/** The pipeline's state for the panel (S1-06). S1-07 styles it; this is the minimal rendering. */
+function useOrchestrator(): Snapshot {
+  const [snap, setSnap] = useState<Snapshot>(() => orchestrator().snapshot());
+  useEffect(() => orchestrator().subscribe(setSnap), []);
+  return snap;
+}
+
+function Panel() {
+  const s = useOrchestrator();
+  const cur = s.current;
+  const empty = s.bullets.length === 0 && !cur && s.allCut.length === 0 && !s.lastNotice;
+  return (
+    <aside id="panel" class="panel" aria-label={t("a11y.panel_region")} data-gen={s.gen} data-play={s.play}>
+      {empty && <p class="panel-empty">{t("panel.empty")}</p>}
+      {cur?.kind === "sentence" && (
+        <div class="now-reading">
+          <p class="now-label">{t("panel.now_reading")}</p>
+          <p class="now-text" data-testid="now-text">
+            {cur.text}
+          </p>
+          {cur.next && (
+            <p class="next-text">
+              <span class="next-label">{t("panel.next_up")}</span> {cur.next}
+            </p>
+          )}
+        </div>
+      )}
+      {s.bullets.length > 0 && (
+        <ul class="bullets" aria-label={t("a11y.bullet_list")}>
+          {s.bullets.map((b, i) => (
+            <li key={i} data-chunk={b.chunkIndex} aria-current={cur?.kind === "bullet" && cur.index === i ? "true" : undefined}>
+              {b.text}
+            </li>
+          ))}
+        </ul>
+      )}
+      {s.allCut.map((ci) => (
+        <p key={ci} class="read-part-row">
+          <button type="button" class="read-part" data-chunk={ci} onClick={() => void orchestrator().readThisPart(ci)}>
+            {t("panel.read_this_part")}
+          </button>
+        </p>
+      ))}
+      {s.lastNotice && (
+        <p class="panel-notice" role="status" aria-live="polite" data-notice={s.lastNotice}>
+          {t(s.lastNotice)}
+        </p>
+      )}
+    </aside>
+  );
+}
+
 export function App() {
   const [level, setLevel] = useState<Level>(DEFAULT_LEVEL);
   const paragraphs = useSampleArticle();
@@ -142,9 +195,7 @@ export function App() {
         <Article paragraphs={paragraphs} />
         <PasteBox />
       </main>
-      <aside id="panel" class="panel" aria-label={t("a11y.panel_region")}>
-        <p class="panel-empty">{t("panel.empty")}</p>
-      </aside>
+      <Panel />
       <ReadChip />
     </div>
   );

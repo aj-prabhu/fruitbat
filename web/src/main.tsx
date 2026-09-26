@@ -1,11 +1,13 @@
 // Entry point for the real app (index.html -> main.tsx -> app.tsx). Sets up the
 // window.__fruitbat test hook before rendering (docs/PLAN.md S1-01) and applies a
 // previously-persisted theme immediately, so the panel and the dial exist before any
-// dial/pipeline packet lands. S1-06 owns everything the `fruitbat:run` / `fruitbat:stop`
-// events trigger; this file only records the request and counts it, per spec.
+// dial/pipeline packet lands. S1-06 wires the `fruitbat:run` / `fruitbat:stop` events to the
+// orchestrator, which owns the pipeline (engine/orchestrator.ts).
 import { render } from "preact";
 import { App } from "./app";
-import type { FruitbatAPI, FruitbatStats, Level, RunRequest } from "./types";
+import { orchestrator } from "./engine/orchestrator";
+import { subscribeLevel } from "./state/level";
+import type { FruitbatAPI, FruitbatStats, Level } from "./types";
 import "./styles/global.css";
 
 function applyStoredTheme(): void {
@@ -19,23 +21,37 @@ function applyStoredTheme(): void {
   }
 }
 
-let runs = 0;
-let last: RunRequest | null = null;
+// S1-06: the orchestrator owns the pipeline. run/stop keep firing the S1-01 events (intake and
+// tests listen for them); the orchestrator is the one listener that acts.
+const o = orchestrator();
 
 const fruitbat: FruitbatAPI = {
   run(text: string, level: Level) {
-    runs += 1;
-    last = { level, chars: text.length };
     window.dispatchEvent(new CustomEvent("fruitbat:run", { detail: { text, level } }));
   },
   stop() {
     window.dispatchEvent(new CustomEvent("fruitbat:stop"));
   },
   stats(): FruitbatStats {
-    return { runs, last };
+    return o.stats();
   },
+  state: () => o.snapshot(),
+  setLevel: (level: Level) => o.setLevel(level),
+  readThisPart: (i: number) => o.readThisPart(i),
+  pause: () => o.pause(),
+  resume: () => o.resume(),
+  skip: () => o.skip(),
+  setSpeakMessages: (on: boolean) => o.setSpeakMessages(on),
 };
 window.__fruitbat = fruitbat;
+window.addEventListener("fruitbat:run", (e) => void o.run(e.detail.text, e.detail.level));
+window.addEventListener("fruitbat:stop", () => o.stop());
+// The dial (app.tsx) writes state/level; a move mid-run regenerates from the current chunk.
+subscribeLevel((level) => void o.setLevel(level));
+// Esc is handled on the main thread and never waits on a worker (Architecture, Concurrency).
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") o.stop();
+});
 
 applyStoredTheme();
 

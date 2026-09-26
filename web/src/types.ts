@@ -11,12 +11,28 @@ export interface RunRequest {
 export interface FruitbatStats {
   runs: number;
   last: RunRequest | null;
+  // S1-06: the orchestrator's measurements (see engine/orchestrator.ts OrchestratorStats)
+  ttfa_ms?: number | null;
+  stop_ms?: number | null;
+  notice_latency_ms?: number | null;
+  notices_spoken?: string[];
+  gen?: unknown;
+  voice?: unknown;
+  voice_run?: unknown;
 }
 
 export interface FruitbatAPI {
   run(text: string, level: Level): void;
   stop(): void;
   stats(): FruitbatStats;
+  // S1-06
+  state?(): unknown;
+  setLevel?(level: Level): Promise<void>;
+  readThisPart?(chunkIndex: number): Promise<void>;
+  pause?(): void;
+  resume?(): void;
+  skip?(): boolean;
+  setSpeakMessages?(on: boolean): void;
 }
 
 export interface FruitbatRunEventDetail {

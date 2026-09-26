@@ -38,10 +38,13 @@ export class KokoroTTS {
    * @param {string} [options.revision="main"] pinned commit hash
    * @param {import("@huggingface/transformers").ProgressCallback} [options.progress_callback=null]
    * @param {(id: string) => Promise<Float32Array>} options.loadVoice required
+   * @param {string} [options.model_file_name] ONNX file name without `.onnx` (e.g. `model_q8f16`)
    */
-  static async from_pretrained(model_id, { dtype = "q8", device = null, revision = "main", progress_callback = null, loadVoice } = {}) {
+  static async from_pretrained(model_id, { dtype = "q8", device = null, revision = "main", progress_callback = null, loadVoice, model_file_name = undefined } = {}) {
     if (typeof loadVoice !== "function") throw new Error("KokoroTTS.from_pretrained: loadVoice(id) is required");
-    const model = StyleTextToSpeech2Model.from_pretrained(model_id, { progress_callback, dtype, device, revision });
+    // `model_file_name` names the ONNX file directly (Fruitbat, S1-06): Transformers.js 4.3.0 has
+    // no `q8f16` dtype, so the WebGPU variant is loaded as `model_q8f16` with dtype fp32.
+    const model = StyleTextToSpeech2Model.from_pretrained(model_id, { progress_callback, dtype, device, revision, ...(model_file_name ? { model_file_name } : {}) });
     const tokenizer = AutoTokenizer.from_pretrained(model_id, { progress_callback, revision });
     const [m, t] = await Promise.all([model, tokenizer]);
     return new KokoroTTS(m, t, loadVoice);

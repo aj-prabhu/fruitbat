@@ -79,6 +79,9 @@ export interface RunStats {
 }
 export interface SummarizeOptions {
   signal?: AbortSignal;
+  /** Start at this chunk index (S1-06 dial change: regenerate from the chunk under the playback
+   *  cursor); ignored for One line, which always covers the whole document. */
+  fromChunk?: number;
   onBullet?: (b: BulletOut) => void;
   onNotice?: (n: NoticeOut) => void;
   onToken?: (text: string) => void;
@@ -376,6 +379,13 @@ export class Summarizer {
     }
   }
 
+  /** The chunks `summarize` would use for `text` (S1-06 needs their offsets for the playback
+   *  cursor). Throws InputLimitError past max_chunks. In real mode this loads the tokenizer. */
+  async chunk(text: string): Promise<Chunk[]> {
+    const budget = { ...BUDGET, chunk_input_tokens: this.flags.chunk ?? BUDGET.chunk_input_tokens };
+    return chunkSentences(segmentSentences(text), this.countTokens, budget);
+  }
+
   /** Read through a method so TypeScript does not narrow `state` across awaits. */
   private stopped(): boolean {
     return this.state === "stopped";
@@ -535,8 +545,9 @@ export class Summarizer {
         opts.onBullet?.(b);
       };
       let ok: boolean;
+      const from = Math.max(0, Math.min(opts.fromChunk ?? 0, chunks.length));
       if (level === "oneline") ok = await this.oneLine(runId, chunks, emit, opts);
-      else ok = await this.perChunk(runId, chunks, level, emit, opts);
+      else ok = await this.perChunk(runId, chunks.slice(from), level, emit, opts);
       if (this.stopped()) return this.stats();
       if (ok) {
         this.runStats.tok_s = this.runStats.gen_ms > 0 ? Math.round((this.runStats.tokens / (this.runStats.gen_ms / 1000)) * 10) / 10 : null;

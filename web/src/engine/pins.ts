@@ -18,7 +18,12 @@ export interface PinnedModels {
     summarizer: PinnedModel;
     /** fallback-a, fallback-b, low-end (spec/models.json, S0-03). */
     summarizer_fallbacks?: (PinnedModel & { role: string })[];
-    voice: PinnedModel & { voices_vendored: { path: string; files: string[] }; tts_phoneme_limit: number; tts_phoneme_target: number };
+    voice: PinnedModel & {
+      voices_vendored: { path: string; files: string[] };
+      variants?: Record<string, { path: string; bytes: number; device: string }>;
+      tts_phoneme_limit: number;
+      tts_phoneme_target: number;
+    };
     libraries: Record<string, string>;
   };
 }
@@ -43,5 +48,6 @@ export function pinnedFileUrls(): string[] {
   // The fallback tiers are pinned too (S1-05): the allowlist covers every tier the loader may pick.
   const { voice } = pinnedModels().web;
   const models: PinnedModel[] = [...summarizerTiers(), voice];
-  return models.flatMap((m) => m.files.map((f) => pinnedFileUrl(m, f.path)));
+  const variants = Object.values(voice.variants ?? {}).map((v) => pinnedFileUrl(voice, v.path)); // `?tts=webgpu` voice (S1-06)
+  return [...models.flatMap((m) => m.files.map((f) => pinnedFileUrl(m, f.path))), ...variants];
 }
