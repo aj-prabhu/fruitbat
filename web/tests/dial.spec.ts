@@ -188,7 +188,10 @@ test.describe("all-cut chunk (?llm=fake&fake=cutshort)", () => {
     expect(s.notices).toContain("notice.all_cut");
     expect((await stats(page)).notices_spoken).toContain("notice.all_cut");
     expect(s.bullets.length).toBe(0);
-    expect(s.voice.enqueued, "nothing auto-played").toBe(0);
+    // The notice itself is spoken in order in the stream (one queue item); the chunk's own text is
+    // never auto-played: no bullet, no sentence cursor (Codex review, PR #18).
+    expect(s.voice.enqueued, "only the notice was queued").toBeLessThanOrEqual(1);
+    expect(s.current, "no chunk text is playing").toBeNull();
     await page.waitForTimeout(1000); // the stream has ended; "Done" must not replace the explanation (Codex review, PR #18)
     expect((await snap(page)).notices).not.toContain("notice.done");
     expect(s.play).toBe("idle");

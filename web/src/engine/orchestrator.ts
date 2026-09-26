@@ -281,6 +281,7 @@ export class Orchestrator {
     this.chunks = null;
     this.notices = [];
     this.lastNotice = null;
+    this.regenFrom = null;
     const id = this.newRun();
     return this.begin(id, level, { fromChunk: 0, base: 0, end: text.length });
   }
@@ -339,6 +340,7 @@ export class Orchestrator {
     const chunkIndex = await this.currentChunkIndex();
     if (this.regenPending === id) this.regenPending = null;
     if (id !== this.runId) return;
+    this.regenFrom = chunkIndex;
     const c = this.chunks?.[chunkIndex];
     await this.begin(id, level, { fromChunk: chunkIndex, base: c?.start ?? 0, end: this.text.length });
   }
@@ -395,9 +397,17 @@ export class Orchestrator {
       const i = chunks.findIndex((c) => cur.start >= c.start && cur.start < c.end);
       return i >= 0 ? i : 0;
     }
-    const lastBullet = this.bullets[this.bullets.length - 1];
-    return lastBullet ? lastBullet.chunkIndex : 0;
+    // Nothing playing right now: the last chunk actually heard, else the chunk this run started
+    // from. Never the newest generated bullet, which may not have been heard (Codex review, PR #18).
+    if (this.heardChunk !== null) return this.heardChunk;
+    return this.regenFrom ?? 0;
   }
+
+  /** The chunk of the last bullet that started playing in this run. */
+  private heardChunk: number | null = null;
+
+  /** The chunk the current dial regeneration restarted from; null for a fresh run. */
+  private regenFrom: number | null = null;
 
   private async begin(id: number, level: Level, o: { fromChunk: number; base: number; end: number; keep?: boolean }): Promise<void> {
     this.last = { level, chars: o.end - o.base }; // dial regeneration and "Read this part" are runs too (Codex review, PR #22)
@@ -405,6 +415,7 @@ export class Orchestrator {
     if (!o.keep) {
       this.bullets = [];
       this.allCut = [];
+      this.heardChunk = null;
     }
     this.current = null;
     this.error = null;
@@ -454,6 +465,9 @@ export class Orchestrator {
     if (this.voice.phase === "failed") {
       this.gen = reduceGen(this.gen, "fail");
       this.error = this.voice.error;
+      // The voice stopped its queue: the panel must not keep a sentence "playing" (Codex review, PR #18).
+      this.play = reducePlay(this.play, "stop");
+      this.current = null;
       this.notice("error.voice");
       return;
     }
@@ -483,7 +497,10 @@ export class Orchestrator {
         if (id !== this.runId) return;
         this.markAudio();
         const b = e.tag === undefined ? undefined : this.bullets[e.tag];
-        if (b) this.current = { kind: "bullet", chunkIndex: b.chunkIndex, index: e.tag as number };
+        if (b) {
+          this.current = { kind: "bullet", chunkIndex: b.chunkIndex, index: e.tag as number };
+          this.heardChunk = b.chunkIndex;
+        }
         this.emit();
       },
     });
@@ -497,6 +514,9 @@ export class Orchestrator {
     if (!ok) {
       this.gen = reduceGen(this.gen, "fail");
       this.error = this.llm.error;
+      // The probe result is cached, so a retry on a device without WebGPU gets no new notice from
+      // the summarizer; say it again for this run (Codex review, PR #18).
+      if (this.llm.gpu?.ok === false && !this.notices.includes("notice.no_webgpu")) this.notice("notice.no_webgpu");
       // End the empty stream rather than voice.stop(), which would also cancel the failure notice
       // the summarizer just raised (Codex review, PR #18).
       void this.voice.endStream(streamId);
