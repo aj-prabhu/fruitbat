@@ -144,7 +144,18 @@ def load_results_csv(path, strict=True):
         return []
     with path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        rows = [{f: _parse_value(f, raw.get(f)) for f in CSV_FIELDS} for raw in reader]
+        if strict and list(reader.fieldnames or []) != list(CSV_FIELDS):
+            # An extra column would be dropped by the projection below and never validated, so it
+            # could carry free text; the header must be exactly RunStats' (Codex merge-gate review, PR #15).
+            print("bench-gate: results.csv header does not match RunStats fields exactly", file=sys.stderr)
+            MALFORMED_ROWS.append(1)
+            return []
+        raws = list(reader)
+        for i, raw in enumerate(raws, start=2):
+            if strict and raw.get(None):
+                print(f"bench-gate: results.csv line {i} has cells beyond the header", file=sys.stderr)
+                MALFORMED_ROWS.append(i)
+        rows = [{f: _parse_value(f, raw.get(f)) for f in CSV_FIELDS} for raw in raws if not (strict and raw.get(None))]
     if not strict:
         return rows
     kept = []
