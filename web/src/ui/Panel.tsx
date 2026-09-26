@@ -173,13 +173,22 @@ function AllCutRows({ allCut }: { allCut: number[] }) {
 
 // ---------------------------------------------------------------- controls
 function TransportRow({ s }: { s: Snapshot }) {
-  const canStop = s.gen !== "idle" || s.play === "playing" || s.play === "paused";
+  // The demo recording is not the engine's, but Stop must reach it too: it plays via its own audio
+  // element and says so with fruitbat:demo-playing (Codex review, PR #25).
+  const [demoPlaying, setDemoPlaying] = useState(false);
+  useEffect(() => {
+    const on = (e: CustomEvent<boolean>) => setDemoPlaying(e.detail);
+    window.addEventListener("fruitbat:demo-playing", on);
+    return () => window.removeEventListener("fruitbat:demo-playing", on);
+  }, []);
+  const canStop = demoPlaying || s.gen !== "idle" || s.play === "playing" || s.play === "paused";
   const canPause = s.play === "playing";
   const canResume = s.play === "paused";
   const canSkip = s.play === "playing" || s.play === "paused";
   return (
     <div class="panel-controls-row">
-      <button type="button" class="panel-transport" disabled={!canStop} onClick={() => orchestrator().stop()}>
+      {/* The shared stop event, like Esc: the orchestrator and the demo recording both listen. */}
+      <button type="button" class="panel-transport" disabled={!canStop} onClick={() => window.dispatchEvent(new CustomEvent("fruitbat:stop"))}>
         <IconStop />
         {t("panel.stop")}
       </button>
