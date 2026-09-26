@@ -1,0 +1,29 @@
+{
+  "id": "006",
+  "key_facts": [
+    "vendor came back with $18,400 for the year, not the $16,000 they quoted in August",
+    "they say it's because we added the second seat in September, not a general price increase",
+    "Contract term is now 14 months, not 12, because they backdated the start to July 1 instead of September 1",
+    "the cancellation window moved from 60 days to 90 days",
+    "support tier dropped from \"priority\" to \"standard\" in the new draft",
+    "I have NOT signed anything, and I won't until that's fixed or we agree it's fine",
+    "this pushes us to $61,200 total vendor spend for the year against a $58,000 line, so it's over by $3,200",
+    "I sent it to them this morning, not last week like I told you in Slack"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "The vendor renewal jumped to $22,500 after a platform-wide price hike.",
+      "distinctive_tokens": ["22500", "platform"]
+    },
+    {
+      "claim": "Kim already finalized the renewal paperwork this week.",
+      "distinctive_tokens": ["finalized", "paperwork"]
+    },
+    {
+      "claim": "The vendor upgraded our support tier to platinum in the new draft.",
+      "distinctive_tokens": ["upgraded", "platinum"]
+    }
+  ],
+  "expected_oneline_keywords": ["vendor", "renewal", "contract", "budget"],
+  "notes": "Every changed term (price, term length, cancellation window, support tier) has an explicit before/after; reversing any one is a plausible trap."
+}
