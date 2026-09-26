@@ -155,6 +155,7 @@ function writeStored(key: string, value: string): void {
 export class VoiceEngine {
   private worker: Worker | null = null;
   private ctx: AudioContext | null = null;
+  private noticeNextStart = 0;
   private queue: AudioQueue | null = null;
   private runId = 0;
   private messageSeq = 0;
@@ -829,6 +830,7 @@ export class VoiceEngine {
 
   stop(): number {
     this.releasePause(); // waiting messages wake, see the new epoch, and return
+    this.noticeNextStart = 0; // stopped notices no longer hold the next one back (Codex review, PR #27)
     this.streaming = false;
     const t0 = performance.now();
     const stale = this.runId;
@@ -944,7 +946,11 @@ export class VoiceEngine {
         if (ctx.currentTime === t0) resolve();
       }, Math.ceil(buf.duration * 1000) + 500);
     });
-    src.start();
+    // Notices queue behind each other instead of starting together (all_cut then done, for
+    // example): schedule at the later of now and the previous notice's end (Codex review, PR #23).
+    const startAt = Math.max(ctx.currentTime, this.noticeNextStart);
+    src.start(startAt);
+    this.noticeNextStart = startAt + buf.duration;
     this.lastNoticeLatencyMs = Math.round((performance.now() - t0) * 100) / 100;
     await played;
     return { seconds: buf.duration };

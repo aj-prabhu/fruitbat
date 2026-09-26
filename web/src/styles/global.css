@@ -337,6 +337,12 @@ body {
   opacity: 0.85;
 }
 
+/* The report preview wraps inside the viewport: user agents and model ids are long (Codex review, PR #23). */
+.report-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
 /* S1-09: minimal styling for the loading line and the canned demo (S1-07's impeccable pass owns
    the real look). Kept plain on purpose so the state is easy to read at a glance. */
 .loading {

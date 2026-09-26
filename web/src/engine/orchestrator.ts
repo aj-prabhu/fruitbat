@@ -316,6 +316,18 @@ export class Orchestrator {
     return this.begin(id, level, { fromChunk: 0, base: 0, end: text.length });
   }
 
+  /** Speak a message raised outside the panel (the report dialog): same voice, same "Speak
+   *  messages" switch, not added to the panel's notices (rule 8; Codex review, PR #23). */
+  speakMessage(key: string): void {
+    if (!this.speakMessages) return;
+    // Never the reason for a voice download (rule 11: mobile / data saver load on demand only), and
+    // never over a read or summary in progress; the dialog's own text and its aria-live region carry
+    // the message then (Codex review, PR #23).
+    if (!this.voiceReady || this.busy()) return;
+    this.spoken.push(key);
+    void this.voice.speak(key).catch(() => undefined);
+  }
+
   /** Silence spoken messages (a "Stopped" still playing, say) without touching any run or load:
    *  the demo recording is about to play (Codex review, PR #20). */
   silenceVoice(): void {

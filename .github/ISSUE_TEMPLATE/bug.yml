@@ -1,0 +1,65 @@
+name: Bug report
+description: Something in Fruitbat didn't work right.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This form is opened by the app's "Report a problem" button, which fills most of the
+        fields below from a report you previewed first (docs/PLAN.md "Bug-report pipeline").
+        You can also fill it out by hand.
+  - type: textarea
+    id: what_happened
+    attributes:
+      label: What happened?
+      description: What you were trying to do and what happened instead.
+      placeholder: Tell us what happened.
+    validations:
+      required: false
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Browser, OS, GPU, and memory bucket. Filled in automatically by the app.
+      render: json
+    validations:
+      required: false
+  - type: textarea
+    id: models
+    attributes:
+      label: Models
+      description: The model ids and revisions in use. Filled in automatically by the app.
+      render: json
+    validations:
+      required: false
+  - type: textarea
+    id: run_stats
+    attributes:
+      label: Run stats
+      description: The last few runs' measurements. Filled in automatically by the app.
+      render: json
+    validations:
+      required: false
+  - type: textarea
+    id: events
+    attributes:
+      label: Events
+      description: A short structured log of what the app did before the report. Filled in automatically by the app.
+      render: json
+    validations:
+      required: false
+  - type: input
+    id: app_version
+    attributes:
+      label: App and version
+      placeholder: web 0.1.0
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: Confirmation
+      options:
+        - label: I checked the preview and this report contains nothing I was reading.
+          required: true

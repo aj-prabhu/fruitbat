@@ -95,6 +95,7 @@
     "report.open_github": "Open on GitHub",
     "report.copy": "Copy report",
     "report.copied": "Copied.",
+    "report.copy_failed": "Couldn't copy it. The report above is selected so you can copy it by hand.",
     "report.privacy_note": "The report has numbers and settings only. Never your text, your audio or your file names.",
     "stats.title": "Stats",
     "stats.empty": "No runs yet.",
