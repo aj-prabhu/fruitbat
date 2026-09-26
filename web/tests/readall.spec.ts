@@ -184,18 +184,22 @@ test("stop during planning settles readAll; stop cancels a pending spoken messag
 });
 
 test("read all to the end writes a RunStats row", async ({}, testInfo) => {
-  const text = PARAGRAPHS_011[0];
+  // With a frozen clock (headless, no audio output) the 30 s cap would stop synthesis partway
+  // through a long paragraph, so the fallback reads a shorter text that fits under it, and must
+  // see every planned segment synthesized (Codex review, PR #17).
+  const text = clockAdvances ? PARAGRAPHS_011[0] : PARAGRAPHS_011[0].split(/\s+/).slice(0, 40).join(" ");
   const result = await page.evaluate(
     async ({ t, adv }) => {
+      const planned = (await window.__tts.plan(t)).segments.length;
       const p = window.__tts.readAll(t);
       if (adv) return await p;
       // Headless without an output: the clock does not advance, so playback never "ends".
-      // Wait for every segment to be synthesized and scheduled instead (the directive's fallback).
+      // Wait for every planned segment to be synthesized and scheduled instead.
       const start = Date.now();
       for (;;) {
         const s = window.__tts.state();
         if (s.phase === "failed") throw new Error(s.error ?? "failed");
-        if (s.enqueued > 0 && s.inFlight === 0 && s.phase === "reading" && Date.now() - start > 2000) break;
+        if (s.phase === "reading" && s.inFlight === 0 && s.enqueued >= planned) break;
         if (Date.now() - start > 240_000) throw new Error("timeout");
         await new Promise((r) => setTimeout(r, 200));
       }
