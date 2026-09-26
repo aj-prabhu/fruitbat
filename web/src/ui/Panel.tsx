@@ -114,10 +114,18 @@ function SpacingGlyph({ step }: { step: number }) {
 
 // ---------------------------------------------------------------- bullets / read-all
 function BulletList({ s }: { s: Snapshot }) {
+  const playing = s.current?.kind === "bullet" ? s.current.index : -1;
+  // The body scrolls: keep the bullet being spoken in view as playback moves down the list
+  // (Codex review, PR #25).
+  useEffect(() => {
+    if (playing < 0) return;
+    const el = document.querySelector(`.panel-bullets li[data-index="${playing}"]`);
+    el?.scrollIntoView({ block: "nearest" });
+  }, [playing]);
   return (
     <ol class="panel-bullets" aria-live="polite" aria-label={t("a11y.bullet_list")}>
       {s.bullets.map((b, i) => (
-        <li key={i} data-chunk={b.chunkIndex} aria-current={s.current?.kind === "bullet" && s.current.index === i ? "true" : undefined}>
+        <li key={i} data-index={i} data-chunk={b.chunkIndex} aria-current={playing === i ? "true" : undefined}>
           {b.text}
         </li>
       ))}

@@ -1,4 +1,5 @@
-import { test, expect, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { test, expect, installModelCacheRoute } from "./model-cache";
+import type { Browser, BrowserContext, Page } from "@playwright/test";
 import { gotoIsolated } from "./isolated";
 import { AxeBuilder } from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
@@ -41,6 +42,7 @@ test.describe("accessibility (?llm=fake, panel populated)", () => {
     // browser.newContext()"), and AxeBuilder.analyze() needs to open a second, blank page in the
     // same context to aggregate results (finishRun in @axe-core/playwright).
     context = await browser.newContext();
+    await installModelCacheRoute(context); // same local model cache as every other spec (S1-13a)
     page = await context.newPage();
     await openPopulated(page);
   });

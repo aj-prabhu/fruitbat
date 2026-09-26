@@ -50,6 +50,14 @@
   }
 }
 
+/* A short, wide window (a laptop with the dock and bookmarks bar): the panel scrolls too, so every
+   control stays reachable (Codex review, PR #25). */
+@media (max-height: 640px) {
+  .panel {
+    overflow-y: auto;
+  }
+}
+
 /* The panel sits over the page, so the page keeps its content clear of it: nothing (the paste box's
    "Read this", the last paragraph) is ever hidden underneath (found by intake.spec, PR #25). */
 @media (min-width: 641px) {

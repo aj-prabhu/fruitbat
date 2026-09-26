@@ -1,4 +1,5 @@
-import { test, expect, type Page, type Browser } from "@playwright/test";
+import { test, expect, installModelCacheRoute } from "./model-cache";
+import type { Page, Browser } from "@playwright/test";
 import { gotoIsolated } from "./isolated";
 import { existsSync, mkdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -53,6 +54,7 @@ test.describe("panel (?llm=fake&delay=40)", () => {
   let page: Page;
   test.beforeAll(async ({ browser }: { browser: Browser }) => {
     page = await browser.newPage();
+    await installModelCacheRoute(page.context()); // same local model cache as every other spec (S1-13a)
     await open(page, "?llm=fake&delay=40");
   });
   test.afterAll(async () => {
