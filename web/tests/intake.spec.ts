@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -41,7 +42,7 @@ async function selectAndShowChip(page: Page): Promise<{ text: string }> {
 
 test.describe("intake: selection chip", () => {
   test("a >= 20 char selection shows the chip within 100 ms of mouseup", async ({ page }) => {
-    await page.goto("/");
+    await gotoIsolated(page, "/");
     await expect(page.locator(".article p").first()).toBeVisible();
 
     const elapsedMs = await page.evaluate(() => {
@@ -78,7 +79,7 @@ test.describe("intake: selection chip", () => {
   });
 
   test("clicking the chip runs the selection at the current level and increments stats", async ({ page }) => {
-    await page.goto("/");
+    await gotoIsolated(page, "/");
     await expect(page.locator(".article p").first()).toBeVisible();
     const { text } = await selectAndShowChip(page);
 
@@ -92,7 +93,7 @@ test.describe("intake: selection chip", () => {
   });
 
   test("⌥R runs the current selection", async ({ page }) => {
-    await page.goto("/");
+    await gotoIsolated(page, "/");
     await expect(page.locator(".article p").first()).toBeVisible();
     const { text } = await selectArticleChars(page, 200);
 
@@ -105,7 +106,7 @@ test.describe("intake: selection chip", () => {
   });
 
   test("⌥R with no selection does nothing", async ({ page }) => {
-    await page.goto("/");
+    await gotoIsolated(page, "/");
     await expect(page.locator(".article p").first()).toBeVisible();
     await page.evaluate(() => window.getSelection()!.removeAllRanges());
 
@@ -117,7 +118,7 @@ test.describe("intake: selection chip", () => {
   });
 
   test("a selection under 20 chars shows no chip", async ({ page }) => {
-    await page.goto("/");
+    await gotoIsolated(page, "/");
     await expect(page.locator(".article p").first()).toBeVisible();
     await selectArticleChars(page, 10);
 
@@ -126,7 +127,7 @@ test.describe("intake: selection chip", () => {
   });
 
   test("Esc hides the chip", async ({ page }) => {
-    await page.goto("/");
+    await gotoIsolated(page, "/");
     await expect(page.locator(".article p").first()).toBeVisible();
     await selectAndShowChip(page);
 
@@ -137,7 +138,7 @@ test.describe("intake: selection chip", () => {
 
 test.describe("intake: paste box", () => {
   test("shows a live word count and 'Read this' runs the pasted text", async ({ page }) => {
-    await page.goto("/");
+    await gotoIsolated(page, "/");
     const textarea = page.locator(".paste-textarea");
     const readButton = page.locator(".read-button");
 
@@ -157,7 +158,7 @@ test.describe("intake: paste box", () => {
   });
 
   test("Cmd/Ctrl+Enter also runs the pasted text", async ({ page }) => {
-    await page.goto("/");
+    await gotoIsolated(page, "/");
     const textarea = page.locator(".paste-textarea");
     const pasted = "read this with a keyboard shortcut please";
     await textarea.fill(pasted);
