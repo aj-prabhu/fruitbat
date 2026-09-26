@@ -1,0 +1,34 @@
+name: Deploy dev Space
+
+# Every push to main deploys the prebuilt web app to the dev Space 2shay/fruitbat-dev
+# (docs/PLAN.md rule 10). The public Space only changes on a web-v* tag (release.yml, S1-15).
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - "spec/**"
+      - "scripts/deploy-space.sh"
+      - ".github/workflows/space-dev.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: space-dev
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install hf CLI
+        run: pip install -U "huggingface_hub[cli]"
+      - name: Deploy
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: scripts/deploy-space.sh 2shay/fruitbat-dev
