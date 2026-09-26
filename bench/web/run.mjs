@@ -344,9 +344,10 @@ async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, dis
   await page.waitForFunction(
     (runId) => {
       const s = window.__fruitbat.state();
-      const voiceIdle =
-        s.play !== "playing" && s.play !== "paused" && s.voice.inFlight === 0 && s.voice.enqueued <= s.voice.ended;
-      return s.runId === runId && (s.gen === "done" || s.gen === "failed") && voiceIdle;
+      // The same condition main.tsx records on: the orchestrator's explicit settlement of this run
+      // (generation and speech both over, metrics final). Queue counters alone can go idle first,
+      // and then the last row read below would be the previous rep's (Codex review, PR #22).
+      return s.runId === runId && (s.gen === "done" || s.gen === "failed") && s.settledRunId === runId;
     },
     runId,
     { timeout: timeoutMs, polling: 250 }
@@ -374,7 +375,8 @@ async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, dis
     const bullets = await page.evaluate(() => window.__fruitbat.state().bullets);
     const scoringText = extractScoringText(level, bullets);
     fs.mkdirSync(LAST_RUN_DIR, { recursive: true });
-    const outFile = path.join(LAST_RUN_DIR, `${level}-${doc}.txt`);
+    // "bench-" prefix: <level>-<doc>.txt would overwrite the committed S1-05 fixture short-011.txt.
+    const outFile = path.join(LAST_RUN_DIR, `bench-${level}-${doc}.txt`);
     fs.writeFileSync(outFile, scoringText, "utf8");
     const scored = scoreOutput(doc, level, outFile);
     row.facts_token_hit = scored.facts_token_hit;

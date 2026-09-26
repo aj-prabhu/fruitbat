@@ -158,7 +158,7 @@ dispatches to `bench/web/run.mjs` (`--target mac` prints `S2-13` and exits 2 -- 
    run does one throwaway "short" request first to prime the cache (discarded, not scored, not
    counted in the reps) so the recorded rows are never accidentally `cache_state: "cold"`.
 4. For each doc x level x rep: `setDocId(doc)`, `run(text, level)`, then polls `state()` until
-   `gen` is `done`/`failed` **and** the voice has drained -- the exact same condition
+   `gen` is `done`/`failed` **and** `settledRunId` equals the run -- the exact same condition
    `web/src/main.tsx` itself uses before calling `stats.record()`, so by the time the poll
    resolves the app has already written a fresh `RunStats` row to its own `localStorage` (read via
    `window.__fruitbat.rows()`, last entry). The runner does not build a row from scratch: it takes
