@@ -386,6 +386,18 @@ async function measureStop(page, doc, level, text, timeoutMs) {
     return window.__fruitbat.stats().stop_ms;
   });
   if (typeof ms !== "number" || !Number.isFinite(ms)) fail(`stop_ms not measured for doc=${doc} level=${level}`);
+  // Let the stopped probe drain before the next rep starts: an interrupted generate or synthesis
+  // still finishing in a worker would land in the next rep's time to first audio (Codex review,
+  // PR #27). Idle generation and voice, then a short settle for the workers' abort acks.
+  await page.waitForFunction(
+    () => {
+      const s = window.__fruitbat.state();
+      return s.gen !== "running" && s.gen !== "loading" && s.voice.inFlight === 0 && s.voice.pending === 0;
+    },
+    null,
+    { timeout: 60_000, polling: 100 }
+  );
+  await sleep(1500);
   return ms;
 }
 
