@@ -762,7 +762,9 @@ export class VoiceEngine {
         // a message that fails to synthesize is spoken live when asked for
       }
     }
-    this.prewarmed = true;
+    // Only true when every notice is actually cached: a Stop or new run during prewarm cancels the
+    // one being synthesized, and the orchestrator prewarms again after the run (Codex review, PR #18).
+    this.prewarmed = keys.every((k) => this.noticeCache.has(this.noticeKey(k)));
   }
 
   private async synthMessage(messageKey: string, cacheKey: string): Promise<{ pcm: Float32Array; sampleRate: number } | null> {

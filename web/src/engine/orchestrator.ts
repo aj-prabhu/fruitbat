@@ -55,7 +55,7 @@ export interface Snapshot {
   speakMessages: boolean;
   progress: { file?: string; loaded?: number; total?: number } | null;
   error: string | null;
-  voice: { aheadSeconds: number; enqueued: number; inFlight: number; ended: number; phase: string };
+  voice: { aheadSeconds: number; enqueued: number; inFlight: number; ended: number; pending: number; phase: string };
 }
 
 export interface OrchestratorStats {
@@ -137,6 +137,12 @@ export class Orchestrator {
     for (const key of this.pendingNotices.splice(0)) this.notice(key);
   }
 
+  /** A prewarm cut short by a run (Stop cancels the notice being synthesized) finishes once the
+   *  run has played out, when the worker is free again (Codex review, PR #18). */
+  private finishPrewarm(): void {
+    if (this.voiceReady && !this.voice.prewarmed) void this.voice.prewarm(PREWARM_KEYS).catch(() => undefined);
+  }
+
   private async warmVoice(): Promise<void> {
     try {
       await this.voice.load();
@@ -174,7 +180,7 @@ export class Orchestrator {
       speakMessages: this.speakMessages,
       progress: this.progress,
       error: this.error,
-      voice: { aheadSeconds: v.aheadSeconds, enqueued: v.enqueued, inFlight: v.inFlight, ended: v.ended, phase: v.phase },
+      voice: { aheadSeconds: v.aheadSeconds, enqueued: v.enqueued, inFlight: v.inFlight, ended: v.ended, pending: v.pending, phase: v.phase },
     };
   }
 
@@ -456,6 +462,7 @@ export class Orchestrator {
       this.play = reducePlay(this.play, "drain");
       this.current = null;
       this.notice("notice.done");
+      this.finishPrewarm();
     }
   }
 
@@ -539,6 +546,7 @@ export class Orchestrator {
       // "Done" only when something was said; an all-cut summary keeps "Couldn't make a summary I
       // trust for this part" and its Read this part key (Codex review, PR #18).
       if (this.gen === "done" && this.bullets.length > 0) this.notice("notice.done");
+      this.finishPrewarm();
     }
   }
 }
