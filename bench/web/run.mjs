@@ -1,0 +1,516 @@
+#!/usr/bin/env node
+// bench/web/run.mjs -- S1-13's web bench runner (docs/PLAN.md rule 3, KPI table, bench/README.md,
+// bench/identity.md). Drives the real app (bundled Chromium, headed, WebGPU on) through
+// doc x level x rep, reads the RunStats row the app itself already wrote to localStorage
+// (web/src/stats/store.ts's record()), fills in the metrics only a Node harness can measure
+// (facts_token_hit/halluc_flags/forbidden_hits/oneline_keyword_hit via bench/score.py, peak_mb via
+// `ps`, heap_mb via CDP Performance.getMetrics), validates the row with bench/schema_check.py, and
+// appends it to bench/results.csv in the schema's fixed column order. Called by bench/run.sh
+// --target web; never invoked directly by CI (no baseline writes happen here).
+//
+// Why the app's own row, not one we build ourselves: buildRow() (web/src/stats/store.ts) already
+// knows the pinned model_id/model_rev/dtype/device for whichever tier actually loaded, the browser
+// commit embedded at build time (vite.config.ts's __FRUITBAT_COMMIT__), and the UA-derived
+// browser/os fields -- reproducing that logic here would drift the moment a pin changes. This
+// harness only adds what genuinely cannot be known inside the page: the diagnostic scorer's
+// numbers (they grade against the eval corpus, not the live pipeline) and process-level memory.
+import { spawn, spawnSync } from "node:child_process";
+import { createRequire } from "node:module";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url)); // bench/web
+const REPO_ROOT = path.resolve(HERE, "..", "..");
+const WEB_DIR = path.join(REPO_ROOT, "web");
+const BENCH_DIR = path.join(REPO_ROOT, "bench");
+const CORPUS_DIR = path.join(REPO_ROOT, "spec", "eval", "corpus");
+const RESULTS_CSV = path.join(BENCH_DIR, "results.csv");
+const SCHEMA_PATH = path.join(REPO_ROOT, "spec", "schemas", "run-stats.schema.json");
+const LAST_RUN_DIR = path.join(BENCH_DIR, "last-run");
+
+const ALL_LEVELS = ["readall", "short", "caveman", "oneline"];
+const WEBGPU_ARGS = [
+  "--enable-unsafe-webgpu",
+  "--ignore-gpu-blocklist",
+  "--mute-audio",
+  "--autoplay-policy=no-user-gesture-required",
+];
+// Only bench's own output files may be dirty when we start (docs/PLAN.md rule 3's evidence
+// pathspec carve-out mirrored for the runner itself; bench/last-run/* is gitignored except the
+// S0-05 fixture, see .gitignore).
+const DIRTY_EXCEPTIONS = [".", ":!bench/results.csv", ":!bench/baselines.json", ":!bench/last-run"];
+
+function fail(msg) {
+  console.error(`bench/web/run.mjs: ${msg}`);
+  process.exit(1);
+}
+
+function sh(cmd, args, opts = {}) {
+  return spawnSync(cmd, args, { encoding: "utf8", ...opts });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// --------------------------------------------------------------------------------------
+// CLI
+// --------------------------------------------------------------------------------------
+
+function parseArgs(argv) {
+  const out = { docs: null, levels: "all", cache: "warm", reps: 3, port: 4251 };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    const next = () => argv[++i];
+    switch (a) {
+      case "--docs":
+        out.docs = next();
+        break;
+      case "--levels":
+        out.levels = next();
+        break;
+      case "--cache":
+        out.cache = next();
+        break;
+      case "--reps":
+        out.reps = Number(next());
+        break;
+      case "--port":
+        out.port = Number(next());
+        break;
+      default:
+        fail(`unknown argument '${a}'`);
+    }
+  }
+  if (!["warm", "cold"].includes(out.cache)) fail(`--cache must be 'warm' or 'cold', got '${out.cache}'`);
+  if (!Number.isInteger(out.reps) || out.reps < 1) fail(`--reps must be a positive integer, got '${out.reps}'`);
+  return out;
+}
+
+function resolveDocs(spec, manifest) {
+  const allIds = manifest.docs.map((d) => d.id);
+  if (!spec) return allIds.slice(0, 3); // default: first 3 corpus ids
+  if (spec.includes(",")) {
+    const ids = spec.split(",").map((s) => s.trim());
+    for (const id of ids) if (!allIds.includes(id)) fail(`--docs: unknown doc id '${id}'`);
+    return ids;
+  }
+  if (allIds.includes(spec)) return [spec]; // a single explicit 3-digit id, e.g. "011"
+  const n = Number(spec);
+  if (!Number.isInteger(n) || n <= 0) fail(`--docs: '${spec}' is neither a known doc id nor a positive integer count`);
+  return allIds.slice(0, n);
+}
+
+function resolveLevels(spec) {
+  if (!spec || spec === "all") return ALL_LEVELS;
+  const levels = spec.split(",").map((s) => s.trim());
+  for (const l of levels) if (!ALL_LEVELS.includes(l)) fail(`--levels: unknown level '${l}'`);
+  return levels;
+}
+
+// --------------------------------------------------------------------------------------
+// Preflight: clean tree, commit, build, preview server
+// --------------------------------------------------------------------------------------
+
+function assertCleanTree() {
+  const res = sh("git", ["status", "--porcelain", "--", ...DIRTY_EXCEPTIONS], { cwd: REPO_ROOT });
+  if (res.status !== 0) fail(`git status failed: ${res.stderr}`);
+  const dirty = res.stdout.trim();
+  if (dirty) {
+    fail(
+      `refusing to run with a dirty tree (only bench/results.csv, bench/baselines.json, ` +
+        `bench/last-run/ may be dirty):\n${dirty}`
+    );
+  }
+}
+
+function currentCommit() {
+  return sh("git", ["rev-parse", "HEAD"], { cwd: REPO_ROOT }).stdout.trim();
+}
+
+function buildApp() {
+  console.log("bench/web/run.mjs: npm run build ...");
+  const res = spawnSync("npm", ["run", "build"], { cwd: WEB_DIR, stdio: "inherit" });
+  if (res.status !== 0) fail("npm run build failed");
+}
+
+function startPreview(port) {
+  return spawn("npx", ["vite", "preview", "--port", String(port), "--strictPort"], {
+    cwd: WEB_DIR,
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+async function waitForServer(url, timeoutMs = 30000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const res = await fetch(url);
+      if (res.status) return;
+    } catch {
+      // not up yet
+    }
+    await sleep(300);
+  }
+  fail(`preview server at ${url} did not come up within ${timeoutMs}ms`);
+}
+
+function loadPlaywright() {
+  // @playwright/test lives in web/node_modules, not bench/web/node_modules or the repo root, so
+  // resolve it relative to web/package.json rather than relying on ESM's own resolution (which
+  // walks up from this file's directory, a sibling of web/, and would never find it).
+  const require = createRequire(path.join(WEB_DIR, "package.json"));
+  return require("@playwright/test");
+}
+
+// --------------------------------------------------------------------------------------
+// Process-level memory (peak_mb via ps, heap_mb via CDP)
+// --------------------------------------------------------------------------------------
+
+// Chromium forwards --user-data-dir to its renderer and gpu-process children (verified against
+// this exact bundled build: both show it in `ps`), so grepping ps by the profile dir plus
+// --type=renderer|gpu-process reliably finds the pids for *this* browser instance even with other
+// Chrome/Chromium processes running on the machine. If a future Chromium build stops doing this,
+// findPids returns [] and peak_mb comes back null (memory.md documents this as the fallback).
+function findPids(profileDir) {
+  const res = sh("ps", ["-eo", "pid,command"], { maxBuffer: 16 * 1024 * 1024 });
+  if (res.status !== 0) return [];
+  const pids = [];
+  for (const line of res.stdout.split("\n")) {
+    if (!line.includes(profileDir)) continue;
+    if (!/--type=(renderer|gpu-process)\b/.test(line)) continue;
+    const m = /^\s*(\d+)/.exec(line);
+    if (m) pids.push(m[1]);
+  }
+  return pids;
+}
+
+function sampleRssMb(pids) {
+  if (pids.length === 0) return null;
+  const res = sh("ps", ["-o", "rss=", "-p", pids.join(",")]);
+  if (res.status !== 0) return null;
+  const kb = res.stdout
+    .split("\n")
+    .map((s) => Number(s.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0)
+    .reduce((a, b) => a + b, 0);
+  return kb > 0 ? kb / 1024 : null;
+}
+
+function startPeakSampler(profileDir) {
+  const pids = findPids(profileDir);
+  if (pids.length === 0) {
+    // Fragile by design (docs/PLAN.md packet text): record null and say so rather than guess.
+    return { stop: () => null, samples: () => 0 };
+  }
+  let peak = 0;
+  let samples = 0;
+  const timer = setInterval(() => {
+    const mb = sampleRssMb(pids);
+    if (mb !== null) {
+      peak = Math.max(peak, mb);
+      samples++;
+    }
+  }, 250);
+  return {
+    stop() {
+      clearInterval(timer);
+      return samples > 0 ? peak : null;
+    },
+  };
+}
+
+// --------------------------------------------------------------------------------------
+// score.py / schema_check.py shell-outs
+// --------------------------------------------------------------------------------------
+
+function extractScoringText(level, bullets) {
+  if (level === "oneline") {
+    const finalLine = bullets.find((b) => b.chunkIndex === -1);
+    if (finalLine) return finalLine.text;
+    // No chunkIndex===-1 bullet made it through (e.g. One line fell back to Short, docs/PLAN.md
+    // "One-line policy on failures"): fall back to joining what we have so scoring still runs.
+    console.warn("bench/web/run.mjs: no final one-line bullet (chunkIndex -1); scoring joined bullets instead");
+  }
+  return bullets.map((b) => b.text).join("\n");
+}
+
+function scoreOutput(doc, level, outFile) {
+  const res = sh("python3", [path.join(BENCH_DIR, "score.py"), "--doc", doc, "--level", level, "--output", outFile], {
+    cwd: REPO_ROOT,
+  });
+  if (res.status !== 0) fail(`bench/score.py failed for doc=${doc} level=${level}:\n${res.stdout}${res.stderr}`);
+  return JSON.parse(res.stdout);
+}
+
+function csvCell(value) {
+  if (value === null || value === undefined) return "";
+  const s = String(value);
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function validateAndAppend(csvFields, row) {
+  const cleanRow = {};
+  for (const f of csvFields) cleanRow[f] = row[f] === undefined ? null : row[f];
+  const tmpFile = path.join(os.tmpdir(), `fruitbat-row-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2)}.json`);
+  fs.writeFileSync(tmpFile, JSON.stringify(cleanRow, null, 2));
+  const res = sh("python3", [path.join(BENCH_DIR, "schema_check.py"), tmpFile, SCHEMA_PATH]);
+  fs.rmSync(tmpFile, { force: true });
+  if (res.status !== 0) {
+    fail(`bench/schema_check.py rejected the row for doc=${row.doc_id} level=${row.level}:\n${res.stdout}${res.stderr}`);
+  }
+  const line = csvFields.map((f) => csvCell(cleanRow[f])).join(",") + "\n";
+  fs.appendFileSync(RESULTS_CSV, line);
+  return cleanRow;
+}
+
+// --------------------------------------------------------------------------------------
+// One measurement: trigger, wait for gen+voice idle (main.tsx's own record() condition), measure
+// --------------------------------------------------------------------------------------
+
+function computeTimeoutMs(text, level, cold) {
+  const words = text.trim().split(/\s+/).length;
+  let ms = 60_000 + words * 40; // generous: ~40ms/word of headroom on top of a 1-minute floor
+  if (level === "oneline" && words > 3000) ms += 120_000; // multi-chunk reduce pass
+  if (cold) ms += 180_000; // model download time, cold cache
+  return Math.min(Math.max(ms, 60_000), 20 * 60_000);
+}
+
+async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, discard = false }) {
+  const sampler = discard ? null : startPeakSampler(profileDir);
+
+  const runId = await page.evaluate(
+    ({ doc, level, text }) => {
+      window.__fruitbat.setDocId(doc);
+      window.__fruitbat.run(text, level);
+      return window.__fruitbat.state().runId;
+    },
+    { doc, level, text }
+  );
+
+  // Mirrors web/src/main.tsx's own record() gate exactly: gen terminal AND the voice queue has
+  // drained. Reading state() (not stats()) because voice.inFlight/enqueued/ended aren't on
+  // FruitbatStats.
+  await page.waitForFunction(
+    (runId) => {
+      const s = window.__fruitbat.state();
+      const voiceIdle =
+        s.play !== "playing" && s.play !== "paused" && s.voice.inFlight === 0 && s.voice.enqueued <= s.voice.ended;
+      return s.runId === runId && (s.gen === "done" || s.gen === "failed") && voiceIdle;
+    },
+    runId,
+    { timeout: timeoutMs, polling: 250 }
+  );
+
+  if (discard) {
+    sampler?.stop();
+    return null;
+  }
+
+  const peak_mb = sampler.stop();
+  const perf = await cdp.send("Performance.getMetrics");
+  const heapEntry = perf.metrics.find((m) => m.name === "JSHeapUsedSize");
+  const heap_mb = heapEntry ? heapEntry.value / 1e6 : null;
+
+  const allRows = await page.evaluate(() => window.__fruitbat.rows());
+  const row = allRows[allRows.length - 1];
+  if (!row || row.doc_id !== doc || row.level !== level) {
+    fail(`expected a fresh RunStats row for doc=${doc} level=${level}, got ${JSON.stringify(row)}`);
+  }
+  row.peak_mb = peak_mb;
+  row.heap_mb = heap_mb;
+
+  if (level !== "readall") {
+    const bullets = await page.evaluate(() => window.__fruitbat.state().bullets);
+    const scoringText = extractScoringText(level, bullets);
+    fs.mkdirSync(LAST_RUN_DIR, { recursive: true });
+    const outFile = path.join(LAST_RUN_DIR, `${level}-${doc}.txt`);
+    fs.writeFileSync(outFile, scoringText, "utf8");
+    const scored = scoreOutput(doc, level, outFile);
+    row.facts_token_hit = scored.facts_token_hit;
+    row.halluc_flags = scored.halluc_flags;
+    row.forbidden_hits = scored.forbidden_hits;
+    row.oneline_keyword_hit = scored.oneline_keyword_hit;
+  }
+
+  return row;
+}
+
+// --------------------------------------------------------------------------------------
+// Summary table
+// --------------------------------------------------------------------------------------
+
+function median(arr) {
+  const nums = arr.filter((x) => typeof x === "number" && Number.isFinite(x)).sort((a, b) => a - b);
+  if (nums.length === 0) return null;
+  const mid = Math.floor(nums.length / 2);
+  return nums.length % 2 ? nums[mid] : (nums[mid - 1] + nums[mid]) / 2;
+}
+
+function fmt(v) {
+  if (v === null || v === undefined) return "null";
+  return Number.isInteger(v) ? String(v) : v.toFixed(3);
+}
+
+function printSummaryTable(summaries) {
+  const cols = ["doc", "level", "ttfa_ms(med)", "tok_s(med)", "facts_token_hit(med)", "cut_rate(med)"];
+  const rows = summaries.map((s) => [s.doc, s.level, fmt(s.ttfa_ms), fmt(s.tok_s), fmt(s.facts_token_hit), fmt(s.cut_rate)]);
+  const widths = cols.map((c, i) => Math.max(c.length, ...rows.map((r) => r[i].length)));
+  const line = (cells) => cells.map((c, i) => c.padEnd(widths[i])).join(" | ");
+  console.log(line(cols));
+  console.log(widths.map((w) => "-".repeat(w)).join("-|-"));
+  for (const r of rows) console.log(line(r));
+}
+
+// --------------------------------------------------------------------------------------
+// Main
+// --------------------------------------------------------------------------------------
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  assertCleanTree();
+  const commit = currentCommit();
+  const manifest = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "spec/eval/manifest.json"), "utf8"));
+  const schema = JSON.parse(fs.readFileSync(SCHEMA_PATH, "utf8"));
+  const csvFields = schema.required;
+
+  const docs = resolveDocs(args.docs, manifest);
+  const levels = resolveLevels(args.levels);
+  const { cache, reps, port } = args;
+
+  console.log(
+    `bench/web/run.mjs: commit=${commit} docs=${docs.join(",")} levels=${levels.join(",")} cache=${cache} reps=${reps} port=${port}`
+  );
+
+  buildApp();
+  const preview = startPreview(port);
+  const baseURL = `http://localhost:${port}`;
+  const summaries = [];
+  let appendedCount = 0;
+
+  const cleanupFns = [() => preview.kill()];
+  const cleanup = () => {
+    for (const fn of cleanupFns.splice(0).reverse()) {
+      try {
+        fn();
+      } catch {
+        // best-effort
+      }
+    }
+  };
+  process.on("SIGINT", () => {
+    cleanup();
+    process.exit(130);
+  });
+
+  try {
+    await waitForServer(baseURL);
+    const { chromium } = loadPlaywright();
+
+    async function measureMatrix(page, cdp, profileDir) {
+      for (const doc of docs) {
+        const text = fs.readFileSync(path.join(CORPUS_DIR, `${doc}.txt`), "utf8");
+        for (const level of levels) {
+          const repRows = [];
+          for (let r = 0; r < reps; r++) {
+            const timeoutMs = computeTimeoutMs(text, level, cache === "cold");
+            const row = await runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs });
+            const clean = validateAndAppend(csvFields, row);
+            appendedCount++;
+            repRows.push(clean);
+            console.log(
+              `  [${doc}/${level}/rep${r + 1}] ttfa_ms=${clean.ttfa_ms} tok_s=${clean.tok_s} facts_token_hit=${clean.facts_token_hit} cut_rate=${clean.cut_rate}`
+            );
+          }
+          summaries.push({
+            doc,
+            level,
+            ttfa_ms: median(repRows.map((r) => r.ttfa_ms)),
+            tok_s: median(repRows.map((r) => r.tok_s)),
+            facts_token_hit: median(repRows.map((r) => r.facts_token_hit)),
+            cut_rate: median(repRows.map((r) => r.cut_rate)),
+          });
+        }
+      }
+    }
+
+    if (cache === "warm") {
+      const profileDir = path.join(BENCH_DIR, ".profile-warm");
+      fs.mkdirSync(profileDir, { recursive: true });
+      const context = await chromium.launchPersistentContext(profileDir, { headless: false, args: WEBGPU_ARGS });
+      cleanupFns.push(() => context.close());
+      const page = context.pages()[0] ?? (await context.newPage());
+      await page.goto(baseURL);
+      await page.waitForFunction(() => !!window.__fruitbat, null, { timeout: 30_000 });
+      const cdp = await context.newCDPSession(page);
+      await cdp.send("Performance.enable");
+
+      // Warm-up: the persistent profile may be empty (first-ever bench run, or a deleted profile
+      // dir), which would make the first real measurement pay for the model downloads and get
+      // tagged cache_state="cold" -- a different bench identity from every other warm row. One
+      // throwaway "short" run on the first doc primes both the summarizer and the voice model
+      // (readall only needs the voice model, so "short" covers strictly more); its row is never
+      // scored, validated, or appended.
+      console.log("bench/web/run.mjs: warm-up run (discarded, not counted in the 36) to prime the model cache...");
+      const warmupText = fs.readFileSync(path.join(CORPUS_DIR, `${docs[0]}.txt`), "utf8");
+      await runOnce(page, cdp, profileDir, docs[0], "short", {
+        text: warmupText,
+        timeoutMs: computeTimeoutMs(warmupText, "short", true),
+        discard: true,
+      });
+
+      await measureMatrix(page, cdp, profileDir);
+    } else {
+      // cold: a fresh temp profile per rep, closed and removed immediately after.
+      for (const doc of docs) {
+        const text = fs.readFileSync(path.join(CORPUS_DIR, `${doc}.txt`), "utf8");
+        for (const level of levels) {
+          const repRows = [];
+          for (let r = 0; r < reps; r++) {
+            const tmpProfile = fs.mkdtempSync(path.join(os.tmpdir(), "fruitbat-bench-cold-"));
+            const context = await chromium.launchPersistentContext(tmpProfile, { headless: false, args: WEBGPU_ARGS });
+            try {
+              const page = context.pages()[0] ?? (await context.newPage());
+              await page.goto(baseURL);
+              await page.waitForFunction(() => !!window.__fruitbat, null, { timeout: 30_000 });
+              const cdp = await context.newCDPSession(page);
+              await cdp.send("Performance.enable");
+              const timeoutMs = computeTimeoutMs(text, level, true);
+              const row = await runOnce(page, cdp, tmpProfile, doc, level, { text, timeoutMs });
+              const clean = validateAndAppend(csvFields, row);
+              appendedCount++;
+              repRows.push(clean);
+              console.log(
+                `  [${doc}/${level}/rep${r + 1}/cold] ttfa_ms=${clean.ttfa_ms} tok_s=${clean.tok_s} facts_token_hit=${clean.facts_token_hit} cut_rate=${clean.cut_rate}`
+              );
+            } finally {
+              await context.close();
+              fs.rmSync(tmpProfile, { recursive: true, force: true });
+            }
+          }
+          summaries.push({
+            doc,
+            level,
+            ttfa_ms: median(repRows.map((r) => r.ttfa_ms)),
+            tok_s: median(repRows.map((r) => r.tok_s)),
+            facts_token_hit: median(repRows.map((r) => r.facts_token_hit)),
+            cut_rate: median(repRows.map((r) => r.cut_rate)),
+          });
+        }
+      }
+    }
+
+    console.log("");
+    printSummaryTable(summaries);
+    console.log(`\nbench/web/run.mjs: appended ${appendedCount} rows to bench/results.csv`);
+  } finally {
+    cleanup();
+  }
+}
+
+main().catch((err) => {
+  console.error("bench/web/run.mjs:", err?.stack ?? err);
+  process.exit(1);
+});
