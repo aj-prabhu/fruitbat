@@ -167,8 +167,13 @@ function isAllCapsShort(token: string): boolean {
   return token.length >= 2 && token.length <= 5 && /^\p{Lu}+$/u.test(token);
 }
 
+// Currency codes are units, not names; numbers carry the fact and are checked separately
+// (Codex merge-gate review, PR #14: "It costs 5 GBP." vs "It costs £5." must pass).
+const CURRENCY_CODES = new Set(["USD", "EUR", "GBP", "JPY", "CNY", "INR", "CAD", "AUD", "CHF", "MXN"]);
+
 function isNameCandidateToken(stripped: string, sentenceInitial: boolean, commonWords: Set<string>): boolean {
   if (stripped.length === 0) return false;
+  if (CURRENCY_CODES.has(stripped)) return false;
   if (!/\p{Lu}/u.test(stripped[0])) return false; // any uppercase letter, not only ASCII (Codex review, PR #14)
 
   // All-caps 2-5 letter tokens (USA, NPS) are candidates unless their lowercase form is a common

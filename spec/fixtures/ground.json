@@ -188,5 +188,18 @@
       "reasons": []
     },
     "why": "spec/grounding.md: '2, 4 and 6' is three numbers; the old run-based regex glued '2, 4' into 24."
+  },
+  {
+    "name": "currency_code_is_not_a_name",
+    "kind": "ground",
+    "input": {
+      "bullet": "It costs 5 GBP.",
+      "source": "It costs £5."
+    },
+    "expect": {
+      "ok": true,
+      "reasons": []
+    },
+    "why": "Currency codes are units, not names; the number check already covers the fact."
   }
 ]
