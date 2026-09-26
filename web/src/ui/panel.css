@@ -47,6 +47,19 @@
   }
 }
 
+/* The panel sits over the page, so the page keeps its content clear of it: nothing (the paste box's
+   "Read this", the last paragraph) is ever hidden underneath (found by intake.spec, PR #25). */
+@media (min-width: 641px) {
+  body .app-shell {
+    padding-right: calc(min(360px, 100% - var(--gutter) * 2) + var(--gutter));
+  }
+}
+@media (max-width: 640px) {
+  body .app-shell {
+    padding-bottom: 70vh; /* room to scroll the page's end above the bottom sheet */
+  }
+}
+
 /* ---------------------------------------------------------------- Pip (S1-08 replaces this) */
 .panel-pip {
   position: absolute;
