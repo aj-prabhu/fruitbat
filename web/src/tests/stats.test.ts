@@ -239,6 +239,12 @@ describe("buildRow", () => {
     expect(buildRow({ ...READALL_STATS, gen: { ...GEN_FIXTURE, cache_cold: true } }, VALID_ENV).cache_state).toBe("warm");
   });
 
+  it("a Read-all row from the WebGPU voice (q8f16) validates (Codex review, PR #22)", () => {
+    const row = buildRow({ ...READALL_STATS, voice_run: { ...READALL_STATS.voice_run!, device: "webgpu", dtype: "q8f16" } }, VALID_ENV);
+    expect(row.dtype).toBe("q8f16");
+    expect(validateRunStats(row).errors).toEqual([]);
+  });
+
   it("never copies an arbitrary field off the orchestrator stats object", () => {
     const tainted = { ...SHORT_STATS, gen: { ...GEN_FIXTURE, note: "source snippet: CANARY-7f3a" } } as unknown as OrchestratorStats;
     const row = buildRow(tainted, VALID_ENV);

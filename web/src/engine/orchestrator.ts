@@ -197,7 +197,9 @@ export class Orchestrator {
       stop_ms: this.stopMs === null ? null : Math.round(this.stopMs * 100) / 100,
       notice_latency_ms: this.noticeLatency,
       notices_spoken: [...this.spoken],
-      gen: this.genStats ?? (this.level === "readall" ? null : this.llm.stats()), // a Read-all run has no summarizer stats (Codex review, PR #22)
+      // The run's own level, not the dial: "Read this part" after a summary is a Read-all run
+      // and has no summarizer stats (Codex review, PR #22).
+      gen: this.genStats ?? ((this.last?.level ?? this.level) === "readall" ? null : this.llm.stats()),
       voice: this.voice.stats(),
       voice_run: this.voiceRun,
     };

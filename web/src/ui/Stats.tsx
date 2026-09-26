@@ -25,6 +25,22 @@ const COLUMNS: (keyof StatsRow)[] = [
   "bullets_cut",
 ];
 
+/** Column headings come from spec/strings/en.json, never the raw field names (Codex review, PR #22). */
+const COLUMN_LABEL: Record<string, string> = {
+  date: "stats.col.date",
+  level: "stats.col.level",
+  device: "stats.col.device",
+  dtype: "stats.col.dtype",
+  cache_state: "stats.col.cache_state",
+  doc_id: "stats.col.doc_id",
+  ttfa_ms: "stats.col.ttfa_ms",
+  tok_s: "stats.col.tok_s",
+  rtf: "stats.col.rtf",
+  stop_ms: "stats.col.stop_ms",
+  bullets_total: "stats.col.bullets_total",
+  bullets_cut: "stats.col.bullets_cut",
+};
+
 function downloadCsv(text: string): void {
   const blob = new Blob([text], { type: "text/csv" });
   const url = URL.createObjectURL(blob);
@@ -53,7 +69,7 @@ export function Stats({ onClose }: { onClose: () => void }) {
           <thead>
             <tr>
               {COLUMNS.map((c) => (
-                <th key={c}>{c}</th>
+                <th key={c}>{t(COLUMN_LABEL[c])}</th>
               ))}
             </tr>
           </thead>
