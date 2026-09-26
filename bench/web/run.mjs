@@ -600,6 +600,13 @@ async function main() {
           for (let r = 0; r < reps; r++) {
             const tmpProfile = fs.mkdtempSync(path.join(os.tmpdir(), "fruitbat-bench-cold-"));
             const context = await chromium.launchPersistentContext(tmpProfile, { headless: false, args: WEBGPU_ARGS });
+            // Registered for Ctrl-C too, so an interrupted cold rep still closes its browser and
+            // removes its temp profile (Codex review, PR #27).
+            const closeCold = async () => {
+              await context.close().catch(() => undefined);
+              fs.rmSync(tmpProfile, { recursive: true, force: true });
+            };
+            cleanupFns.push(closeCold);
             try {
               await primeRate(context);
               const page = context.pages()[0] ?? (await context.newPage());
@@ -616,8 +623,9 @@ async function main() {
                 `  [${doc}/${level}/rep${r + 1}/cold] ttfa_ms=${clean.ttfa_ms} tok_s=${clean.tok_s} facts_token_hit=${clean.facts_token_hit} cut_rate=${clean.cut_rate}`
               );
             } finally {
-              await context.close();
-              fs.rmSync(tmpProfile, { recursive: true, force: true });
+              const i = cleanupFns.indexOf(closeCold);
+              if (i >= 0) cleanupFns.splice(i, 1);
+              await closeCold();
             }
           }
           summaries.push({
