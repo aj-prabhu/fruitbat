@@ -1,4 +1,5 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect } from "./model-cache";
+import type { Page } from "@playwright/test";
 import { gotoIsolated } from "./isolated";
 
 // S1-00a proof (docs/PLAN.md): real text -> >= 3 bullets, no <think>, AudioContext running with

@@ -1,4 +1,5 @@
-import { test, expect, type Page, type Browser } from "@playwright/test";
+import { test, expect, installModelCacheRoute } from "./model-cache";
+import type { Page, Browser } from "@playwright/test";
 import { gotoIsolated } from "./isolated";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -49,6 +50,11 @@ let clockAdvances = false;
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {
   page = await browser.newPage();
+  // S1-13a: browser.newPage() bypasses this file's `context`/`page` fixtures (test-scoped,
+  // unreachable from beforeAll), so the cache route is installed directly -- on page.context(),
+  // not the page: the voice model download happens inside a dedicated Worker (tts.worker.ts),
+  // and only context-level routing (not page-level) reaches a Worker's own fetches.
+  await installModelCacheRoute(page.context());
   // TTS_DEVICE=webgpu loads the q8f16 voice on WebGPU instead of q8 on WASM (S1-06 measurement).
   await gotoIsolated(page, `/readall.html${process.env.TTS_DEVICE === "webgpu" ? "?tts=webgpu" : ""}`);
   await page.waitForFunction(() => typeof window.__tts !== "undefined", null, { timeout: 20_000 });
