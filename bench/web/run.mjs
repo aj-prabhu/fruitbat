@@ -366,14 +366,21 @@ async function measureStop(page, doc, level, text, timeoutMs) {
     },
     { doc, level, text }
   );
+  // Playing, or the run ended without ever playing (every bullet cut, a failed load): then there is
+  // no audio to stop and nothing to measure (Codex review, PR #27).
   await page.waitForFunction(
     (runId) => {
       const s = window.__fruitbat.state();
-      return s.runId === runId && s.play === "playing";
+      return s.runId === runId && (s.play === "playing" || s.settledRunId === runId);
     },
     runId,
     { timeout: timeoutMs, polling: 50 }
   );
+  const played = await page.evaluate(() => window.__fruitbat.state().play === "playing");
+  if (!played) {
+    console.warn(`bench/web/run.mjs: stop probe for doc=${doc} level=${level} never played; stop_ms left empty`);
+    return null;
+  }
   const ms = await page.evaluate(() => {
     window.__fruitbat.stop(); // the orchestrator measures the stop synchronously
     return window.__fruitbat.stats().stop_ms;
@@ -434,10 +441,6 @@ async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, dis
   }
   row.peak_mb = peak_mb;
   row.heap_mb = heap_mb;
-  // stop_ms: the app never records it on a row (a stopped run is never a row, S1-10), so the
-  // runner measures it for this identity: the same run again, Stop once audio plays, and the
-  // engine's own measured stop time. bench/gate.py requires it at every level (Codex review, PR #27).
-  row.stop_ms = await measureStop(page, doc, level, text, timeoutMs);
 
   if (level !== "readall") {
     const bullets = await page.evaluate(() => window.__fruitbat.state().bullets);
@@ -453,6 +456,11 @@ async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, dis
     row.oneline_keyword_hit = scored.oneline_keyword_hit;
   }
 
+  // stop_ms, measured last: the probe starts a new run, which clears this run's bullets, so it only
+  // happens after they were scored (Codex review, PR #27). The app never records stop_ms on a row
+  // (a stopped run is never a row, S1-10); the runner starts the same run again, presses Stop once
+  // audio plays, and takes the engine's measured stop time. bench/gate.py requires it.
+  row.stop_ms = await measureStop(page, doc, level, text, timeoutMs);
   return row;
 }
 
