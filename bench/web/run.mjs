@@ -360,6 +360,12 @@ function computeTimeoutMs(text, level, cold, { warmup = false } = {}) {
 async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, discard = false }) {
   const sampler = discard ? null : startPeakSampler(profileDir);
 
+  // The row this rep must produce is the one after these (Codex review, PR #27): if the app rejects
+  // its row or the localStorage write fails, the last row would still be the previous rep's.
+  const before = await page.evaluate(() => {
+    const rows = window.__fruitbat.rows();
+    return { count: rows.length, lastDate: rows.length ? rows[rows.length - 1].date : null };
+  });
   const runId = await page.evaluate(
     ({ doc, level, text }) => {
       window.__fruitbat.setDocId(doc);
@@ -396,7 +402,9 @@ async function runOnce(page, cdp, profileDir, doc, level, { text, timeoutMs, dis
 
   const allRows = await page.evaluate(() => window.__fruitbat.rows());
   const row = allRows[allRows.length - 1];
-  if (!row || row.doc_id !== doc || row.level !== level) {
+  // New = more rows than before, or (at the 200-row cap) a different last row.
+  const fresh = row && (allRows.length > before.count || row.date !== before.lastDate);
+  if (!fresh || row.doc_id !== doc || row.level !== level) {
     fail(`expected a fresh RunStats row for doc=${doc} level=${level}, got ${JSON.stringify(row)}`);
   }
   row.peak_mb = peak_mb;
