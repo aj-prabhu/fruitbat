@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,15 +41,7 @@ const stats = (page: Page) => page.evaluate(() => (window as unknown as W).__fru
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
 async function open(page: Page, query: string) {
-  await page.goto(`/${query}`);
-  for (let i = 0; i < 3; i++) {
-    try {
-      await page.waitForFunction(() => crossOriginIsolated === true, null, { timeout: 15_000 });
-      break;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
+  await gotoIsolated(page, `/${query}`);
   await page.waitForFunction(() => typeof (window as unknown as Partial<W>).__fruitbat?.state === "function", null, { timeout: 20_000 });
   // The voice loads on page load (rule 11) and prewarms the fixed notices; the dial notice
   // latency is measured against a warm voice, as in the product.
