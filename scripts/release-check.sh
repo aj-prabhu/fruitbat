@@ -165,33 +165,40 @@ fi
 # JSON object whose doc/level/commit match its name and whose numeric score is >= 4. Counting
 # files is not enough: empty or unrelated files must not pass (Codex review, PR #6).
 if [ -d bench/graded ]; then
-  GRADED_SHA=""
-  for f in bench/graded/*-*.json; do
-    [ -e "$f" ] || continue
-    sha="$(basename "$f" | cut -d- -f1)"
-    if evidence_valid "$sha"; then GRADED_SHA="$sha"; fi
-  done
-  if [ -n "$GRADED_SHA" ]; then
-    GRADED_DOCS="$(jq -r '.graded_set[]' spec/eval/manifest.json)"
-    NEED=0
-    BAD=()
+  GRADED_DOCS="$(jq -r '.graded_set[]' spec/eval/manifest.json)"
+  # graded_problems SHA: prints one line per missing or invalid file of SHA's full matrix.
+  graded_problems() {
+    local sha="$1" doc level f
     for doc in $GRADED_DOCS; do
       for level in short caveman oneline; do
-        NEED=$((NEED + 1))
-        f="bench/graded/${GRADED_SHA}-${doc}-${level}.json"
-        if [ ! -s "$f" ]; then BAD+=("$doc/$level missing"); continue; fi
-        if ! jq -e --arg d "$doc" --arg l "$level" --arg s "$GRADED_SHA" \
+        f="bench/graded/${sha}-${doc}-${level}.json"
+        if [ ! -s "$f" ]; then echo "$doc/$level missing"; continue; fi
+        jq -e --arg d "$doc" --arg l "$level" --arg s "$sha" \
           '(type == "object") and (.doc == $d) and (.level == $l)
            and ((.commit | tostring) as $c | ($c | startswith($s)) or ($s | startswith($c)))
-           and ((.score | type) == "number") and (.score >= 4)' "$f" >/dev/null 2>&1; then
-          BAD+=("$doc/$level invalid or score < 4")
-        fi
+           and ((.score | type) == "number") and (.score >= 4)' "$f" >/dev/null 2>&1 \
+          || echo "$doc/$level invalid or score < 4"
       done
     done
-    if [ "$NEED" -ge 18 ] && [ "${#BAD[@]}" -eq 0 ]; then
+  }
+  NEED=$(( $(echo "$GRADED_DOCS" | grep -c .) * 3 ))
+  # Candidate SHAs with valid evidence, newest commit first (not filename order); the first one
+  # whose whole matrix is complete and valid is used (Codex review, PR #6).
+  CANDIDATES="$(for f in bench/graded/*-*.json; do [ -e "$f" ] && basename "$f" | cut -d- -f1; done | sort -u \
+    | while read -r sha; do evidence_valid "$sha" && echo "$(git log -1 --format=%ct "$sha" 2>/dev/null || echo 0) $sha"; done \
+    | sort -rn | cut -d' ' -f2)" || true # an empty glob or no valid sha is an empty list, not an exit
+  GRADED_SHA=""
+  PROBLEMS=""
+  for sha in $CANDIDATES; do
+    p="$(graded_problems "$sha")"
+    if [ -z "$p" ]; then GRADED_SHA="$sha"; PROBLEMS=""; break; fi
+    [ -z "$PROBLEMS" ] && PROBLEMS="$sha: $(echo "$p" | head -5 | tr '\n' ';')"
+  done
+  if [ -n "$CANDIDATES" ]; then
+    if [ -n "$GRADED_SHA" ] && [ "$NEED" -ge 18 ]; then
       row graded PASS "$NEED graded files for $GRADED_SHA (evidence valid for $COMMIT_FULL), all scores >= 4"
     else
-      row graded FAIL "$GRADED_SHA: need $NEED (graded_set x 3 levels, >= 18); problems: ${BAD[*]:-graded_set too small}"
+      row graded FAIL "need $NEED (graded_set x 3 levels, >= 18) for one sha; newest candidate ${PROBLEMS:-graded_set too small}"
     fi
   else
     row graded FAIL "no bench/graded/<sha>-*.json whose sha is valid evidence for $COMMIT_FULL"
@@ -208,16 +215,24 @@ else
 fi
 
 # (k) docs/qa/privacy-requests-<sha>.json, non-empty, for a sha whose evidence is valid for COMMIT
+# The log must be the object privacy.spec.ts writes, for its own commit, with at least one
+# recorded request; "[]", "{}" or broken JSON is not evidence (Codex review, PR #6).
+privacy_log_ok() {
+  jq -e --arg s "$2" '(type == "object")
+    and ((.commit | tostring) as $c | ($c | startswith($s)) or ($s | startswith($c)))
+    and ((.records | type) == "array") and ((.records | length) > 0)
+    and (.requestCount == (.records | length))' "$1" >/dev/null 2>&1
+}
 PRIVACY_FILE=""
 for f in docs/qa/privacy-requests-*.json; do
   [ -s "$f" ] || continue
   sha="$(basename "$f" .json)"; sha="${sha#privacy-requests-}"
-  if evidence_valid "$sha"; then PRIVACY_FILE="$f"; fi
+  if evidence_valid "$sha" && privacy_log_ok "$f" "$sha"; then PRIVACY_FILE="$f"; fi
 done
 if [ -n "$PRIVACY_FILE" ]; then
   row privacy-requests PASS "$PRIVACY_FILE (evidence valid for $COMMIT_FULL)"
 elif ls docs/qa/privacy-requests-*.json >/dev/null 2>&1; then
-  row privacy-requests FAIL "no docs/qa/privacy-requests-<sha>.json whose sha is valid evidence for $COMMIT_FULL"
+  row privacy-requests FAIL "no well-formed docs/qa/privacy-requests-<sha>.json whose sha is valid evidence for $COMMIT_FULL"
 else
   missing privacy-requests S1-12 "docs/qa/privacy-requests-<sha>.json"
 fi
