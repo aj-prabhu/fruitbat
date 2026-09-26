@@ -241,8 +241,14 @@ export class Orchestrator {
   // ---------------------------------------------------------------- runs
   /** Stop whatever runs (LLM aborted, queued TTS dropped, playback silenced ≤ 200 ms) and take a
    *  new run id. Every callback of the old run checks the id and drops itself. */
+  /** Aborts the summary of the current run, even one still queued behind a draining worker,
+   *  which llm.abort() alone cannot reach (Codex review, PR #18). */
+  private runAbort: AbortController | null = null;
+
   private newRun(): number {
     const id = ++this.runId;
+    this.runAbort?.abort();
+    this.runAbort = new AbortController();
     this.llm.abort();
     this.stopMs = this.voice.stop();
     this.gen = reduceGen(this.gen, "stop");
@@ -343,7 +349,8 @@ export class Orchestrator {
     const c = chunks?.[chunkIndex];
     if (!c) return;
     const id = this.newRun();
-    await this.begin(id, "readall", { fromChunk: chunkIndex, base: c.start, end: c.end });
+    // Reading one part keeps the summary and every other part's "Read this part" key (Codex review, PR #18).
+    await this.begin(id, "readall", { fromChunk: chunkIndex, base: c.start, end: c.end, keep: true });
   }
 
   private async ensureChunks(): Promise<Chunk[] | null> {
@@ -376,10 +383,12 @@ export class Orchestrator {
     return lastBullet ? lastBullet.chunkIndex : 0;
   }
 
-  private async begin(id: number, level: Level, o: { fromChunk: number; base: number; end: number }): Promise<void> {
+  private async begin(id: number, level: Level, o: { fromChunk: number; base: number; end: number; keep?: boolean }): Promise<void> {
     this.play = reducePlay(this.play, "reset");
-    this.bullets = [];
-    this.allCut = [];
+    if (!o.keep) {
+      this.bullets = [];
+      this.allCut = [];
+    }
     this.current = null;
     this.error = null;
     this.ttfa = null;
@@ -471,6 +480,7 @@ export class Orchestrator {
     await this.ensureChunks();
     if (id !== this.runId) return;
     const stats = await this.llm.summarize(this.text, level, {
+      signal: this.runAbort?.signal,
       fromChunk,
       onBullet: (b) => {
         if (id !== this.runId) return;
