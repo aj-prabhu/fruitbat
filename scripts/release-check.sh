@@ -44,9 +44,15 @@ run_check() {
     row "$name" PASS "$*"
   else
     row "$name" FAIL "see $log (tail printed above)"
-    # The CI runner is discarded after the job, so the reason goes into the job log too (Codex review, PR #6).
-    { echo "---- $name FAILED: last 40 lines of $log ----"; tail -n 40 "$log"; echo "----"; } >&2
+    show_log "$name" "$log"
   fi
+  return 0
+}
+
+# show_log NAME LOG — print a failing check's log tail to the job log; the CI runner's /tmp is
+# discarded after the job (Codex review, PR #6).
+show_log() {
+  { echo "---- $1 FAILED: last 40 lines of $2 ----"; tail -n 40 "$2"; echo "----"; } >&2
   return 0
 }
 
@@ -113,13 +119,15 @@ fi
 if (cd web && npm ci --no-fund --no-audit && npm run build) >/tmp/release-check-web-build.log 2>&1; then
   row web-build PASS "npm ci && npm run build"
 else
-  row web-build FAIL "see /tmp/release-check-web-build.log"
+  row web-build FAIL "see /tmp/release-check-web-build.log (tail printed above)"
+  show_log web-build /tmp/release-check-web-build.log
 fi
 if jq -e '.scripts.test' web/package.json >/dev/null 2>&1; then
   if (cd web && npm test) >/tmp/release-check-web-test.log 2>&1; then
     row web-test PASS "npm test"
   else
-    row web-test FAIL "see /tmp/release-check-web-test.log"
+    row web-test FAIL "see /tmp/release-check-web-test.log (tail printed above)"
+    show_log web-test /tmp/release-check-web-test.log
   fi
 else
   row web-test SKIPPED "no test script in web/package.json"
@@ -134,7 +142,8 @@ elif grep -qiE "executable doesn't exist|playwright install" "$PW_LOG"; then
   [ "$ALLOW_MISSING" = "1" ] && STATUS=SKIPPED
   row playwright-wasm-ci "$STATUS" "Playwright browsers not installed (run: npx playwright install)"
 else
-  row playwright-wasm-ci FAIL "see $PW_LOG"
+  row playwright-wasm-ci FAIL "see $PW_LOG (tail printed above)"
+  show_log playwright-wasm-ci "$PW_LOG"
 fi
 
 # (f) scripts/check-logs.sh and scripts/check-network.sh, if present
