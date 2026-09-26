@@ -18,6 +18,8 @@ export type GenState = "idle" | "probing" | "loading" | "running" | "done" | "fa
 
 /** spec/chunking.md "Token budgets". */
 export const BUDGET = { chunk_input_tokens: 1600, max_chunks: 100 };
+/** Longest the next run waits for the worker to confirm a Stop (one uninterruptible prefill). */
+const ABORT_DRAIN_MS = 15_000;
 
 interface DialLevel {
   id: string;
@@ -127,6 +129,14 @@ export class Summarizer {
   private loaded = false;
   private modelSpec: (PinnedModel & { role: string }) | null = null;
   private pending: Pending | null = null;
+  /** In-flight model load, shared by overlapping callers (Codex review, PR #16). */
+  private loading: Promise<boolean> | null = null;
+  /** Settles once the worker confirms the last Stop, so the next run never overlaps it. */
+  private drain: Promise<void> | null = null;
+  /** A Stop pressed during the adapter probe, before anything reached the worker. */
+  private stopDuringProbe = false;
+  /** The current run's options, so its own onNotice hears the notices it raises. */
+  private runOpts: SummarizeOptions | null = null;
   private waiters = new Map<string, { resolve: (m: WorkerToMain) => void; reject: (e: Error) => void }>();
   private modelRequests = 0; // model files requested (one per Transformers.js "initiate")
   private runStats: RunStats = emptyStats();
@@ -166,11 +176,23 @@ export class Summarizer {
   private notice(n: NoticeOut): void {
     this.notices.push(n);
     this.onNotice?.(n);
+    this.runOpts?.onNotice?.(n);
   }
 
-  /** Stage one: adapter + device only. Milliseconds; downloads nothing. */
-  async probe(): Promise<GpuProbe> {
-    if (this.gpu) return this.gpu;
+  private probeP: Promise<GpuProbe> | null = null;
+
+  /** Stage one: adapter + device only. Milliseconds; downloads nothing. Concurrent callers share one probe. */
+  probe(): Promise<GpuProbe> {
+    if (this.gpu) return Promise.resolve(this.gpu);
+    if (!this.probeP) {
+      this.probeP = this.probeOnce().finally(() => {
+        this.probeP = null;
+      });
+    }
+    return this.probeP;
+  }
+
+  private async probeOnce(): Promise<GpuProbe> {
     this.state = "probing";
     this.gpu = await probeWebGpu(this.flags.inject);
     if (this.flags.llm === "fake") this.gpu = { ...this.gpu, ok: true, reason: "ok" };
@@ -192,6 +214,10 @@ export class Summarizer {
         : new Worker(new URL("../workers/llm.worker.ts", import.meta.url), { type: "module" });
     this.worker.onmessage = (e: MessageEvent<WorkerToMain>) => this.onWorkerMessage(e.data);
     this.worker.onerror = (e) => {
+      // Drop the failed worker so a retry starts a fresh one (Codex review, PR #16).
+      this.worker?.terminate();
+      this.worker = null;
+      this.loaded = false;
       this.state = "failed";
       this.error = `worker:${e.message}`;
       this.pending?.reject(new Error(this.error));
@@ -211,6 +237,14 @@ export class Summarizer {
   }
 
   private onWorkerMessage(m: WorkerToMain): void {
+    if (m.type === "aborted") {
+      // The Stop confirmation settles the drain even if a later load already bumped runId.
+      const w = this.waiters.get(`aborted:${m.runId}`);
+      if (w) {
+        this.waiters.delete(`aborted:${m.runId}`);
+        w.resolve(m);
+      }
+    }
     if (m.runId !== this.runId) return; // stale run: dropped (Cancellation)
     if (m.type === "progress") {
       if (m.status === "initiate") this.modelRequests++;
@@ -236,11 +270,6 @@ export class Summarizer {
       const p = this.pending;
       this.pending = null;
       p?.resolve({ tokens: 0, ms: 0, aborted: true });
-      const w = this.waiters.get(`aborted:${m.runId}`);
-      if (w) {
-        this.waiters.delete(`aborted:${m.runId}`);
-        w.resolve(m);
-      }
       return;
     }
     if (m.type === "error") {
@@ -248,12 +277,14 @@ export class Summarizer {
       const p = this.pending;
       this.pending = null;
       p?.reject(err);
-      for (const [k, w] of this.waiters) {
-        if (k.endsWith(`:${m.runId}`)) {
-          this.waiters.delete(k);
-          w.reject(err);
-        }
-      }
+      // After any worker error (a lost GPU device, a failed session) its model can't be trusted:
+      // settle every waiter, drop the worker, and let the next request reload from cache
+      // (Codex review, PR #16).
+      for (const w of this.waiters.values()) w.reject(err);
+      this.waiters.clear();
+      this.worker?.terminate();
+      this.worker = null;
+      this.loaded = false;
       return;
     }
     const w = this.waiters.get(`${m.type}:${m.runId}`);
@@ -269,8 +300,40 @@ export class Summarizer {
    */
   async ensureLoaded(opts: { signal?: AbortSignal } = {}): Promise<boolean> {
     if (this.loaded) return true;
+    // An explicit load right after a Stop waits for the worker to finish unwinding (Codex review, PR #16).
+    if (this.drain) await this.drain;
+    if (opts.signal?.aborted) return false;
+    if (this.loading) {
+      // A second caller joins the load already running; its signal can still stop it.
+      const abort = () => this.abort();
+      opts.signal?.addEventListener("abort", abort, { once: true });
+      try {
+        return await this.loading;
+      } finally {
+        opts.signal?.removeEventListener("abort", abort);
+      }
+    }
+    const p = this.loadOnce(opts);
+    this.loading = p;
+    try {
+      return await p;
+    } finally {
+      if (this.loading === p) this.loading = null;
+    }
+  }
+
+  private async loadOnce(opts: { signal?: AbortSignal }): Promise<boolean> {
+    this.stopDuringProbe = false;
     const gpu = await this.probe();
     if (!gpu.ok) return false;
+    if (opts.signal?.aborted || this.stopDuringProbe) {
+      this.stopDuringProbe = false;
+      // Stopped while the adapter probe was running, before the abort listener existed.
+      this.state = "stopped";
+      this.error = "aborted";
+      this.notice({ key: "notice.stopped" });
+      return false;
+    }
     this.state = "loading";
     const runId = ++this.runId;
     const spec = this.tier();
@@ -329,7 +392,12 @@ export class Summarizer {
   }
 
   private countTokens = (text: string): Promise<number> | number =>
-    this.flags.llm === "fake" ? Math.ceil(text.split(/\s+/).filter(Boolean).length * 1.3) : countTokens(text);
+    this.flags.llm === "fake" ? Math.ceil(text.split(/\s+/).filter(Boolean).length * 1.3) : countTokens(text, this.activeTier());
+
+  /** The tier the worker actually loaded (a memory fallback may have replaced the requested one). */
+  private activeTier(): PinnedModel & { role: string } {
+    return summarizerTiers().find((t) => t.role === this.runStats.role) ?? this.modelSpec ?? this.tier();
+  }
 
   private levelCfg(level: Level): Required<Pick<DialLevel, "max_bullets_per_chunk" | "max_words_per_bullet" | "max_new_tokens">> & DialLevel {
     const l = LEVELS.get(level);
@@ -352,22 +420,17 @@ export class Summarizer {
 
   /** Stop the current run: abort the worker, drop everything still queued. */
   abort(): void {
+    if (this.state === "probing") {
+      // Nothing is on the worker yet; loadOnce() sees this once the probe returns (Codex review, PR #16).
+      this.stopDuringProbe = true;
+      return;
+    }
     if (this.state !== "running" && this.state !== "loading") return;
     const runId = this.runId;
     this.state = "stopped";
     this.post({ type: "abort", runId });
-    // The worker's generate() keeps running until it sees the abort; the next serialized run must
-    // not start on top of it. Hold the pending resolution until the worker acks (5 s cap), and let
-    // summarizeNow() wait on that ack (Codex review, PR #21).
-    const pending = this.pending;
+    this.pending?.resolve({ tokens: 0, ms: 0, aborted: true });
     this.pending = null;
-    const ack = this.waitFor("aborted", runId);
-    const cap = new Promise<void>((r) => setTimeout(r, 5000));
-    this.abortAck = Promise.race([ack.then(() => undefined, () => undefined), cap]).then(() => {
-      pending?.resolve({ tokens: 0, ms: 0, aborted: true });
-      if (this.abortAck === settled) this.abortAck = null;
-    });
-    const settled = this.abortAck;
     // A Stop during the download must settle ensureLoaded()'s waiters too (Codex review, PR #16).
     const err = new Error("aborted");
     err.name = "AbortError";
@@ -377,15 +440,52 @@ export class Summarizer {
         w.reject(err);
       }
     }
+    this.armDrain(runId);
+  }
+
+  /**
+   * Stop resolves the UI at once, but the worker may still be finishing an interrupted
+   * generate. The next run waits for the worker's "aborted" before it posts anything. If
+   * that takes longer than ABORT_DRAIN_MS the worker is replaced, so a stuck GPU job can
+   * never run under the next summary (Codex review, PR #16).
+   */
+  private armDrain(runId: number): void {
+    const key = `aborted:${runId}`;
+    const confirmed = this.waitFor("aborted", runId).then(
+      () => undefined,
+      () => undefined,
+    );
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const capped = new Promise<void>((r) => {
+      timer = setTimeout(() => {
+        this.waiters.delete(key);
+        this.resetWorker();
+        r();
+      }, ABORT_DRAIN_MS);
+    });
+    const d: Promise<void> = Promise.race([confirmed, capped]).then(() => {
+      clearTimeout(timer);
+      if (this.drain === d) this.drain = null;
+    });
+    this.drain = d;
+  }
+
+  /** Drop a worker that never confirmed a Stop; the next run starts a fresh one and reloads from cache. */
+  private resetWorker(): void {
+    this.worker?.terminate();
+    this.worker = null;
+    this.loaded = false;
+    this.pending = null;
+    this.waiters.clear();
   }
 
   private inFlight: Promise<RunStats> | null = null;
-  private abortAck: Promise<void> | null = null;
 
   /** Runs are serialized: a second call waits for the previous one to settle (Codex review, PR #16). */
   summarize(text: string, level: Level, opts: SummarizeOptions = {}): Promise<RunStats> {
     const prev = this.inFlight ?? Promise.resolve();
-    const run = prev.then(() => this.summarizeNow(text, level, opts), () => this.summarizeNow(text, level, opts));
+    const start = () => (this.drain ?? Promise.resolve()).then(() => this.summarizeNow(text, level, opts));
+    const run = prev.then(start, start);
     this.inFlight = run;
     run.then(
       () => {
@@ -399,7 +499,23 @@ export class Summarizer {
   }
 
   private async summarizeNow(text: string, level: Level, opts: SummarizeOptions = {}): Promise<RunStats> {
-    if (this.abortAck) await this.abortAck; // the previous generate() has stopped in the worker
+    this.runOpts = opts;
+    try {
+      return await this.summarizeRun(text, level, opts);
+    } finally {
+      if (this.runOpts === opts) this.runOpts = null;
+    }
+  }
+
+  private async summarizeRun(text: string, level: Level, opts: SummarizeOptions): Promise<RunStats> {
+    if (opts.signal?.aborted) {
+      // Cancelled while queued behind another run: never start it (Codex review, PR #16).
+      const prev = this.runStats;
+      this.runStats = { ...emptyStats(), model_id: prev.model_id, role: prev.role, downgraded: prev.downgraded, load_ms: prev.load_ms, probe_ms: prev.probe_ms, level };
+      this.state = "stopped";
+      this.error = "aborted";
+      return this.stats();
+    }
     if (!(await this.ensureLoaded({ signal: opts.signal }))) return this.stats();
     const runId = ++this.runId;
     const started = performance.now();
@@ -458,9 +574,7 @@ export class Summarizer {
       if (runId !== this.runId || this.state === "stopped") return false;
       const parser = new BulletParser({ max_bullets_per_chunk: cfg.max_bullets_per_chunk, max_words_per_bullet: cfg.max_words_per_bullet });
       let kept = 0;
-      let seen = 0;
       const handle = (b: { text: string; index: number }) => {
-        seen++;
         this.runStats.bullets_total++;
         const g = ground(b.text, chunk.text, COMMON_WORDS);
         if (g.ok) {
@@ -481,10 +595,8 @@ export class Summarizer {
       this.runStats.tokens += r.tokens;
       this.runStats.gen_ms += r.ms;
       this.runStats.per_chunk_kept.push(kept);
+      // Nothing kept, whether every bullet was cut or the model gave none: say so (grounding.md).
       if (kept === 0) {
-        // nothing kept: every bullet cut, or no parseable bullet at all (prose, a heading, an
-        // empty reply). Same recovery either way: the notice and "Read this part" (Codex review, PR #18)
-        void seen;
         this.runStats.all_cut_chunks++;
         this.notice({ key: "notice.all_cut", chunkIndex: chunk.index, start: chunk.start, end: chunk.end });
       }
@@ -515,6 +627,8 @@ export class Summarizer {
       });
       if (r.aborted) return false;
       for (const b of parser.flush()) lines.push(b.text);
+      this.runStats.parser_dropped += parser.dropped;
+      this.runStats.parser_overlength += parser.overlength;
       this.runStats.tokens += r.tokens;
       this.runStats.gen_ms += r.ms;
       this.runStats.bullets_total += lines.length;
@@ -552,11 +666,16 @@ export class Summarizer {
         });
         if (r.aborted) return false;
         for (const b of parser.flush()) out.push(b.text);
+        this.runStats.parser_dropped += parser.dropped;
+        this.runStats.parser_overlength += parser.overlength;
         this.runStats.tokens += r.tokens;
         this.runStats.gen_ms += r.ms;
+        // Same accounting as the per-chunk lines above: a reduce output counts toward the total,
+        // and only a line that was produced and then failed grounding counts as cut (Codex review, PR #16).
+        this.runStats.bullets_total += out.length;
         const line = out[0];
         if (line && ground(line, source, COMMON_WORDS).ok) next.push(line);
-        else this.runStats.bullets_cut++;
+        else if (line) this.runStats.bullets_cut++;
       }
       if (next.length === 0) return fallback();
       lines = next;

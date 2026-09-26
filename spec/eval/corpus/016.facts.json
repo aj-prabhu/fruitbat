@@ -1,0 +1,29 @@
+{
+  "id": "016",
+  "key_facts": [
+    "Earth's lithosphere comprises a number of large tectonic plates, which have been slowly moving since 3–4 billion years ago",
+    "Plate tectonics came to be accepted by geoscientists after seafloor spreading was validated in the mid- to late 1960s",
+    "fractured into seven or eight major plates (depending on how they are defined) and many minor plates or \"platelets\"",
+    "The relative movement of the plates typically ranges from zero to 10 cm annually",
+    "Jupiter's moon Europa shows signs of ice crustal plates moving and interacting",
+    "Average oceanic lithosphere is typically 100 km (62 mi) thick",
+    "Continental lithosphere is typically about 200 km (120 mi) thick",
+    "The San Andreas Fault in California is an example of a transform boundary exhibiting dextral motion"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Tectonic plates typically move up to 500 centimeters annually.",
+      "distinctive_tokens": ["500", "centimeters"]
+    },
+    {
+      "claim": "Mars today has stronger, ongoing plate tectonics than Earth does.",
+      "distinctive_tokens": ["stronger", "ongoing"]
+    },
+    {
+      "claim": "The Ring of Fire mostly circles the Arctic Ocean's plate boundaries.",
+      "distinctive_tokens": ["arctic", "circles"]
+    }
+  ],
+  "expected_oneline_keywords": ["plate tectonics", "lithosphere", "earthquakes", "plates"],
+  "notes": "Earth is explicitly the only planet with CURRENT active tectonics; Mars/Venus are past-tense -- a reversal trap."
+}

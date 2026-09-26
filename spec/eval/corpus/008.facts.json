@@ -1,0 +1,29 @@
+{
+  "id": "008",
+  "key_facts": [
+    "reach from a thunderstorm down to the ground",
+    "Bring intense winds, over 200 miles per hour",
+    "the Midwest and the Southeast have a greater risk for tornadoes",
+    "The Emergency Alert System (EAS) and NOAA Weather Radio also provide emergency alerts",
+    "a safe room built using FEMA criteria or a storm shelter built to ICC 500 standards",
+    "There is no safe option when caught in a tornado in a car, just slightly less dangerous ones",
+    "Avoid seeking shelter under bridges, which can create deadly traffic hazards",
+    "Stay clear of fallen power lines or broken utility lines"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Tornadoes can bring gusts over 650 miles per hour.",
+      "distinctive_tokens": ["650", "gusts"]
+    },
+    {
+      "claim": "Sheltering under a highway bridge is recommended during a tornado.",
+      "distinctive_tokens": ["recommended", "highway"]
+    },
+    {
+      "claim": "It's safe to stay in a mobile home during a tornado if the windows are closed.",
+      "distinctive_tokens": ["mobile", "closed"]
+    }
+  ],
+  "expected_oneline_keywords": ["tornado", "shelter", "safety", "warning"],
+  "notes": "The bridge advice is a real reversal trap: the guide explicitly says to avoid bridges."
+}
