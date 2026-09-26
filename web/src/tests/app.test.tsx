@@ -73,12 +73,16 @@ describe("App", () => {
     expect(labels).toEqual(expected);
   });
 
-  it("renders an empty panel slot with an id of 'panel'", () => {
+  it("renders the panel (S1-07) with an id of 'panel' and the empty-state message", () => {
     const container = mount();
     const panel = container.querySelector("#panel");
     expect(panel).not.toBeNull();
     expect(panel?.tagName).toBe("ASIDE");
-    expect(panel?.textContent).toBe(STRINGS["panel.empty"]);
+    // S1-07: the panel always shows its title and controls chrome; only the body's empty-state
+    // message is conditional on nothing running yet (engine/orchestrator.ts Snapshot.bullets/
+    // current/allCut/lastNotice all empty).
+    const empty = panel?.querySelector(".panel-empty");
+    expect(empty?.textContent).toBe(STRINGS["panel.empty"]);
   });
 
   it("renders the app title from spec/strings/en.json", () => {

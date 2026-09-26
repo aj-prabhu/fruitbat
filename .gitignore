@@ -16,6 +16,7 @@ mac/**/DerivedData/
 
 bench/last-run/*
 !bench/last-run/short-011.txt
+bench/.profile-warm/
 
 .venv/
 __pycache__/

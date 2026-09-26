@@ -166,6 +166,12 @@ export class Summarizer {
   }
 
   /** The model is loaded and probed (the Loading panel's "done" state). */
+  /** Nothing queued, running, loading or draining: a stopped generate has been acknowledged by the
+   *  worker. The bench waits on this before its next measurement (Codex review, PR #27). */
+  isIdle(): boolean {
+    return !this.drain && !this.inFlight && !this.loading && this.state !== "running" && this.state !== "loading";
+  }
+
   isLoaded(): boolean {
     return this.loaded;
   }

@@ -54,6 +54,8 @@ declare global {
     "fruitbat:demo": CustomEvent<undefined>;
     /** the orchestrator started a live run (any kind); the demo recording stops */
     "fruitbat:live": CustomEvent<undefined>;
+    /** the demo recording started (true) or stopped (false) playing */
+    "fruitbat:demo-playing": CustomEvent<boolean>;
   }
   // vite.config.ts `define`s this from `git rev-parse --short HEAD` (S1-10, stats/store.ts).
   const __FRUITBAT_COMMIT__: string;

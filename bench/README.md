@@ -138,6 +138,52 @@ document (`#/$defs/Name`) and to a sibling schema file (`run-stats.schema.json` 
 no dependency beyond the standard library; if a `jsonschema` venv is available it's a fine second
 opinion, but `schema_check.py` is what CI and a bare Python 3 checkout actually run.
 
+## The runner (S1-13)
+
+`bench/run.sh --target web [--docs N|id,id,...] [--levels all|level,level,...] [--cache warm|cold] [--reps N] [--port PORT]`
+dispatches to `bench/web/run.mjs` (`--target mac` prints `S2-13` and exits 2 -- not built yet).
+
+`run.mjs`:
+
+1. Refuses to run on a dirty tree (only `bench/results.csv`, `bench/baselines.json`,
+   `bench/last-run/` may be dirty) so the row's `commit` is unambiguous.
+2. `npm run build` once, then serves the build with `npx vite preview --port <PORT> --strictPort`
+   (killed at exit). The build embeds the tested commit into every row automatically
+   (`web/vite.config.ts`'s `__FRUITBAT_COMMIT__`, read by `web/src/stats/store.ts`) -- the runner
+   doesn't stamp `commit` itself.
+3. Launches the bundled Chromium **headed**, WebGPU on (`--enable-unsafe-webgpu
+   --ignore-gpu-blocklist`), audio muted. `--cache warm` uses one persistent profile
+   (`bench/.profile-warm/`, gitignored) for the whole run, so models download once into that
+   profile's Cache API; `--cache cold` gives every rep its own temp profile, removed after. A warm
+   run does one throwaway "short" request first to prime the cache (discarded, not scored, not
+   counted in the reps) so the recorded rows are never accidentally `cache_state: "cold"`.
+4. For each doc x level x rep: `setDocId(doc)`, `run(text, level)`, then polls `state()` until
+   `gen` is `done`/`failed` **and** `settledRunId` equals the run -- the exact same condition
+   `web/src/main.tsx` itself uses before calling `stats.record()`, so by the time the poll
+   resolves the app has already written a fresh `RunStats` row to its own `localStorage` (read via
+   `window.__fruitbat.rows()`, last entry). The runner does not build a row from scratch: it takes
+   that row and fills in only what the browser genuinely cannot know (plus `stop_ms`, which the
+   app never records because a stopped run is never a row: the runner starts the same run again,
+   presses Stop once audio plays, and takes the engine's measured stop time) --
+   `facts_token_hit`/`halluc_flags`/`forbidden_hits`/`oneline_keyword_hit` from `bench/score.py`
+   against `state().bullets`, and `peak_mb`/`heap_mb` (see `bench/web/memory.md`).
+5. Validates the filled-in row with `bench/schema_check.py` before appending it to
+   `bench/results.csv` in the schema's column order; a rejected row aborts the run rather than
+   being silently dropped.
+6. Prints a summary table (doc, level, median `ttfa_ms`/`tok_s`/`facts_token_hit`/`cut_rate`
+   across that identity's reps).
+
+`readall` rows skip `score.py` entirely (`facts_token_hit` etc. stay `null` -- it's verbatim
+playback, not a summary; see `bench/score.py`'s own docstring).
+
+### The runner's proof run (not bench evidence)
+
+`bench/proof/2026-09-25-runner-proof-13c7dc0.csv` holds the 36 rows the runner produced when S1-13
+was built (docs 005, 011, 025 x 4 levels x 3 reps, warm, speech at 1.5x, on a shared machine). They
+prove the runner end to end. They are **not** in `results.csv`: they were measured at `13c7dc0`, and
+the pipeline has changed since, so under rule 3 they are not valid evidence for any later commit.
+The first real rows come from a fresh `bench/run.sh --target web` run on a quiet machine.
+
 ## Keeping `model_id`'s enum in sync
 
 `spec/schemas/run-stats.schema.json#/$defs/model_id` is a closed enum, not a free string, because
