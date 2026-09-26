@@ -15,6 +15,7 @@ import { Demo } from "./ui/Demo";
 import { Loading } from "./ui/Loading";
 import { Panel } from "./ui/Panel";
 import type { Level } from "./types";
+import { Stats } from "./ui/Stats";
 
 interface DialLevel {
   id: string;
@@ -116,6 +117,7 @@ function useSampleArticle(): string[] {
 
 export function App() {
   const [level, setLevel] = useState<Level>(DEFAULT_LEVEL);
+  const [statsOpen, setStatsOpen] = useState(false);
   const paragraphs = useSampleArticle();
 
   useEffect(() => {
@@ -139,6 +141,9 @@ export function App() {
             setLevel(l);
           }}
         />
+        <button type="button" class="stats-toggle" onClick={() => setStatsOpen(true)}>
+          {t("panel.stats")}
+        </button>
         <ThemeToggle />
       </header>
       <Loading />
@@ -149,6 +154,7 @@ export function App() {
       </main>
       <Panel />
       <ReadChip />
+      {statsOpen && <Stats onClose={() => setStatsOpen(false)} />}
     </div>
   );
 }

@@ -6,13 +6,14 @@
   "description": "Fruitbat Stage 1: static web app, all inference in the browser",
   "license": "AGPL-3.0-only",
   "scripts": {
-    "prebuild": "node scripts/copy-ort.mjs && node scripts/copy-sample.mjs",
-    "dev": "node scripts/copy-ort.mjs && node scripts/copy-sample.mjs && vite",
+    "prebuild": "node scripts/copy-ort.mjs && node scripts/copy-sample.mjs && node ../scripts/csp.mjs",
+    "dev": "node scripts/copy-ort.mjs && node scripts/copy-sample.mjs && node ../scripts/csp.mjs && vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --port 4173 --strictPort",
     "test:e2e": "playwright test",
     "measure:tts": "node scripts/measure-tts-limit.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:generated": "node ../scripts/csp.mjs --check && node ../scripts/privacy-md.mjs --check"
   },
   "dependencies": {
     "@huggingface/transformers": "4.3.0",

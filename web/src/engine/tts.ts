@@ -16,7 +16,6 @@ const RATE_KEY = "fruitbat.rate";
 /** Starting guess for English speech at 1.0x; the engine then learns the real rate from the audio it gets. */
 const CHARS_PER_SECOND = 14;
 const VOICE_KEY = "fruitbat.voice";
-const STATS_KEY = "fruitbat.stats.last";
 // The TTS-safe split, from spec/models.json (measured in S1-00a), not a second copy (Codex review, PR #17).
 const LIMITS = { target: pinnedModels().web.voice.tts_phoneme_target, limit: pinnedModels().web.voice.tts_phoneme_limit };
 
@@ -50,6 +49,7 @@ export interface ReadAllOptions {
 }
 
 export interface StreamMetrics {
+  cache_state: "cold" | "warm" | "unknown";
   ttfa_ms: number | null;
   rtf: number | null;
   gap_ms: number;
@@ -170,6 +170,18 @@ export class VoiceEngine {
   private rate: number;
   private voice: VoiceId;
   private downloadedBytes = 0;
+  /** A load that fetched the voice over the network makes the run it served cold, once (S1-10). */
+  private coldPending = false;
+  private runCold = false;
+  private takeCold(): void {
+    if (this.coldPending) {
+      this.runCold = true;
+      this.coldPending = false;
+    }
+  }
+  private cacheState(): "cold" | "warm" | "unknown" {
+    return !this.loaded ? "unknown" : this.runCold ? "cold" : "warm";
+  }
   /** `?tts=webgpu` loads the q8f16 variant on WebGPU (S1-06 measurement); default q8 on WASM. */
   readonly device: "wasm" | "webgpu";
   private loadedInfo: LoadedInfo | null = null;
@@ -272,6 +284,7 @@ export class VoiceEngine {
     }
     if (m.type === "loaded") {
       this.downloadedBytes = m.downloadedBytes;
+      this.coldPending = m.downloadedBytes > 1_000_000;
       this.loadedDevice = m.device;
       this.loadedDtype = m.dtype;
       this.loadedInfo = m;
@@ -380,6 +393,8 @@ export class VoiceEngine {
     }
     if (this.runId !== before || ticket !== this.readSeq) return this.result(before, 0, 0, false);
     const runId = ++this.runId;
+    this.runCold = false;
+    this.takeCold();
     // A read already playing is replaced: settle its promise now, or its caller waits forever
     // (Codex review, PR #17).
     const replaced = this.pendingDone;
@@ -525,6 +540,7 @@ export class VoiceEngine {
 
   private handleStart(e: QueueEvent): void {
     if (e.runId !== this.runId) return;
+    if (e.seq < 0) return; // a notice in the stream: not a segment, not first audio
     if (this.runTtfa === null) this.runTtfa = performance.now() - this.runT0;
     this.current = { seq: e.seq, start: e.start, end: e.end, at: e.at, seconds: e.seconds, tag: e.tag };
     this.next = this.runSegments[e.seq + 1] ?? null;
@@ -533,6 +549,7 @@ export class VoiceEngine {
 
   private handleEnd(e: QueueEvent): void {
     if (e.runId !== this.runId) return;
+    if (e.seq < 0) return;
     this.userOnEnd?.({ seq: e.seq, start: e.start, end: e.end, at: e.at, seconds: e.seconds, tag: e.tag });
     if (this.current?.seq === e.seq) this.current = null;
   }
@@ -549,6 +566,7 @@ export class VoiceEngine {
   metrics(seconds: number): StreamMetrics {
     const synthSeconds = this.runSynthMs / 1000;
     return {
+      cache_state: this.cacheState(),
       ttfa_ms: this.runTtfa === null ? null : Math.round(this.runTtfa),
       rtf: synthSeconds > 0 ? Math.round((seconds / synthSeconds) * 100) / 100 : null,
       gap_ms: Math.round(this.queue?.maxGapMs ?? 0),
@@ -584,7 +602,9 @@ export class VoiceEngine {
       tts_overlimit: m.overlimit,
     });
     this.lastStats = row;
-    writeStored(STATS_KEY, JSON.stringify(row));
+    // In-memory only (stats() below): the validated, retained copy lives in stats/store.ts under
+    // "fruitbat.stats", keyed by RunStats' own schema rather than this class's internal shape
+    // (S1-10; this used to also write "fruitbat.stats.last" here, which duplicated that).
     return { runId, segments, coverage, ttsOverlimit: m.overlimit, seconds: secs, finished };
   }
 
@@ -601,7 +621,7 @@ export class VoiceEngine {
       browser_major: env.browser_major,
       os: env.os,
       os_major: env.os_major,
-      cache_state: this.loaded ? (this.downloadedBytes > 1_000_000 ? "cold" : "warm") : "unknown",
+      cache_state: this.cacheState(),
       model_id: spec.id,
       model_rev: spec.revision,
       dtype: this.loadedDtype,
@@ -633,6 +653,8 @@ export class VoiceEngine {
   // ---------------------------------------------------------------- streaming (S1-06)
   private streamChain: Promise<void> = Promise.resolve();
   private streamSeq = 0;
+  /** A bullet stream is open: notices raised now join it in order (see speak()). */
+  private streaming = false;
 
   /**
    * Start a run that is fed text piece by piece (the orchestrator pushes each bullet as the
@@ -655,6 +677,9 @@ export class VoiceEngine {
     this.userOnEnd = opts.onEnd ?? null;
     this.streamSeq = 0;
     this.streamChain = Promise.resolve();
+    this.streaming = true;
+    this.runCold = false;
+    this.takeCold(); // the voice may already have loaded (page-load warm-up) during this stream's setup
     this.pendingDone = null;
     return runId;
   }
@@ -675,6 +700,7 @@ export class VoiceEngine {
       if (runId !== this.runId || this.phase === "failed") return;
       await this.load();
       if (runId !== this.runId) return;
+      this.takeCold(); // a first bullet that had to fetch the voice makes this stream cold
       const planId = -++this.messageSeq; // per push, same allocator as plan()/speak() (Codex review, PR #17)
       const plannedP = this.wait(`planned:${planId}`);
       this.send({ type: "plan", runId: planId, text, limits: LIMITS, firstPieceTarget: 0 });
@@ -689,8 +715,8 @@ export class VoiceEngine {
       for (const seg of planned.segments) {
         // Same back-pressure as Read all: the segment's estimated seconds count against the 30 s
         // cap, and stay reserved until its audio is scheduled (Codex review, PR #18).
-        // Current voice and rate per request, like Read all: moving the dial mid-summary changes the
-        // bullets not yet synthesized (Codex review, PR #25).
+        // Current voice and rate per request, like Read all: moving the rate mid-summary changes the
+        // bullets not yet synthesized (Codex review, PRs #18/#25).
         const rate = this.rate;
         const est = (seg.text.length * this.secPerChar) / Math.max(rate, 0.1);
         while (runId === this.runId && !queue.canAccept(est)) await new Promise((r) => setTimeout(r, 50));
@@ -730,7 +756,13 @@ export class VoiceEngine {
    * or at once if the run was stopped or a piece failed (finished: false).
    */
   async endStream(runId: number): Promise<{ finished: boolean; metrics: StreamMetrics }> {
-    await this.streamChain; // never rejects (see pushText)
+    // Settle everything chained so far, including notices chained while waiting (never rejects).
+    let chain: Promise<void>;
+    do {
+      chain = this.streamChain;
+      await chain;
+    } while (chain !== this.streamChain);
+    if (runId === this.runId) this.streaming = false;
     const queue = this.queue!;
     if (runId !== this.runId || this.phase === "failed") return { finished: false, metrics: this.metrics(queue.totalSeconds) };
     if (queue.enqueued === 0) {
@@ -761,7 +793,9 @@ export class VoiceEngine {
         // a message that fails to synthesize is spoken live when asked for
       }
     }
-    this.prewarmed = true;
+    // Only true when every notice is actually cached: a Stop or new run during prewarm cancels the
+    // one being synthesized, and the orchestrator prewarms again after the run (Codex review, PR #18).
+    this.prewarmed = keys.every((k) => this.noticeCache.has(this.noticeKey(k)));
   }
 
   private async synthMessage(messageKey: string, cacheKey: string): Promise<{ pcm: Float32Array; sampleRate: number } | null> {
@@ -795,6 +829,7 @@ export class VoiceEngine {
 
   stop(): number {
     this.releasePause(); // waiting messages wake, see the new epoch, and return
+    this.streaming = false;
     const t0 = performance.now();
     const stale = this.runId;
     this.runId++;
@@ -824,7 +859,6 @@ export class VoiceEngine {
     this.lastStop = { runId: stale, ms: Math.round(stopMs * 100) / 100 };
     if (this.lastStats) {
       this.lastStats = { ...this.lastStats, stop_ms: Math.round(stopMs * 100) / 100 };
-      writeStored(STATS_KEY, JSON.stringify(this.lastStats));
     }
     this.pendingDone?.resolve(false);
     this.pendingDone = null;
@@ -874,6 +908,21 @@ export class VoiceEngine {
       // the shared context and the paused read with it (Codex review, PR #17).
       await new Promise<void>((r) => this.resumeWaiters.push(r));
       if (epoch !== this.messageEpoch) return { seconds: 0 }; // stopped while waiting
+    }
+    const q = this.queue;
+    if (this.streaming && q && q.currentRunId === this.runId) {
+      // During a summary a notice joins the ordered stream: it plays after the bullets already
+      // pushed instead of over them, and later bullets wait for it (Codex review, PRs #17/#18).
+      const runId = this.runId;
+      const { pcm, sampleRate } = entry;
+      let queued = false;
+      this.streamChain = this.streamChain.then(() => {
+        if (runId === this.runId && this.streaming) queued = q.enqueue({ runId, seq: -1, pcm, sampleRate, start: -1, end: -1 });
+      });
+      await this.streamChain;
+      if (queued) return { seconds: pcm.length / sampleRate };
+      if (epoch !== this.messageEpoch) return { seconds: 0 }; // stopped meanwhile
+      // The stream closed before this notice's turn: play it on its own rather than lose it.
     }
     const buf = ctx.createBuffer(1, entry.pcm.length, entry.sampleRate);
     buf.copyToChannel(entry.pcm as Float32Array<ArrayBuffer>, 0);

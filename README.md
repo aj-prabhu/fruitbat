@@ -12,6 +12,8 @@ with free open models. Nothing you read leaves your device. Zero telemetry.
 
 ## Status
 
+![health](https://github.com/aj-prabhu/fruitbat/actions/workflows/health.yml/badge.svg)
+
 Pre-alpha. Nothing runs yet. Building in public. Read the plan at `docs/PLAN.md`.
 
 Web demo target: 2026-09-29. macOS app after that.
