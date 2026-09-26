@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,18 +35,6 @@ declare global {
   }
 }
 
-async function waitIsolated(page: Page) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      await page.waitForFunction(() => crossOriginIsolated === true, null, { timeout: 15_000 });
-      return;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
-  throw new Error("crossOriginIsolated never became true");
-}
-
 test.describe.configure({ mode: "serial" });
 
 let page: Page;
@@ -53,8 +42,7 @@ let clockAdvances = false;
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {
   page = await browser.newPage();
-  await page.goto("/readall.html");
-  await waitIsolated(page);
+  await gotoIsolated(page, "/readall.html");
   await page.waitForFunction(() => typeof window.__tts !== "undefined", null, { timeout: 20_000 });
   const loaded = await page.evaluate(() => window.__tts.load());
   expect(loaded.maxTokens).toBe(512);
