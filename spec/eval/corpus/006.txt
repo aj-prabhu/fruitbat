@@ -1,0 +1,21 @@
+To: Anders Voss
+From: Kim Whitfield
+Subject: Vendor renewal — numbers changed since last week
+
+Anders,
+
+Following up before you sign the renewal. The vendor came back with $18,400 for the year, not the $16,000 they quoted in August — they say it's because we added the second seat in September, not a general price increase. I'd push back on that framing even if we pay it.
+
+Contract term is now 14 months, not 12, because they backdated the start to July 1 instead of September 1 to match our fiscal year. That backdating is the reason the total looks higher than a straight 12-month renewal would.
+
+Two things changed from the draft you reviewed last week:
+
+First, the cancellation window moved from 60 days to 90 days. That matters more than it sounds like, because it means our next real exit point isn't next August, it's two months earlier than that if we want out before the following renewal.
+
+Second, support tier dropped from "priority" to "standard" in the new draft, and nobody flagged that to us. I only caught it because I compared line by line instead of trusting the redline. I have NOT signed anything, and I won't until that's fixed or we agree it's fine.
+
+On budget: this pushes us to $61,200 total vendor spend for the year against a $58,000 line, so it's over by $3,200 unless something else comes out. Legal hasn't reviewed the new draft yet either — I sent it to them this morning, not last week like I told you in Slack, because I only found the support-tier change today.
+
+I'd rather delay signing a few days and get the support tier back than sign now and fight about it in January. Let me know if you disagree and want to move faster instead.
+
+Kim

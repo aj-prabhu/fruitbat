@@ -1,0 +1,145 @@
+[
+  {
+    "name": "under_target_no_split",
+    "input": { "text": "Short text under target.", "phonemize": { "kind": "charcount" }, "target": 40, "limit": 60 },
+    "expect": [{ "text": "Short text under target.", "start": 0, "end": 24 }],
+    "why": "a segment already at or under the phoneme target is returned unchanged."
+  },
+  {
+    "name": "clause_split_at_comma_then_word_boundary",
+    "input": {
+      "text": "This is clause one, and this is clause two which is a bit longer than the first.",
+      "phonemize": { "kind": "charcount" },
+      "target": 30,
+      "limit": 60
+    },
+    "expect": [
+      { "text": "This is clause one,", "start": 0, "end": 19 },
+      { "text": " and this is clause two which ", "start": 19, "end": 49 },
+      { "text": "is a bit longer than the ", "start": 49, "end": 74 },
+      { "text": "first.", "start": 74, "end": 80 }
+    ],
+    "why": "the first clause (up to and including the comma) already fits the target; the long second clause has no more clause punctuation, so it falls through to greedy word-boundary packing. Offsets tile the source with no gaps."
+  },
+  {
+    "name": "clause_split_at_semicolon",
+    "input": {
+      "text": "This is clause one; and this is clause two which is a bit longer than the first.",
+      "phonemize": { "kind": "charcount" },
+      "target": 30,
+      "limit": 60
+    },
+    "expect": [
+      { "text": "This is clause one;", "start": 0, "end": 19 },
+      { "text": " and this is clause two which ", "start": 19, "end": 49 },
+      { "text": "is a bit longer than the ", "start": 49, "end": 74 },
+      { "text": "first.", "start": 74, "end": 80 }
+    ],
+    "why": "semicolons split the same way commas do."
+  },
+  {
+    "name": "pure_word_boundary_split_no_punctuation",
+    "input": {
+      "text": "one two three four five six seven eight nine ten eleven twelve thirteen fourteen",
+      "phonemize": { "kind": "charcount" },
+      "target": 20,
+      "limit": 40
+    },
+    "expect": [
+      { "text": "one two three four ", "start": 0, "end": 19 },
+      { "text": "five six seven eight ", "start": 19, "end": 40 },
+      { "text": "nine ten eleven ", "start": 40, "end": 56 },
+      { "text": "twelve thirteen ", "start": 56, "end": 72 },
+      { "text": "fourteen", "start": 72, "end": 80 }
+    ],
+    "why": "no clause punctuation anywhere, so the whole thing is packed greedily word by word up to the target; each inter-word gap is folded into the end of the preceding piece so the pieces still tile the source."
+  },
+  {
+    "name": "single_giant_word_over_limit_fixed_width_split",
+    "input": {
+      "text": "supercalifragilisticexpialidocioussupercalifragilisticexpialidocious",
+      "phonemize": { "kind": "charcount" },
+      "target": 10,
+      "limit": 20
+    },
+    "expect": [
+      { "text": "supercalifragilis", "start": 0, "end": 17 },
+      { "text": "ticexpialidocious", "start": 17, "end": 34 },
+      { "text": "supercalifragilis", "start": 34, "end": 51 },
+      { "text": "ticexpialidocious", "start": 51, "end": 68 }
+    ],
+    "why": "a single 'word' with no whitespace to split on and a phoneme count over the hard limit is cut at a fixed character width, recursively, until every piece fits; spec/chunking.md calls this the should-be-impossible backstop."
+  },
+  {
+    "name": "word_boundary_split_many_short_words",
+    "input": {
+      "text": "alpha beta gamma delta epsilon zeta eta theta iota kappa lambda mu nu xi omicron pi",
+      "phonemize": { "kind": "charcount" },
+      "target": 15,
+      "limit": 25
+    },
+    "expect": [
+      { "text": "alpha beta ", "start": 0, "end": 11 },
+      { "text": "gamma delta ", "start": 11, "end": 23 },
+      { "text": "epsilon zeta ", "start": 23, "end": 36 },
+      { "text": "eta theta iota ", "start": 36, "end": 51 },
+      { "text": "kappa lambda mu ", "start": 51, "end": 67 },
+      { "text": "nu xi omicron ", "start": 67, "end": 81 },
+      { "text": "pi", "start": 81, "end": 83 }
+    ],
+    "why": "greedy packing takes as many whole words as fit under the target on each group, never fewer than it could."
+  },
+  {
+    "name": "repeated_run_no_spaces_fixed_width",
+    "input": {
+      "text": "wordwordwordwordwordwordwordwordwordwordwordwordwordwordwordwordwordwordword",
+      "phonemize": { "kind": "charcount" },
+      "target": 10,
+      "limit": 20
+    },
+    "expect": [
+      { "text": "wordwordwordwordwor", "start": 0, "end": 19 },
+      { "text": "dwordwordwordwordwo", "start": 19, "end": 38 },
+      { "text": "rdwordwordwordwordw", "start": 38, "end": 57 },
+      { "text": "ordwordwordwordword", "start": 57, "end": 76 }
+    ],
+    "why": "a whitespace-free run over the limit is halved recursively regardless of where 'words' would conventionally be; every piece lands at exactly the limit or under."
+  },
+  {
+    "name": "multiple_clause_marks_then_word_boundary_on_the_remainder",
+    "input": {
+      "text": "clauseone, clausetwo; clausethree: clausefourwithalotmoretextthatisreallyquitelongindeed",
+      "phonemize": { "kind": "charcount" },
+      "target": 15,
+      "limit": 30
+    },
+    "expect": [
+      { "text": "clauseone,", "start": 0, "end": 10 },
+      { "text": " clausetwo;", "start": 10, "end": 21 },
+      { "text": " clausethree:", "start": 21, "end": 34 },
+      { "text": " clausefourwithalotmoretext", "start": 34, "end": 61 },
+      { "text": "thatisreallyquitelongindeed", "start": 61, "end": 88 }
+    ],
+    "why": "comma, semicolon and colon all split; the final clause has no internal punctuation and no spaces, so it falls to the fixed-width backstop, still tiling the source."
+  },
+  {
+    "name": "doc_020_style_unpunctuated_excerpt_splits_and_tiles",
+    "input": {
+      "text": "The Time Traveller (for so it will be convenient to speak of him) was expounding a recondite matter to us His grey eyes shone and twinkled, and his usually pale face was flushed and animated The fire burnt brightly, and the soft radiance of the incandescent lights in the lilies of silver caught the bubbles that flashed and passed in our glasses",
+      "phonemize": { "kind": "charcount" },
+      "target": 60,
+      "limit": 100
+    },
+    "expect": [
+      { "text": "The Time Traveller (for so it will be convenient to speak of ", "start": 0, "end": 61 },
+      { "text": "him) was expounding a recondite matter to us His grey eyes ", "start": 61, "end": 120 },
+      { "text": "shone and twinkled,", "start": 120, "end": 139 },
+      { "text": " and his usually pale face was flushed and animated The fire ", "start": 139, "end": 200 },
+      { "text": "burnt brightly,", "start": 200, "end": 215 },
+      { "text": " and the soft radiance of the incandescent lights in the ", "start": 215, "end": 272 },
+      { "text": "lilies of silver caught the bubbles that flashed and passed ", "start": 272, "end": 332 },
+      { "text": "in our glasses", "start": 332, "end": 346 }
+    ],
+    "why": "this is the opening of spec/eval/corpus/020.txt (role 'unpunctuated'), which arrives from segment.ts as one giant Segment; the mix of a couple of commas and long punctuation-free stretches exercises both the clause and word-boundary paths in one input. First piece starts at 0, last piece ends at 346 (the input's length), and every piece.end equals the next piece.start: the offsets tile the source exactly. A dedicated integration test (core.test.ts) re-runs the full doc against the real vendored phonemizer."
+  }
+]

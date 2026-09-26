@@ -1,0 +1,30 @@
+{
+  "id": "011",
+  "key_facts": [
+    "The park hosts 17 different bat species.",
+    "They typically roost in a different part of the cavern and fly about 1.5 miles (2.4 km) before exiting the Natural Entrance",
+    "The Brazilian free-tailed bats weigh about 1/2 ounce (13 g), which is equivalent to the weight of three nickel coins",
+    "the resident colony should not be called the maternity colony because it is typically greater than 50% male",
+    "WNS has already taken the lives of an estimated 7+ million bats in the United States",
+    "adding up to more than $3.7 billion worth of pest control each year in the U.S.",
+    "Researchers first discovered the disease in New York in the winter of 2006",
+    "WNS has killed 99% of some bat colonies",
+    "Tree-roosting and migratory bats face significant threats from wind turbines"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "The park hosts 42 different bat species, the most of any site in the region.",
+      "distinctive_tokens": ["42", "region"]
+    },
+    {
+      "claim": "Researchers believe White-nose Syndrome originated in Texas during the winter of 2006.",
+      "distinctive_tokens": ["texas", "originated"]
+    },
+    {
+      "claim": "The resident colony at Carlsbad Cavern excludes males entirely during the summer months.",
+      "distinctive_tokens": ["excludes", "entirely"]
+    }
+  ],
+  "expected_oneline_keywords": ["bats", "carlsbad caverns", "white-nose syndrome", "ecosystem"],
+  "notes": "Sample article for the Space demo (role: sample-article). The 50%-male fact is a reversal trap: this colony is explicitly NOT female-dominated, unlike most large colonies outside the park."
+}

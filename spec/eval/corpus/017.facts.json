@@ -1,0 +1,29 @@
+{
+  "id": "017",
+  "key_facts": [
+    "I have travelled a good deal in Concord",
+    "The twelve labors of Hercules were trifling in comparison with those which my neighbors have undertaken",
+    "They have no friend Iolas to burn with a hot iron the root of the hydra’s head",
+    "pushing before it a barn seventy-five feet by forty",
+    "It is said that Deucalion and Pyrrha created men by throwing stones over their heads behind them",
+    "Or, as Raleigh rhymes it in his sonorous way",
+    "The mass of men lead lives of quiet desperation.",
+    "I have lived some thirty years on this planet"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Thoreau claims in this passage to have lived fifty full years on the planet.",
+      "distinctive_tokens": ["fifty", "full"]
+    },
+    {
+      "claim": "Thoreau compares his neighbors' burdens to the labors of Theseus, aided by his friend Iolas.",
+      "distinctive_tokens": ["theseus", "aided"]
+    },
+    {
+      "claim": "Thoreau says his elders handed down treasured guidance he still follows today.",
+      "distinctive_tokens": ["treasured", "guidance"]
+    }
+  ],
+  "expected_oneline_keywords": ["quiet desperation", "labor", "society", "thoreau"],
+  "notes": "Thoreau says elders gave him nothing useful -- the exact opposite of a claim crediting them with valuable advice. Continues directly after doc 010's cutoff."
+}
