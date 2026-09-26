@@ -205,6 +205,10 @@ export class Orchestrator {
 
   // ---------------------------------------------------------------- notices
   private onLlmNotice(n: NoticeOut): void {
+    // The summarizer says "stopped" whenever its load or run is aborted, including by a dial
+    // change or new input. Only the orchestrator knows the user pressed Stop, and says so itself
+    // (Codex review, PR #18).
+    if (n.key === "notice.stopped") return;
     if (n.key === "notice.all_cut" && n.chunkIndex !== undefined && !this.allCut.includes(n.chunkIndex)) this.allCut.push(n.chunkIndex);
     this.notice(n.key);
   }
@@ -470,10 +474,12 @@ export class Orchestrator {
         this.emit();
       },
     });
-    let ok = await this.llm.ensureLoaded();
+    // The run's own signal goes to both attempts, so Esc also cancels a load waiting on a drain.
+    const signal = this.runAbort?.signal;
+    let ok = await this.llm.ensureLoaded({ signal });
     // A newer run's newRun() aborts the load an older run started; if this run joined that load,
     // start it again rather than failing (Codex review, PR #18).
-    if (!ok && id === this.runId && this.llm.error === "aborted") ok = await this.llm.ensureLoaded();
+    if (!ok && id === this.runId && this.llm.error === "aborted") ok = await this.llm.ensureLoaded({ signal });
     if (id !== this.runId) return;
     if (!ok) {
       this.gen = reduceGen(this.gen, "fail");
