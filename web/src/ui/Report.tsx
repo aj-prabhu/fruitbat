@@ -17,6 +17,8 @@ export function Report({ onClose }: { onClose: () => void }) {
   const [base, setBase] = useState<BugReport | null>(null);
   const [description, setDescription] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const previewRef = useRef(null) as { current: HTMLPreElement | null };
 
   // Built once per open: the env/model probe is async (WebGPU adapter info) and doesn't need to
   // re-run on every keystroke in the description box below -- that field is overlaid locally.
@@ -64,7 +66,7 @@ export function Report({ onClose }: { onClose: () => void }) {
         onInput={(e) => setDescription((e.target as HTMLTextAreaElement).value)}
       />
       <p class="report-preview-intro">{t("report.preview_intro")}</p>
-      <pre class="report-preview" data-testid="report-preview">
+      <pre class="report-preview" data-testid="report-preview" ref={previewRef}>
         {report ? JSON.stringify(report, null, 2) : ""}
       </pre>
       <div class="report-actions">
@@ -87,10 +89,29 @@ export function Report({ onClose }: { onClose: () => void }) {
           disabled={!report}
           onClick={() => {
             if (!report) return;
-            void navigator.clipboard.writeText(buildCopyText(report)).then(() => setCopied(true));
+            // A denied clipboard (browser permission, embedding policy) says so and selects the
+            // preview, so the report can still be copied by hand (Codex review, PR #23).
+            void navigator.clipboard.writeText(buildCopyText(report)).then(
+              () => {
+                setCopyFailed(false);
+                setCopied(true);
+              },
+              () => {
+                setCopied(false);
+                setCopyFailed(true);
+                const el = previewRef.current;
+                const sel = typeof window !== "undefined" ? window.getSelection() : null;
+                if (el && sel) {
+                  const range = document.createRange();
+                  range.selectNodeContents(el);
+                  sel.removeAllRanges();
+                  sel.addRange(range);
+                }
+              },
+            );
           }}
         >
-          <span aria-live="polite">{copied ? t("report.copied") : t("report.copy")}</span>
+          <span aria-live="polite">{copyFailed ? t("report.copy_failed") : copied ? t("report.copied") : t("report.copy")}</span>
         </button>
       </div>
     </div>

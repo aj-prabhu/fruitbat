@@ -336,3 +336,10 @@ body {
   font-size: 0.95em;
   opacity: 0.85;
 }
+
+/* The report preview wraps inside the viewport: user agents and model ids are long (Codex review, PR #23). */
+.report-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
