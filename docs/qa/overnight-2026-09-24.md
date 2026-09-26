@@ -31,7 +31,7 @@ _Updated Sat 2026-09-26 09:40 PDT._
 
 - **Your two product ideas:** a fruit bat Wikipedia demo, and a "fruits eaten" counter. Recon and a draft plan are in `docs/plans/2026-09-26-fruit-bat-demo-and-fruits-eaten.md`, waiting on four answers from you.
 - **The S1-12 real-model privacy sweep:** it writes `docs/qa/privacy-requests-<sha>.json`. It needs a visible WebGPU browser, which takes window focus, so it's yours (see blocked.md).
-- **Bench baselines:** #27 has 36 proof rows. Setting baselines from them is your call.
+- **First real bench run:** #27's 36 rows are the runner's proof on an older commit (now in `bench/proof/`). Real rows and baselines need a quiet 4-hour headed run, yours (see blocked.md).
 - **S1-14:** Safari. **S1-16:** live gate and `web-v0.1.0`. **S1-L1**, **S1-L4**, **S2-01/02**.
 
 ## Blocked on you
