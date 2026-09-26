@@ -163,6 +163,15 @@ def load_baselines(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def load_baselines_at(repo_root, rev):
+    """bench/baselines.json as it is at `rev` (empty set if the file did not exist there)."""
+    out = subprocess.run(["git", "-C", str(repo_root), "show", f"{rev}:bench/baselines.json"],
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        return {"version": 1, "baselines": []}
+    return json.loads(out.stdout)
+
+
 def save_baselines(path, data):
     path.write_text(json.dumps(data, indent=2, sort_keys=False) + "\n", encoding="utf-8")
 
@@ -197,11 +206,21 @@ def group_rows_by_identity(rows):
     return groups
 
 
+# Zero-tolerance counters: one bad rep is a failure, so they aggregate by the worst rep, not the
+# median (Codex merge-gate review, PR #15: [0, 0, 1] halluc_flags must not pass as 0).
+WORST_REP_FIELDS = {"halluc_flags", "forbidden_hits", "tts_overlimit"}
+
+
 def compute_medians(rows):
     out = {}
     for field in METRIC_FIELDS:
         values = [r[field] for r in rows if r.get(field) is not None]
-        out[field] = statistics.median(values) if values else None
+        if not values:
+            out[field] = None
+        elif field in WORST_REP_FIELDS:
+            out[field] = max(values)
+        else:
+            out[field] = statistics.median(values)
     return out
 
 
@@ -475,8 +494,11 @@ def cmd_pr_head(args):
     rows = load_results_csv(repo_root / "bench" / "results.csv")
     valid_rows = [r for r in rows if is_valid_row(r.get("commit"), args.head, repo_root)]
     labels = read_labels(args.labels)
-    baselines = load_baselines(repo_root / "bench" / "baselines.json")
     allow_reset = bool(args.allow_baseline_reset) or ("baseline-reset" in labels)  # label or flag (Codex review, PR #15)
+    # The approved baselines are the base revision's: a PR that edits bench/baselines.json alongside
+    # its rows must not grade itself against its own numbers. Only `baseline-reset` may replace them
+    # (Codex merge-gate review, PR #15).
+    baselines = load_baselines_at(repo_root, args.base) if args.base else load_baselines(repo_root / "bench" / "baselines.json")
     exit_code, lines, updates = pr_head_logic(valid_rows, baselines, labels, allow_reset, args.head)
     print("\n".join(lines))
     if updates:
@@ -568,7 +590,7 @@ def test_floor_breach():
     baseline = {**WEB_SHORT_IDENTITY._asdict(), **_good_medians(tok_s=10)}  # baseline itself is bad
     medians = _good_medians(tok_s=10)  # identical to baseline: no regression, but floor breach
     passed, reasons, _ = gate_identity(WEB_SHORT_IDENTITY, medians, baseline, allow_reset=False)
-    ok = (not passed) and any("tok_s" in r and "floor" in r for r in reasons)
+    ok = (not passed) and any("tok_s" in r and "floor" in r for r in reasons) and _worst_rep_check()
     # A row with every metric blank must fail too, not slide past every skip (Codex review, PR #15).
     blank = {k: None for k in _good_medians()}
     passed_blank, reasons_blank, _ = gate_identity(WEB_SHORT_IDENTITY, blank, baseline, allow_reset=False)
@@ -579,6 +601,11 @@ def test_floor_breach():
         {**WEB_SHORT_IDENTITY._asdict(), **_good_medians(facts_token_hit=0.95)}, allow_reset=False)
     ok = ok and (not passed_rt) and any("facts_token_hit dropped" in r for r in reasons_rt)
     return ok, f"passed={passed} blank={passed_blank} rounding={passed_rt} reasons={reasons}"
+
+
+def _worst_rep_check():
+    m = compute_medians([{**_good_medians(halluc_flags=0)}, {**_good_medians(halluc_flags=0)}, {**_good_medians(halluc_flags=1)}])
+    return m["halluc_flags"] == 1
 
 
 def test_nullable_readall_skips_llm_gates():
