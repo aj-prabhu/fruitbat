@@ -117,22 +117,12 @@ function replaceSpelledOutNumbers(text: string): string {
   return s;
 }
 
-/** A maximal digit run, matching spec/grounding.md's "\d[\d,.\s]*\d|\d". */
-const NUMBER_RUN = /\d[\d,.\s]*\d|\d/g;
-
-/** "1,400"/"1 400" -> "1400"; "1.400" (single dot, exactly 3 trailing digits) -> "1400"; "3.5" kept. */
-function stripThousandsSeparators(part: string): string {
-  let s = part.replace(/\s+/g, "");
-  s = s.replace(/,/g, "");
-  const dotCount = (s.match(/\./g) ?? []).length;
-  if (dotCount > 1) {
-    s = s.replace(/\./g, "");
-  } else if (dotCount === 1) {
-    const m = /^(\d+)\.(\d{3})$/.exec(s);
-    if (m) s = m[1] + m[2];
-  }
-  return s;
-}
+/** One number, per spec/grounding.md: a comma is a thousands separator only when exactly three
+ *  digits follow it, and a space never joins two numbers, so "May 3, 2026" is 3 and 2026, "1,400"
+ *  is 1400 (Codex merge-gate review, PR #8). Ranges and times split on their own because "-", "–",
+ *  "/" and ":" are not part of a number. */
+const NUM = String.raw`\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?`;
+const NUMBER_RE = new RegExp(NUM, "g");
 
 /**
  * Every number in `text`, normalized (spec/grounding.md): thousands separators and currency
@@ -142,22 +132,16 @@ function stripThousandsSeparators(part: string): string {
 export function normalizeNumbers(text: string): Set<string> {
   let t = replaceSpelledOutNumbers(text);
   t = t.replace(/\b(\d+)(?:st|nd|rd|th)\b/gi, "$1");
-  t = t.replace(/[$€£]\s?(\d[\d,.\s]*\d|\d)/g, (_m, num: string) => num);
-  t = t.replace(/\b(?:USD|EUR|GBP)\s?(\d[\d,.\s]*\d|\d)/gi, (_m, num: string) => num);
-  t = t.replace(/(\d[\d,.\s]*\d|\d)\s?(?:USD|EUR|GBP)\b/gi, (_m, num: string) => num);
-  t = t.replace(/(\d[\d,.\s]*\d|\d)\s+(?:dollars?|cents?|pounds?|euros?)\b/gi, (_m, num: string) => num);
-  t = t.replace(/(\d[\d,.\s]*\d|\d)\s?%/g, (_m, num: string) => num);
-  t = t.replace(/(\d[\d,.\s]*\d|\d)\s+per\s?cent\b/gi, (_m, num: string) => num);
-  t = t.replace(/(\d[\d,.\s]*\d|\d)\s+percent\b/gi, (_m, num: string) => num);
+  t = t.replace(new RegExp(String.raw`[$€£]\s?(${NUM})`, "g"), (_m, num: string) => num);
+  t = t.replace(new RegExp(String.raw`\b(?:USD|EUR|GBP)\s?(${NUM})`, "gi"), (_m, num: string) => num);
+  t = t.replace(new RegExp(String.raw`(${NUM})\s?(?:USD|EUR|GBP)\b`, "gi"), (_m, num: string) => num);
+  t = t.replace(new RegExp(String.raw`(${NUM})\s+(?:dollars?|cents?|pounds?|euros?)\b`, "gi"), (_m, num: string) => num);
+  t = t.replace(new RegExp(String.raw`(${NUM})\s?%`, "g"), (_m, num: string) => num);
+  t = t.replace(new RegExp(String.raw`(${NUM})\s+per\s?cent\b`, "gi"), (_m, num: string) => num);
+  t = t.replace(new RegExp(String.raw`(${NUM})\s+percent\b`, "gi"), (_m, num: string) => num);
 
   const out = new Set<string>();
-  const matches = t.match(NUMBER_RUN) ?? [];
-  for (const raw of matches) {
-    for (const part of raw.split(/[–—/:-]/)) {
-      const cleaned = stripThousandsSeparators(part.trim());
-      if (cleaned) out.add(cleaned);
-    }
-  }
+  for (const raw of t.match(NUMBER_RE) ?? []) out.add(raw.replace(/,/g, ""));
   return out;
 }
 
