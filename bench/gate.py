@@ -205,6 +205,20 @@ def compute_medians(rows):
     return out
 
 
+def rep_problems(rows, target, level):
+    """Every repetition must carry every required metric: a median over the reps that happen to
+    have a number would hide the reps that don't (Codex merge-gate review, PR #15)."""
+    required = list(REQUIRED_METRICS.get(level, []))
+    if target == "mac":
+        required.append("peak_mb")
+    out = []
+    for field in required:
+        missing = sum(1 for r in rows if r.get(field) is None)
+        if missing:
+            out.append(f"{field} missing in {missing} of {len(rows)} reps")
+    return out
+
+
 # --------------------------------------------------------------------------------------
 # Row-validity / evidence rule (docs/PLAN.md rule 3; scripts/release-check.sh mirrors this)
 # --------------------------------------------------------------------------------------
@@ -327,6 +341,12 @@ def evaluate_deltas(target, m, b):
     """Regression-vs-baseline checks: docs/PLAN.md S0-05 packet text, verbatim list."""
     fails = []
 
+    # A metric the baseline measured must still be measured: a blank current value would otherwise
+    # skip its regression check silently (Codex merge-gate review, PR #15).
+    for field in METRIC_FIELDS:
+        if b.get(field) is not None and m.get(field) is None:
+            fails.append(f"{field} missing (the baseline has {b[field]})")
+
     if m.get("ttfa_ms") is not None and b.get("ttfa_ms") is not None:
         limit = b["ttfa_ms"] * TTFA_REGRESSION_FACTOR
         if m["ttfa_ms"] > limit:
@@ -400,6 +420,9 @@ def gate_groups(groups, baselines, allow_reset):
         medians = compute_medians(rows)
         baseline = find_baseline(baselines, identity)
         passed, reasons, new_metrics = gate_identity(identity, medians, baseline, allow_reset)
+        rep_fails = rep_problems(rows, identity.target, identity.level)
+        if rep_fails:
+            passed, reasons, new_metrics = False, rep_fails + list(reasons), None
         status = "PASS" if passed else "FAIL"
         if not passed:
             all_pass = False
@@ -435,7 +458,7 @@ def release_logic(valid_rows):
     lines = ["status | identity | detail"]
     for identity, rows in sorted(groups.items(), key=lambda kv: identity_str(kv[0])):
         medians = compute_medians(rows)
-        fails = evaluate_floors(identity.target, identity.level, identity.cache_state, medians)
+        fails = rep_problems(rows, identity.target, identity.level) + evaluate_floors(identity.target, identity.level, identity.cache_state, medians)
         status = "PASS" if not fails else "FAIL"
         if fails:
             all_pass = False
