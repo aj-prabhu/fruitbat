@@ -36,6 +36,16 @@
   --measure: 65ch;
   --border-radius: 8px;
 
+  /* 4pt spacing scale (docs/PLAN.md S1-07 impeccable pass); semantic names, not pixel names. */
+  --space-3xs: 2px;
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
   --color-bg: #faf9f6;
   --color-fg: #1a1a1a;
   --color-muted: #5b5b5b;
@@ -45,6 +55,9 @@
   --color-panel-bg: #ffffff;
   --color-input-bg: #ffffff;
   --color-focus-ring: #7a3b2e;
+  /* The "current item" tint (panel bullets, read-all sentence). Derived from the accent itself,
+     not a stock color, so it stays coherent with whichever theme is active. */
+  --color-accent-soft: color-mix(in oklch, var(--color-accent) 16%, var(--color-panel-bg));
 }
 
 @media (prefers-color-scheme: dark) {
@@ -58,6 +71,7 @@
     --color-panel-bg: #201f23;
     --color-input-bg: #201f23;
     --color-focus-ring: #e0a893;
+    --color-accent-soft: color-mix(in oklch, var(--color-accent) 22%, var(--color-panel-bg));
   }
 }
 
@@ -71,6 +85,7 @@
   --color-panel-bg: #201f23;
   --color-input-bg: #201f23;
   --color-focus-ring: #e0a893;
+  --color-accent-soft: color-mix(in oklch, var(--color-accent) 22%, var(--color-panel-bg));
 }
 
 * {
@@ -277,65 +292,7 @@ body {
   outline-offset: 2px;
 }
 
-.panel {
-  position: fixed;
-  right: var(--gutter);
-  bottom: var(--gutter);
-  width: min(320px, calc(100% - var(--gutter) * 2));
-  background: var(--color-panel-bg);
-  border: 1px solid var(--color-border);
-  border-radius: var(--border-radius);
-  padding: var(--gutter);
-}
-
-.panel-empty {
-  margin: 0;
-  color: var(--color-muted);
-}
-
-/* Narrow screens (390 px devices and up to a small-tablet breakpoint): panel drops to a
-   full-width bar pinned to the bottom instead of a floating bottom-right card. */
-@media (max-width: 640px) {
-  .panel {
-    left: var(--gutter);
-    right: var(--gutter);
-    width: auto;
-  }
-}
-
-/* S1-06: minimal panel contents (S1-07 owns the real styling) */
-.bullets {
-  margin: 0;
-  padding-left: 1.2em;
-}
-.bullets li {
-  margin: 0.35em 0;
-}
-.bullets li[aria-current="true"] {
-  background: var(--color-accent-soft, rgba(120, 90, 200, 0.15));
-  border-radius: 4px;
-}
-.now-label,
-.next-label {
-  font-size: 0.8em;
-  opacity: 0.7;
-}
-.now-text {
-  font-size: 1.35em;
-  line-height: 1.4;
-  margin: 0.2em 0 0.6em;
-}
-.next-text {
-  opacity: 0.6;
-}
-.read-part {
-  font: inherit;
-  padding: 0.4em 0.8em;
-}
-.panel-notice {
-  font-size: 0.95em;
-  opacity: 0.85;
-}
+/* The panel itself (docs/PLAN.md S1-07) lives in web/src/ui/panel.css, loaded by Panel.tsx. */
 
 /* S1-09: minimal styling for the loading line and the canned demo (S1-07's impeccable pass owns
    the real look). Kept plain on purpose so the state is easy to read at a glance. */

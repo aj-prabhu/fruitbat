@@ -1,0 +1,336 @@
+/* The panel (docs/PLAN.md S1-07, impeccable pass): bottom-right dock, full-width bottom sheet
+   under 640px. Built on the tokens in styles/global.css (color, --gutter, --border-radius) plus
+   the 4pt --space-* scale added there for this packet. Two panel-only settings, font size and
+   spacing, are read as --panel-* custom properties off data-font-size / data-spacing so every
+   rule below only has to reference the variable once. */
+
+.panel {
+  position: fixed;
+  right: var(--gutter);
+  bottom: var(--gutter);
+  width: min(360px, calc(100% - var(--gutter) * 2));
+  max-height: calc(100vh - var(--gutter) * 2);
+  overflow: visible; /* Pip pokes above the top edge */
+  display: flex;
+  flex-direction: column;
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.25);
+
+  --panel-pad: var(--space-lg);
+  --panel-gap: var(--space-sm);
+}
+
+.panel[data-spacing="compact"] {
+  --panel-pad: var(--space-md);
+  --panel-gap: var(--space-xs);
+}
+.panel[data-spacing="roomy"] {
+  --panel-pad: var(--space-xl);
+  --panel-gap: var(--space-md);
+}
+
+.panel[data-font-size="sm"] {
+  font-size: 0.9375rem;
+}
+.panel[data-font-size="lg"] {
+  font-size: 1.125rem;
+}
+
+@media (max-width: 640px) {
+  .panel {
+    left: var(--gutter);
+    right: var(--gutter);
+    width: auto;
+    max-height: 70vh;
+  }
+}
+
+/* ---------------------------------------------------------------- Pip (S1-08 replaces this) */
+.panel-pip {
+  position: absolute;
+  top: 0;
+  left: var(--space-lg);
+  transform: translateY(-62%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-panel-bg);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-accent);
+}
+.panel-pip-svg {
+  display: block;
+}
+
+/* ---------------------------------------------------------------- head / body / controls */
+.panel-head {
+  padding: var(--panel-pad) var(--panel-pad) var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+.panel-title {
+  margin: 0;
+  padding-left: calc(48px - var(--space-lg) + var(--space-sm)); /* clears Pip on narrow panels */
+  font-size: 1.05em;
+  font-weight: 700;
+}
+
+.panel-body {
+  padding: var(--panel-pad);
+  display: flex;
+  flex-direction: column;
+  gap: var(--panel-gap);
+  overflow-y: auto;
+  max-height: 40vh;
+}
+.panel-body:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.panel-empty {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.panel-controls {
+  padding: var(--space-sm) var(--panel-pad) var(--panel-pad);
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: var(--panel-gap);
+}
+
+.panel-controls-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+/* ---------------------------------------------------------------- bullets / read-all */
+.panel-bullets {
+  margin: 0;
+  padding-left: 1.3em;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+.panel-bullets li {
+  padding: var(--space-3xs) var(--space-2xs);
+  border-radius: 4px;
+  transition: background-color 150ms ease-out;
+}
+.panel-bullets li[aria-current="true"] {
+  background: var(--color-accent-soft);
+  font-weight: 700;
+  margin-inline-start: calc(-1 * var(--space-2xs));
+}
+
+.now-reading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3xs);
+}
+.now-label,
+.next-label {
+  margin: 0;
+  font-size: 0.8em;
+  font-weight: 700;
+  color: var(--color-muted);
+  text-transform: none;
+}
+.now-text {
+  margin: 0;
+  font-size: 1.5rem;
+  line-height: 1.35;
+  font-weight: 700;
+}
+.next-text {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.read-part-row {
+  margin: 0;
+}
+.read-part {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  font: inherit;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--border-radius);
+  background: var(--color-panel-bg);
+  color: var(--color-fg);
+  cursor: pointer;
+}
+.read-part:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.panel-notice {
+  margin: 0;
+  font-size: 0.95em;
+  color: var(--color-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel-bullets li {
+    transition: none;
+  }
+}
+
+/* ---------------------------------------------------------------- transport buttons */
+.panel-transport {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2xs);
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-panel-bg);
+  color: var(--color-fg);
+  font: inherit;
+  cursor: pointer;
+}
+.panel-transport:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+.panel-transport:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.panel-transport:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.panel-transport-icon {
+  flex: none;
+}
+.panel-transport--primary {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+.panel-transport--primary:hover:not(:disabled) {
+  border-color: var(--color-accent);
+}
+
+/* ---------------------------------------------------------------- rate slider */
+.panel-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2xs);
+}
+.panel-field-label {
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--color-muted);
+}
+.panel-rate-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+.panel-rate-end {
+  font-size: 0.8em;
+  color: var(--color-muted);
+  white-space: nowrap;
+}
+.panel-rate-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+  color: var(--color-muted);
+  min-width: 3ch;
+  text-align: right;
+}
+.panel-rate-slider {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 44px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+.panel-rate-slider:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.panel-select {
+  min-height: 44px;
+  padding: var(--space-2xs) var(--space-xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  background: var(--color-input-bg);
+  color: var(--color-fg);
+  font: inherit;
+}
+.panel-select:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.panel-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 44px;
+}
+.panel-toggle-row input {
+  accent-color: var(--color-accent);
+  width: 18px;
+  height: 18px;
+}
+.panel-toggle-row label {
+  cursor: pointer;
+}
+
+/* ---------------------------------------------------------------- text size / spacing */
+.panel-steps {
+  display: inline-flex;
+  gap: var(--space-3xs);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: var(--space-3xs);
+}
+.panel-step-btn {
+  position: relative; /* ::before below expands the tap target to 44px without growing the icon */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: calc(var(--border-radius) - 3px);
+  background: transparent;
+  color: var(--color-fg);
+  cursor: pointer;
+}
+.panel-step-btn::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+}
+.panel-step-btn:hover {
+  background: var(--color-accent-soft);
+}
+.panel-step-btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.panel-step-btn[aria-pressed="true"] {
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+}
+.panel-step-glyph {
+  display: block;
+}
