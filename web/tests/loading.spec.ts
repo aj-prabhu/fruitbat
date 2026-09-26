@@ -1,5 +1,6 @@
 import { test, expect } from "./model-cache";
 import type { Page } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -19,7 +20,6 @@ const models = JSON.parse(readFileSync(specDir + "models.json", "utf8")) as {
 const stringsFile = JSON.parse(readFileSync(specDir + "strings/en.json", "utf8")) as { strings: Record<string, string> };
 const STRINGS = stringsFile.strings;
 const SUMMARIZER_SIZE_MB = Math.round(models.web.summarizer.files.reduce((n, f) => n + f.bytes, 0) / 1e6);
-const SUMMARIZER_ID_FRAGMENT = models.web.summarizer.id.split("/")[1]; // e.g. "Qwen3.5-0.8B-Text-ONNX"
 
 /** Every request to the Hub gets a small fixed delay before continuing ("route-throttled"): real
  *  enough to prove ordering, small enough that the real ~90 MB voice model still loads in a CI
@@ -38,14 +38,15 @@ async function throttleHub(page: Page): Promise<{ urls: string[] }> {
 }
 
 test.describe("loading UX (?llm=fake, route-throttled)", () => {
-  test("summarizer size shown before download; no summarizer request before the click; progress bars reach 100 %; cache detection", async ({ page }) => {
-    const { urls } = await throttleHub(page);
-    await page.goto("/?llm=fake");
+  // Download gating (rule 11) is enforced in the Summarizer, which this app page and the S1-05
+  // harness share; it is proven with real requests on the harness page (summarize.spec.ts, cold
+  // load, webgpu-local only). No wasm-ci test on this page can prove it: ?llm=fake never
+  // downloads, and without WebGPU the real probe stops before any request. So this test checks
+  // the Loading UI only (Codex review, PR #20).
+  test("summarizer size shown before the click; progress bars reach 100 %; cache detection", async ({ page }) => {
+    await throttleHub(page);
+    await gotoIsolated(page, "/?llm=fake");
     await page.waitForSelector('[data-testid="loading"]');
-
-    // Voice loads automatically (rule 11); the summarizer must not have been requested yet.
-    await page.waitForTimeout(300);
-    expect(urls.some((u) => u.includes(SUMMARIZER_ID_FRAGMENT))).toBe(false);
 
     // Size shown first: the button and the size line exist before any click, with the real MB
     // number from spec/models.json (never a hard-coded UI literal).
@@ -56,7 +57,6 @@ test.describe("loading UX (?llm=fake, route-throttled)", () => {
     await expect(sizeLine).toHaveText(new RegExp(`${SUMMARIZER_SIZE_MB} MB`));
 
     await button.click();
-    expect(urls.some((u) => u.includes(SUMMARIZER_ID_FRAGMENT)), "?llm=fake never fetches the real summarizer").toBe(false);
 
     // The summarizer's own bar reaches 100 % (fake mode "downloads" instantly; real mode would
     // reach it once the last byte arrives -- same bar, same assertion).
@@ -86,7 +86,7 @@ test.describe("loading UX (?llm=fake, route-throttled)", () => {
     await context.addInitScript(() => {
       Object.defineProperty(window.navigator, "connection", { value: { saveData: true }, configurable: true });
     });
-    await page.goto("/?llm=fake");
+    await gotoIsolated(page, "/?llm=fake");
     const line = page.locator('[data-phase="save_data"]');
     await expect(line).toHaveText(STRINGS["loading.save_data"]);
     await page.waitForTimeout(500);
@@ -97,7 +97,7 @@ test.describe("loading UX (?llm=fake, route-throttled)", () => {
 
 test.describe("canned demo (?llm=fake, ?inject=nogpu -- never touches the models)", () => {
   test('"Try it now" plays within 1 s; turning the dial switches the recording', async ({ page }) => {
-    await page.goto("/?llm=fake&inject=nogpu");
+    await gotoIsolated(page, "/?llm=fake&inject=nogpu");
     const demo = page.getByTestId("demo");
     await expect(demo).toBeVisible();
     await expect(page.getByTestId("demo-audio")).toHaveAttribute("src", "/demo/short.wav", { timeout: 15_000 });
