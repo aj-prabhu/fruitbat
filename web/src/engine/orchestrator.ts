@@ -55,7 +55,10 @@ export interface Snapshot {
   voiceReady: boolean;
   prewarmed: boolean;
   speakMessages: boolean;
+  /** Summarizer download progress (S1-09 Loading UX: per-file MB while the summarizer loads). */
   progress: { file?: string; loaded?: number; total?: number } | null;
+  /** Voice download progress (S1-09 Loading UX: per-file MB while the voice loads). */
+  voiceProgress: { file?: string; loaded?: number; total?: number } | null;
   error: string | null;
   voice: { aheadSeconds: number; enqueued: number; inFlight: number; ended: number; pending: number; phase: string };
 }
@@ -101,6 +104,7 @@ export class Orchestrator {
   current: Cursor | null = null;
   error: string | null = null;
   progress: Snapshot["progress"] = null;
+  voiceProgress: Snapshot["voiceProgress"] = null;
   private runId = 0;
   private text = "";
   private chunks: Chunk[] | null = null;
@@ -121,10 +125,30 @@ export class Orchestrator {
     this.llm = llm;
     this.speakMessages = readStored(SPEAK_KEY) !== "off";
     llm.onNotice = (n) => this.onLlmNotice(n);
+    // Progress is per file in both engines; the Loading bars show each model's total, so bytes are
+    // summed across that model's files (Codex review, PR #20).
+    const summarizerFiles = new Map<string, { loaded: number; total: number }>();
+    const voiceFiles = new Map<string, { loaded: number; total: number }>();
+    const sum = (m: Map<string, { loaded: number; total: number }>) => {
+      let loaded = 0;
+      let total = 0;
+      for (const v of m.values()) {
+        loaded += v.loaded;
+        total += v.total;
+      }
+      return { loaded, total };
+    };
     llm.onProgress = (p) => {
-      this.progress = p;
+      if (p.file) summarizerFiles.set(p.file, { loaded: p.loaded ?? 0, total: p.total ?? 0 });
+      this.progress = { file: p.file, ...sum(summarizerFiles) };
       this.emit();
     };
+    // S1-09 Loading UX: the voice's MB progress, same shape as the summarizer's.
+    voice.onProgress((file, loaded, total) => {
+      voiceFiles.set(file, { loaded, total });
+      this.voiceProgress = { file, ...sum(voiceFiles) };
+      this.emit();
+    });
     // Rule 11: the voice loads on page load, except on data saver / mobile. (No Worker = a unit
     // test environment: nothing loads, nothing is reported.)
     if (typeof Worker !== "undefined" && !saveData() && !isMobile()) void this.warmVoice();
@@ -182,6 +206,7 @@ export class Orchestrator {
       prewarmed: this.voice.prewarmed,
       speakMessages: this.speakMessages,
       progress: this.progress,
+      voiceProgress: this.voiceProgress,
       error: this.error,
       voice: { aheadSeconds: v.aheadSeconds, enqueued: v.enqueued, inFlight: v.inFlight, ended: v.ended, pending: v.pending, phase: v.phase },
     };
@@ -291,9 +316,16 @@ export class Orchestrator {
     return this.begin(id, level, { fromChunk: 0, base: 0, end: text.length });
   }
 
-  /** Esc. Returns the measured stop time in ms. */
-  stop(): number {
-    const active = isActive(this.gen, this.play);
+  /** Silence spoken messages (a "Stopped" still playing, say) without touching any run or load:
+   *  the demo recording is about to play (Codex review, PR #20). */
+  silenceVoice(): void {
+    this.voice.stop();
+  }
+
+  /** Esc. Returns the measured stop time in ms. `quiet` skips the spoken "Stopped" (the demo
+   *  recording is about to play and must not be talked over; Codex review, PR #20). */
+  stop(opts: { quiet?: boolean } = {}): number {
+    const active = isActive(this.gen, this.play) && !opts.quiet;
     this.newRun();
     this.current = null;
     this.progress = null;
@@ -416,6 +448,9 @@ export class Orchestrator {
 
   private async begin(id: number, level: Level, o: { fromChunk: number; base: number; end: number; keep?: boolean }): Promise<void> {
     this.last = { level, chars: o.end - o.base }; // dial regeneration and "Read this part" are runs too (Codex review, PR #22)
+    // Every live run (a new read, a dial regeneration, "Read this part") silences the demo
+    // recording, which listens for this without importing the engine (Codex review, PR #20).
+    if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("fruitbat:live"));
     this.play = reducePlay(this.play, "reset");
     if (!o.keep) {
       this.bullets = [];

@@ -1,0 +1,95 @@
+{
+  "level": "readall",
+  "label_key": "dial.readall",
+  "source_doc": "spec/eval/corpus/011.txt",
+  "source_start": 0,
+  "source_end": 1173,
+  "sample_rate": 24000,
+  "duration_seconds": 80.8,
+  "items": [
+    {
+      "text": "The most famous of the park's mammals are the bats.",
+      "start": 0,
+      "end": 51,
+      "audioStart": 0,
+      "audioEnd": 3.225
+    },
+    {
+      "text": "The park hosts 17 different bat species.",
+      "start": 52,
+      "end": 92,
+      "audioStart": 3.225,
+      "audioEnd": 6.475
+    },
+    {
+      "text": "The large colony of Brazilian free-tailed bats wow visitors every evening from spring through fall with its spectacular outflights.",
+      "start": 93,
+      "end": 224,
+      "audioStart": 6.475,
+      "audioEnd": 14.9
+    },
+    {
+      "text": "Two other species have also been found regularly in Carlsbad Cavern—cave myotis and fringed myotis bats.",
+      "start": 225,
+      "end": 329,
+      "audioStart": 14.9,
+      "audioEnd": 22.625
+    },
+    {
+      "text": "They typically roost in a different part of the cavern and fly about 1.5 miles (2.4 km) before exiting the Natural Entrance.",
+      "start": 330,
+      "end": 454,
+      "audioStart": 22.625,
+      "audioEnd": 32
+    },
+    {
+      "text": "But not all bat species roost in caves.",
+      "start": 456,
+      "end": 495,
+      "audioStart": 32,
+      "audioEnd": 35.025
+    },
+    {
+      "text": "Among the other species using the park are eastern red bats and hoary bats, which roost in trees, and parastrellus hesperus or canyon bats, which roost on rock cliffs and in cracks.",
+      "start": 496,
+      "end": 677,
+      "audioStart": 35.025,
+      "audioEnd": 47.025
+    },
+    {
+      "text": "Bats are mammals, which means that they give live birth to their young (do not lay eggs), are warm-blooded, have fur (not feathers), and baby bats or pups are fed breast milk (not insects) by their mothers.",
+      "start": 678,
+      "end": 884,
+      "audioStart": 47.025,
+      "audioEnd": 59.8
+    },
+    {
+      "text": "Bats are the only true flying mammals.",
+      "start": 885,
+      "end": 923,
+      "audioStart": 59.8,
+      "audioEnd": 62.625
+    },
+    {
+      "text": "All the bats in the area around Carlsbad Caverns National Park are insectivores.",
+      "start": 924,
+      "end": 1004,
+      "audioStart": 62.625,
+      "audioEnd": 68.25
+    },
+    {
+      "text": "The Brazilian free-tailed bats weigh about 1/2 ounce (13 g), which is equivalent to the weight of three nickel coins.",
+      "start": 1005,
+      "end": 1122,
+      "audioStart": 68.25,
+      "audioEnd": 76.3
+    },
+    {
+      "text": "Their wingspan is approximately 11 inches (28 cm).",
+      "start": 1123,
+      "end": 1173,
+      "audioStart": 76.3,
+      "audioEnd": 80.8
+    }
+  ]
+}

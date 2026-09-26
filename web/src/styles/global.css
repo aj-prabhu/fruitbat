@@ -343,3 +343,99 @@ body {
   overflow-wrap: anywhere;
   max-width: 100%;
 }
+/* S1-09: minimal styling for the loading line and the canned demo (S1-07's impeccable pass owns
+   the real look). Kept plain on purpose so the state is easy to read at a glance. */
+.loading {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: var(--gutter);
+  max-width: var(--measure);
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+.loading-line {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+.loading-bar {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--color-accent);
+}
+.loading-cache {
+  margin: 0;
+  font-size: 0.8rem;
+  opacity: 0.7;
+}
+.loading-notice {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+.loading-summarizer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.loading-summarizer-button {
+  align-self: flex-start;
+  border: 1px solid var(--color-accent);
+  background: var(--color-panel-bg);
+  color: var(--color-fg);
+  border-radius: var(--border-radius);
+  padding: 6px 12px;
+  cursor: pointer;
+  font: inherit;
+}
+.loading-summarizer-button:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.demo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  padding: var(--gutter);
+}
+.demo-recording-label,
+.demo-excerpt-note,
+.demo-switch-level {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+.demo-try-it-now {
+  align-self: flex-start;
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-fg);
+  border-radius: var(--border-radius);
+  padding: 6px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+.demo-try-it-now:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.demo-try-it-now:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+.demo-items {
+  margin: 0;
+  padding-left: 1.2em;
+}
+.demo-items li {
+  margin: 0.35em 0;
+}
+.demo-items li[aria-current="true"] {
+  background: var(--color-accent-soft, rgba(120, 90, 200, 0.15));
+  border-radius: 4px;
+}

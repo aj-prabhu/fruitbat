@@ -7,6 +7,7 @@ import { render } from "preact";
 import { App } from "./app";
 import { pushEvent } from "./engine/events";
 import { orchestrator, type Snapshot } from "./engine/orchestrator";
+import { isActive } from "./engine/state";
 import { subscribeLevel } from "./state/level";
 import * as stats from "./stats/store";
 import type { FruitbatAPI, FruitbatStats, Level } from "./types";
@@ -50,6 +51,16 @@ const fruitbat: FruitbatAPI = {
 window.__fruitbat = fruitbat;
 window.addEventListener("fruitbat:run", (e) => void o.run(e.detail.text, e.detail.level));
 window.addEventListener("fruitbat:stop", () => o.stop());
+// The demo recording is about to play: silence a live read or summary, but leave a summarizer
+// download the user started from the Loading panel alone (Codex review, PR #20).
+window.addEventListener("fruitbat:demo", () => {
+  const s = o.snapshot();
+  // Speech still on its way (a summary whose generation finished before its first bullet was
+  // synthesized) counts too (Codex review, PR #20).
+  const speechPending = s.voice.pending > 0 || s.voice.inFlight > 0 || s.voice.enqueued > s.voice.ended;
+  if (isActive(s.gen, s.play) || speechPending) o.stop({ quiet: true });
+  else o.silenceVoice(); // e.g. the "Stopped" an Esc just spoke must not play under the recording
+});
 // S1-10: one RunStats row per finished run (done or failed), never on stop -- a stopped run never
 // finished (docs/PLAN.md "Stats store"). `runId` is monotonic and never reused, so recording once
 // per (runId, terminal-gen) pair is enough to survive later emits of the same terminal state

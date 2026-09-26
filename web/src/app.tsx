@@ -12,6 +12,8 @@ import { ReadChip } from "./intake/ReadChip";
 import { orchestrator, type Snapshot } from "./engine/orchestrator";
 import { setLevel as setSharedLevel } from "./state/level";
 import { t } from "./strings";
+import { Demo } from "./ui/Demo";
+import { Loading } from "./ui/Loading";
 import type { Level } from "./types";
 import { Report } from "./ui/Report";
 import { Stats } from "./ui/Stats";
@@ -201,7 +203,9 @@ export function App() {
         </button>
         <ThemeToggle />
       </header>
+      <Loading />
       <main class="app-main">
+        <Demo />
         <Article paragraphs={paragraphs} />
         <PasteBox />
       </main>
