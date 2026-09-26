@@ -15,7 +15,8 @@ cd "$ROOT"
 
 COMMIT="${1:-}"
 [ -z "$COMMIT" ] && { echo "usage: $0 <commit>" >&2; exit 2; }
-COMMIT_FULL="$(git rev-parse "$COMMIT")"
+# ^{commit} peels an annotated tag to the commit it points at (Codex review, PR #6).
+COMMIT_FULL="$(git rev-parse --verify "$COMMIT^{commit}")"
 ALLOW_MISSING="${RELEASE_CHECK_ALLOW_MISSING:-}"
 if [ "$ALLOW_MISSING" = "1" ]; then
   echo "### RELEASE_CHECK_ALLOW_MISSING=1 — missing infra counts as skipped, not FAIL. Dry runs only. ###"

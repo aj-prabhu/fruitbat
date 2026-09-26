@@ -62,7 +62,11 @@ jobs:
       - name: release-check
         env:
           TAG: ${{ steps.tag.outputs.tag }}
-        run: scripts/release-check.sh "$GITHUB_SHA"
+        run: |
+          # Cut-list fallback (docs/PLAN.md): a hand-filled gate committed as
+          # bench/release-gate-<tag>.md stands in for bench rows on that release (Codex review, PR #6).
+          if [ -s "bench/release-gate-$TAG.md" ]; then export RELEASE_GATE_FILE="bench/release-gate-$TAG.md"; fi
+          scripts/release-check.sh "$GITHUB_SHA"
 
       - name: Dry run (manual run, or tag contains -test)
         if: github.event_name != 'push' || contains(steps.tag.outputs.tag, '-test')
