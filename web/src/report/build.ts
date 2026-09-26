@@ -81,12 +81,12 @@ function ramBucket(): BugReportEnv["ram_bucket"] {
   return mem < 8 ? "under_8gb" : "8gb";
 }
 
-function osString(): string {
-  const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
+export function osString(ua: string = typeof navigator !== "undefined" ? navigator.userAgent || "" : ""): string {
+  // iOS first: iPhone and iPad user agents also say "like Mac OS X" (Codex review, PR #23).
+  if (/iPhone|iPad/.test(ua)) return `ios ${/OS (\d+)_/.exec(ua)?.[1] ?? ""}`.trim();
   if (/Mac OS X/.test(ua)) return `macos ${/Mac OS X (\d+)/.exec(ua)?.[1] ?? ""}`.trim();
   if (/Windows NT/.test(ua)) return `windows ${/Windows NT (\d+)/.exec(ua)?.[1] ?? ""}`.trim();
   if (/Android/.test(ua)) return `android ${/Android (\d+)/.exec(ua)?.[1] ?? ""}`.trim();
-  if (/iPhone|iPad/.test(ua)) return `ios ${/OS (\d+)_/.exec(ua)?.[1] ?? ""}`.trim();
   if (/Linux/.test(ua)) return "linux";
   return "unknown";
 }

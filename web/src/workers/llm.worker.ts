@@ -11,7 +11,7 @@ import {
   type PreTrainedModel,
   type PreTrainedTokenizer,
 } from "@huggingface/transformers";
-import { configureRuntime, load, type LoadProgress } from "../engine/loader";
+import { configureRuntime, load, loadsSettled, networkBytes, type LoadProgress } from "../engine/loader";
 import { summarizerTiers, type PinnedModel } from "../engine/pins";
 import type { Inject } from "../engine/capabilities";
 import type { MainToWorker, WorkerToMain } from "../engine/llmProtocol";
@@ -26,6 +26,8 @@ let inject: Inject = null;
 let oomFired = false;
 let stopper: InterruptableStoppingCriteria | null = null;
 let generating: number | null = null; // runId of the generation in flight
+let probing: number | null = null; // runId of the 1-token probe in flight
+let loadingRun: number | null = null; // runId of the model load in flight
 const aborted = new Set<number>();
 
 function isMemoryError(e: unknown): boolean {
@@ -36,6 +38,12 @@ function isMemoryError(e: unknown): boolean {
 let loadAbort: AbortController | null = null;
 
 async function loadTier(spec: PinnedModel & { role: string }, runId: number): Promise<void> {
+  // Free the previous model first: a Stop or failed probe leaves the main thread "not loaded"
+  // while this worker still holds the GPU sessions (Codex review, PR #16).
+  const old = model;
+  model = null;
+  tokenizer = null;
+  if (old) await old.dispose().catch(() => undefined);
   loadAbort = new AbortController();
   const signal = loadAbort.signal;
   if (inject === "oom" && spec.role !== "low-end" && !oomFired) {
@@ -64,16 +72,42 @@ async function loadTier(spec: PinnedModel & { role: string }, runId: number): Pr
   loadedRole = spec.role;
 }
 
+/** networkBytes() is cumulative for the worker; each "loaded" reports only this load's bytes, so a
+ *  reload that came from the cache is never marked cold by an earlier download (Codex review, PR #22). */
+let reportedNetBytes = 0;
+function netSinceLastReport(): number {
+  const now = networkBytes();
+  const delta = now - reportedNetBytes;
+  reportedNetBytes = now;
+  return delta;
+}
+
 async function onLoad(msg: Extract<MainToWorker, { type: "load" }>): Promise<void> {
   inject = msg.inject;
   const t0 = performance.now();
+  loadingRun = msg.runId;
+  try {
+    await onLoadInner(msg, t0);
+  } finally {
+    // A Stop during the load is confirmed only once the factories underneath have settled:
+    // load() rejects at once on abort, but a download or session init may still be ending
+    // (Codex review, PR #16).
+    if (aborted.has(msg.runId)) await loadsSettled();
+    loadingRun = null;
+    if (aborted.has(msg.runId)) post({ type: "aborted", runId: msg.runId });
+  }
+}
+
+async function onLoadInner(msg: Extract<MainToWorker, { type: "load" }>, t0: number): Promise<void> {
   try {
     await loadTier(msg.model, msg.runId);
-    post({ type: "loaded", runId: msg.runId, modelId: msg.model.id, role: loadedRole, downgraded: false, ms: Math.round(performance.now() - t0) });
+    if (aborted.has(msg.runId)) return;
+    post({ type: "loaded", runId: msg.runId, modelId: msg.model.id, role: loadedRole, downgraded: false, netBytes: netSinceLastReport(), ms: Math.round(performance.now() - t0) });
   } catch (e) {
     if (aborted.has(msg.runId) || (e instanceof Error && e.name === "AbortError")) {
-      // Stop during the download: in-flight requests cancelled by the loader's signal (Codex review, PR #16)
-      post({ type: "aborted", runId: msg.runId });
+      // Stop during the download: in-flight requests cancelled by the loader's signal (Codex review, PR #16).
+      // onLoad's finally posts "aborted" for a Stop; a bare AbortError without one is posted here.
+      if (!aborted.has(msg.runId)) post({ type: "aborted", runId: msg.runId });
       return;
     }
     if (!isMemoryError(e)) {
@@ -89,8 +123,10 @@ async function onLoad(msg: Extract<MainToWorker, { type: "load" }>): Promise<voi
       tokenizer = null;
       model = null;
       await loadTier(low, msg.runId);
-      post({ type: "loaded", runId: msg.runId, modelId: low.id, role: low.role, downgraded: true, ms: Math.round(performance.now() - t0) });
+      if (aborted.has(msg.runId)) return;
+      post({ type: "loaded", runId: msg.runId, modelId: low.id, role: low.role, downgraded: true, netBytes: netSinceLastReport(), ms: Math.round(performance.now() - t0) });
     } catch (e2) {
+      if (aborted.has(msg.runId)) return;
       post({ type: "error", runId: msg.runId, name: e2 instanceof Error ? e2.name : "Error", message: e2 instanceof Error ? e2.message : String(e2) });
     }
   }
@@ -98,6 +134,7 @@ async function onLoad(msg: Extract<MainToWorker, { type: "load" }>): Promise<voi
 
 async function onProbe(msg: Extract<MainToWorker, { type: "probe" }>): Promise<void> {
   const t0 = performance.now();
+  probing = msg.runId;
   try {
     if (!tokenizer || !model) throw new Error("not loaded");
     if (inject === "devicelost") {
@@ -111,6 +148,10 @@ async function onProbe(msg: Extract<MainToWorker, { type: "probe" }>): Promise<v
     post({ type: "probe_result", runId: msg.runId, ok, error: ok ? undefined : "no token", ms: Math.round(performance.now() - t0) });
   } catch (e) {
     post({ type: "probe_result", runId: msg.runId, ok: false, error: e instanceof Error ? `${e.name}: ${e.message}` : String(e), ms: Math.round(performance.now() - t0) });
+  } finally {
+    probing = null;
+    // A Stop during the probe is confirmed only once the GPU is actually free.
+    if (aborted.has(msg.runId)) post({ type: "aborted", runId: msg.runId });
   }
 }
 
@@ -182,7 +223,7 @@ self.onmessage = (e: MessageEvent<MainToWorker>) => {
       aborted.add(msg.runId);
       loadAbort?.abort();
       if (generating === msg.runId && stopper) stopper.interrupt();
-      else post({ type: "aborted", runId: msg.runId });
+      else if (probing !== msg.runId && loadingRun !== msg.runId) post({ type: "aborted", runId: msg.runId }); // else onProbe/onLoad confirm when done
       break;
   }
 };

@@ -54,10 +54,20 @@ async function ready(page, query) {
 }
 async function runOne(page, model, doc, level, variant) {
   const text = await readFile(path.join(root, "spec/eval/corpus", `${doc}.txt`), "utf8");
-  // facts files come from S0-04b; until that merges, FACTS_DIR may point at its worktree
-  let facts = { key_facts: [], expected_oneline_keywords: [] };
+  // Facts files come from S0-04b (spec/eval/corpus); FACTS_DIR may point elsewhere. A missing or
+  // malformed file stops the run: grading against nothing would report a fake score (Codex review, PR #16).
+  let facts = null;
+  const tried = [];
   for (const dir of [path.join(root, "spec/eval/corpus"), process.env.FACTS_DIR].filter(Boolean)) {
-    try { facts = JSON.parse(await readFile(path.join(dir, `${doc}.facts.json`), "utf8")); break; } catch { /* try next */ }
+    const f = path.join(dir, `${doc}.facts.json`);
+    let raw;
+    try { raw = await readFile(f, "utf8"); } catch { tried.push(f); continue; }
+    facts = JSON.parse(raw); // malformed JSON throws here, on purpose
+    break;
+  }
+  if (!facts) throw new Error(`bakeoff: no facts file for ${doc} (tried ${tried.join(", ")})`);
+  if (!Array.isArray(facts.key_facts) || !Array.isArray(facts.expected_oneline_keywords) || facts.key_facts.length === 0) {
+    throw new Error(`bakeoff: ${doc}.facts.json needs non-empty key_facts and an expected_oneline_keywords array`);
   }
   const t0 = Date.now();
   const r = await page.evaluate(([t, l]) => window.__llm.summarize(t, l), [text, level]);

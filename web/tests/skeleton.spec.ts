@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 
 // S1-00a proof (docs/PLAN.md): real text -> >= 3 bullets, no <think>, AudioContext running with
 // >= 1 s of PCM played, crossOriginIsolated === true. The LLM test runs on `webgpu-local` only;
@@ -6,32 +7,15 @@ import { test, expect, type Page } from "@playwright/test";
 
 const TEXT = `Bats are the only mammals that can truly fly. More than 1,400 species live on every continent except Antarctica, and about 47 of them live in the United States. A single little brown bat can eat up to 1,000 insects in one hour, which is why farmers count on bats to protect crops. Most bats find their way in the dark by echolocation: they send out high-pitched calls and listen for the echoes that bounce back. Fruit bats, also called flying foxes, rely more on their large eyes and strong sense of smell, and they spread the seeds of figs, mangoes, and more than 300 other plants. Since 2006 a fungal disease called white-nose syndrome has killed millions of bats in North America, cutting some colonies by 90 percent. Bats are slow to recover because most females raise only one pup a year. Leaving dead trees standing and turning off outdoor lights are two simple ways people help.`;
 
-async function waitIsolated(page: Page) {
-  // coi-serviceworker registers on the first load, then reloads the page once.
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      await page.waitForFunction(() => (window as unknown as { crossOriginIsolated: boolean }).crossOriginIsolated === true, null, {
-        timeout: 15_000,
-      });
-      return;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
-  throw new Error("crossOriginIsolated never became true");
-}
-
 test("cross-origin isolation holds via the service worker", async ({ page }) => {
-  await page.goto("/skeleton.html");
-  await waitIsolated(page);
+  await gotoIsolated(page, "/skeleton.html");
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
   expect(await page.evaluate(() => typeof SharedArrayBuffer)).toBe("function");
 });
 
 test("real text -> real bullets -> real audio", async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== "webgpu-local", "needs WebGPU; wasm-ci gets ?llm=fake in S1-05");
-  await page.goto("/skeleton.html");
-  await waitIsolated(page);
+  await gotoIsolated(page, "/skeleton.html");
   await page.waitForFunction(() => (window as unknown as { __skeleton?: { state: string } }).__skeleton?.state === "idle", null, {
     timeout: 20_000,
   });

@@ -5,24 +5,32 @@ import { AutoTokenizer, type PreTrainedTokenizer } from "@huggingface/transforme
 import { configureRuntime } from "../engine/loader";
 import { pinnedModels } from "../engine/pins";
 
-let ready: Promise<PreTrainedTokenizer> | null = null;
+/** A pinned model whose tokenizer is wanted: the default summarizer unless a fallback tier is live. */
+export type TokenizerPin = { id: string; revision: string };
 
-/** The pinned tokenizer, loaded once (Cache API in the browser, FS cache in Node). */
-export function tokenizerReady(): Promise<PreTrainedTokenizer> {
-  if (!ready) {
+const ready = new Map<string, Promise<PreTrainedTokenizer>>();
+
+/**
+ * The pinned tokenizer, loaded once per model (Cache API in the browser, FS cache in Node).
+ * Defaults to the default summarizer; when a fallback tier is loaded, the summarizer passes that
+ * tier so chunk budgets match the model that reads them (Codex review, PR #16).
+ */
+export function tokenizerReady(pin: TokenizerPin = pinnedModels().web.summarizer): Promise<PreTrainedTokenizer> {
+  let p = ready.get(pin.id);
+  if (!p) {
     configureRuntime();
-    const { id, revision } = pinnedModels().web.summarizer;
-    ready = AutoTokenizer.from_pretrained(id, { revision }).catch((e: unknown) => {
-      ready = null;
+    p = AutoTokenizer.from_pretrained(pin.id, { revision: pin.revision }).catch((e: unknown) => {
+      ready.delete(pin.id);
       throw e;
     });
+    ready.set(pin.id, p);
   }
-  return ready;
+  return p;
 }
 
 /** Number of tokens `text` occupies as model input, without special tokens. */
-export async function countTokens(text: string): Promise<number> {
-  const tok = await tokenizerReady();
+export async function countTokens(text: string, pin?: TokenizerPin): Promise<number> {
+  const tok = await tokenizerReady(pin);
   return countTokensWith(tok, text);
 }
 

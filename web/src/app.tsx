@@ -12,6 +12,8 @@ import { ReadChip } from "./intake/ReadChip";
 import { orchestrator, type Snapshot } from "./engine/orchestrator";
 import { setLevel as setSharedLevel } from "./state/level";
 import { t } from "./strings";
+import { Demo } from "./ui/Demo";
+import { Loading } from "./ui/Loading";
 import type { Level } from "./types";
 import { Report } from "./ui/Report";
 import { Stats } from "./ui/Stats";
@@ -186,7 +188,13 @@ export function App() {
     <div class="app-shell">
       <header class="app-header">
         <h1 class="app-title">{t("app.title")}</h1>
-        <Dial level={level} onChange={setLevel} />
+        <Dial
+          level={level}
+          onChange={(l) => {
+            setSharedLevel(l); // synchronous, so a read triggered right after the click sees it (Codex merge-gate review, PR #12)
+            setLevel(l);
+          }}
+        />
         <button type="button" class="stats-toggle" onClick={() => setStatsOpen(true)}>
           {t("panel.stats")}
         </button>
@@ -195,7 +203,9 @@ export function App() {
         </button>
         <ThemeToggle />
       </header>
+      <Loading />
       <main class="app-main">
+        <Demo />
         <Article paragraphs={paragraphs} />
         <PasteBox />
       </main>

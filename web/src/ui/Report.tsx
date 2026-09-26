@@ -6,7 +6,7 @@
 // component just calls it and renders the result. Every label comes from spec/strings/en.json
 // (CONTRIBUTING.md "Strings"); the structured preview itself is rendered from the report object,
 // not from translated copy, the same way ui/Stats.tsx renders its raw column names.
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { events } from "../engine/events";
 import { orchestrator } from "../engine/orchestrator";
 import { buildCopyText, buildIssueUrl, buildReport, type BugReport } from "../report/build";
@@ -17,6 +17,8 @@ export function Report({ onClose }: { onClose: () => void }) {
   const [base, setBase] = useState<BugReport | null>(null);
   const [description, setDescription] = useState("");
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
+  const previewRef = useRef(null) as { current: HTMLPreElement | null };
 
   // Built once per open: the env/model probe is async (WebGPU adapter info) and doesn't need to
   // re-run on every keystroke in the description box below -- that field is overlaid locally.
@@ -37,8 +39,16 @@ export function Report({ onClose }: { onClose: () => void }) {
 
   const report: BugReport | null = base ? { ...base, user_description: description.slice(0, 2000) } : null;
 
+  const viewRef = useRef<HTMLDivElement>(null);
+  // Opened from the header above a long article: bring it to the reader and move focus into it
+  // (Codex review, PR #23).
+  useEffect(() => {
+    viewRef.current?.scrollIntoView({ block: "start" });
+    viewRef.current?.focus();
+  }, []);
+
   return (
-    <div class="report-view" role="dialog" aria-label={t("report.title")}>
+    <div class="report-view" role="dialog" aria-label={t("report.title")} ref={viewRef} tabIndex={-1}>
       <div class="report-view-header">
         <h2>{t("report.title")}</h2>
         <button type="button" class="report-close" onClick={onClose}>
@@ -56,7 +66,7 @@ export function Report({ onClose }: { onClose: () => void }) {
         onInput={(e) => setDescription((e.target as HTMLTextAreaElement).value)}
       />
       <p class="report-preview-intro">{t("report.preview_intro")}</p>
-      <pre class="report-preview" data-testid="report-preview">
+      <pre class="report-preview" data-testid="report-preview" ref={previewRef}>
         {report ? JSON.stringify(report, null, 2) : ""}
       </pre>
       <div class="report-actions">
@@ -79,10 +89,33 @@ export function Report({ onClose }: { onClose: () => void }) {
           disabled={!report}
           onClick={() => {
             if (!report) return;
-            void navigator.clipboard.writeText(buildCopyText(report)).then(() => setCopied(true));
+            // A denied clipboard (browser permission, embedding policy) says so and selects the
+            // preview, so the report can still be copied by hand (Codex review, PR #23).
+            // No Clipboard API at all (a plain-HTTP preview, an old browser) takes the same
+            // "copy it by hand" path as a refused one (Codex review, PR #23).
+            const clip = typeof navigator !== "undefined" ? navigator.clipboard : undefined;
+            const write = clip ? clip.writeText(buildCopyText(report)) : Promise.reject(new Error("no clipboard"));
+            void write.then(
+              () => {
+                setCopyFailed(false);
+                setCopied(true);
+              },
+              () => {
+                setCopied(false);
+                setCopyFailed(true);
+                const el = previewRef.current;
+                const sel = typeof window !== "undefined" ? window.getSelection() : null;
+                if (el && sel) {
+                  const range = document.createRange();
+                  range.selectNodeContents(el);
+                  sel.removeAllRanges();
+                  sel.addRange(range);
+                }
+              },
+            );
           }}
         >
-          <span aria-live="polite">{copied ? t("report.copied") : t("report.copy")}</span>
+          <span aria-live="polite">{copyFailed ? t("report.copy_failed") : copied ? t("report.copied") : t("report.copy")}</span>
         </button>
       </div>
     </div>

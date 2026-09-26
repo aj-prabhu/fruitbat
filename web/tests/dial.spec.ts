@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Browser } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,15 +41,7 @@ const stats = (page: Page) => page.evaluate(() => (window as unknown as W).__fru
 const words = (s: string) => s.split(/\s+/).filter(Boolean).length;
 
 async function open(page: Page, query: string) {
-  await page.goto(`/${query}`);
-  for (let i = 0; i < 3; i++) {
-    try {
-      await page.waitForFunction(() => crossOriginIsolated === true, null, { timeout: 15_000 });
-      break;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
+  await gotoIsolated(page, `/${query}`);
   await page.waitForFunction(() => typeof (window as unknown as Partial<W>).__fruitbat?.state === "function", null, { timeout: 20_000 });
   // The voice loads on page load (rule 11) and prewarms the fixed notices; the dial notice
   // latency is measured against a warm voice, as in the product.
@@ -195,7 +188,12 @@ test.describe("all-cut chunk (?llm=fake&fake=cutshort)", () => {
     expect(s.notices).toContain("notice.all_cut");
     expect((await stats(page)).notices_spoken).toContain("notice.all_cut");
     expect(s.bullets.length).toBe(0);
-    expect(s.voice.enqueued, "nothing auto-played").toBe(0);
+    // The notice itself is spoken in order in the stream (one queue item); the chunk's own text is
+    // never auto-played: no bullet, no sentence cursor (Codex review, PR #18).
+    expect(s.voice.enqueued, "only the notice was queued").toBeLessThanOrEqual(1);
+    expect(s.current, "no chunk text is playing").toBeNull();
+    await page.waitForTimeout(1000); // the stream has ended; "Done" must not replace the explanation (Codex review, PR #18)
+    expect((await snap(page)).notices).not.toContain("notice.done");
     expect(s.play).toBe("idle");
     const button = page.locator("button.read-part[data-chunk='0']");
     await expect(button).toBeVisible();

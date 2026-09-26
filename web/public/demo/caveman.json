@@ -1,0 +1,46 @@
+{
+  "level": "caveman",
+  "label_key": "dial.caveman",
+  "source_doc": "spec/eval/corpus/011.txt",
+  "source_start": 0,
+  "source_end": 1173,
+  "sample_rate": 24000,
+  "duration_seconds": 13.5,
+  "items": [
+    {
+      "text": "The park hosts 17 bat species.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 0,
+      "audioEnd": 2.725
+    },
+    {
+      "text": "Brazilian free-tailed bats roost in caves.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 2.725,
+      "audioEnd": 5.95
+    },
+    {
+      "text": "Other species roost in trees or cliffs.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 5.95,
+      "audioEnd": 8.975
+    },
+    {
+      "text": "Bats give live birth, not eggs.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 8.975,
+      "audioEnd": 11.45
+    },
+    {
+      "text": "Bats are insectivores.",
+      "start": 0,
+      "end": 1173,
+      "audioStart": 11.45,
+      "audioEnd": 13.5
+    }
+  ]
+}

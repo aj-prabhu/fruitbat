@@ -121,18 +121,73 @@ def _parse_value(field, raw):
     return raw
 
 
-def load_results_csv(path):
+def _row_problems(row):
+    """Schema + finiteness check for one parsed row (Codex merge-gate review, PR #15)."""
+    import math
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from schema_check import Validator  # noqa: E402  (sibling module, stdlib only)
+    schema_path = REPO_ROOT_FALLBACK / "spec" / "schemas" / "run-stats.schema.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    errors = []
+    Validator(schema_path.parent).validate(row, schema, "$", schema, schema_path, errors)
+    for k, v in row.items():
+        if isinstance(v, float) and not math.isfinite(v):
+            errors.append(f"$.{k}: not a finite number")
+    return errors
+
+
+def load_results_csv(path, strict=True):
+    """Parsed rows from results.csv. With strict=True (the default) a row that fails the RunStats
+    schema or carries a non-finite number is dropped and reported on stderr, so it can never be
+    aggregated or gated."""
     if not path.exists():
         return []
     with path.open(newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
-        return [{f: _parse_value(f, raw.get(f)) for f in CSV_FIELDS} for raw in reader]
+        if strict and list(reader.fieldnames or []) != list(CSV_FIELDS):
+            # An extra column would be dropped by the projection below and never validated, so it
+            # could carry free text; the header must be exactly RunStats' (Codex merge-gate review, PR #15).
+            print("bench-gate: results.csv header does not match RunStats fields exactly", file=sys.stderr)
+            MALFORMED_ROWS.append(1)
+            return []
+        raws = list(reader)
+        for i, raw in enumerate(raws, start=2):
+            if strict and raw.get(None):
+                print(f"bench-gate: results.csv line {i} has cells beyond the header", file=sys.stderr)
+                MALFORMED_ROWS.append(i)
+        rows = [{f: _parse_value(f, raw.get(f)) for f in CSV_FIELDS} for raw in raws if not (strict and raw.get(None))]
+    if not strict:
+        return rows
+    kept = []
+    for i, row in enumerate(rows, start=2):
+        errs = _row_problems(row)
+        if errs:
+            print(f"bench-gate: results.csv line {i} rejected: {'; '.join(errs[:3])}", file=sys.stderr)
+            MALFORMED_ROWS.append(i)
+        else:
+            kept.append(row)
+    return kept
+
+
+# Line numbers of rows load_results_csv() rejected. Any entry fails --pr-head and --release: the
+# runner validates before appending, so a malformed row is a bug or an edit, never noise
+# (Codex merge-gate review, PR #15).
+MALFORMED_ROWS = []
 
 
 def load_baselines(path):
     if not path.exists():
         return {"version": 1, "baselines": []}
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def load_baselines_at(repo_root, rev):
+    """bench/baselines.json as it is at `rev` (empty set if the file did not exist there)."""
+    out = subprocess.run(["git", "-C", str(repo_root), "show", f"{rev}:bench/baselines.json"],
+                         capture_output=True, text=True)
+    if out.returncode != 0:
+        return {"version": 1, "baselines": []}
+    return json.loads(out.stdout)
 
 
 def save_baselines(path, data):
@@ -169,11 +224,39 @@ def group_rows_by_identity(rows):
     return groups
 
 
+# Zero-tolerance counters: one bad rep is a failure, so they aggregate by the worst rep, not the
+# median (Codex merge-gate review, PR #15: [0, 0, 1] halluc_flags must not pass as 0).
+WORST_REP_FIELDS = {"halluc_flags", "forbidden_hits", "tts_overlimit"}
+# Coverage must be 100 % on every rep: its worst rep is the minimum (Codex merge-gate review, PR #15).
+WORST_REP_MIN_FIELDS = {"coverage"}
+
+
 def compute_medians(rows):
     out = {}
     for field in METRIC_FIELDS:
         values = [r[field] for r in rows if r.get(field) is not None]
-        out[field] = statistics.median(values) if values else None
+        if not values:
+            out[field] = None
+        elif field in WORST_REP_FIELDS:
+            out[field] = max(values)
+        elif field in WORST_REP_MIN_FIELDS:
+            out[field] = min(values)
+        else:
+            out[field] = statistics.median(values)
+    return out
+
+
+def rep_problems(rows, target, level):
+    """Every repetition must carry every required metric: a median over the reps that happen to
+    have a number would hide the reps that don't (Codex merge-gate review, PR #15)."""
+    required = list(REQUIRED_METRICS.get(level, []))
+    if target == "mac":
+        required.append("peak_mb")
+    out = []
+    for field in required:
+        missing = sum(1 for r in rows if r.get(field) is None)
+        if missing:
+            out.append(f"{field} missing in {missing} of {len(rows)} reps")
     return out
 
 
@@ -250,7 +333,10 @@ def evaluate_floors(target, level, cache_state, m):
     just because the environment "legitimately changed"."""
     fails = []
 
-    for field in REQUIRED_METRICS.get(level, []):
+    required = list(REQUIRED_METRICS.get(level, []))
+    if target == "mac":
+        required.append("peak_mb")  # the Mac memory ceiling is a gate, so the number must be there (Codex merge-gate review, PR #15)
+    for field in required:
         if m.get(field) is None:
             fails.append(f"{field} missing: required for level {level}")
 
@@ -281,7 +367,7 @@ def evaluate_floors(target, level, cache_state, m):
         fails.append(f"stop_ms {m['stop_ms']} exceeds floor {STOP_MS_FLOOR}ms")
 
     if level == "readall":
-        if m.get("coverage") is not None and m["coverage"] < 0.999:
+        if m.get("coverage") is not None and m["coverage"] < 1.0:  # the requirement is 100 % (Codex merge-gate review, PR #15)
             fails.append(f"coverage {m['coverage']} below 1.0 floor (readall)")
         if m.get("tts_overlimit") is not None and m["tts_overlimit"] > 0:
             fails.append(f"tts_overlimit {m['tts_overlimit']} > 0 (readall)")
@@ -295,6 +381,12 @@ def evaluate_floors(target, level, cache_state, m):
 def evaluate_deltas(target, m, b):
     """Regression-vs-baseline checks: docs/PLAN.md S0-05 packet text, verbatim list."""
     fails = []
+
+    # A metric the baseline measured must still be measured: a blank current value would otherwise
+    # skip its regression check silently (Codex merge-gate review, PR #15).
+    for field in METRIC_FIELDS:
+        if b.get(field) is not None and m.get(field) is None:
+            fails.append(f"{field} missing (the baseline has {b[field]})")
 
     if m.get("ttfa_ms") is not None and b.get("ttfa_ms") is not None:
         limit = b["ttfa_ms"] * TTFA_REGRESSION_FACTOR
@@ -369,6 +461,9 @@ def gate_groups(groups, baselines, allow_reset):
         medians = compute_medians(rows)
         baseline = find_baseline(baselines, identity)
         passed, reasons, new_metrics = gate_identity(identity, medians, baseline, allow_reset)
+        rep_fails = rep_problems(rows, identity.target, identity.level)
+        if rep_fails:
+            passed, reasons, new_metrics = False, rep_fails + list(reasons), None
         status = "PASS" if passed else "FAIL"
         if not passed:
             all_pass = False
@@ -404,7 +499,7 @@ def release_logic(valid_rows):
     lines = ["status | identity | detail"]
     for identity, rows in sorted(groups.items(), key=lambda kv: identity_str(kv[0])):
         medians = compute_medians(rows)
-        fails = evaluate_floors(identity.target, identity.level, identity.cache_state, medians)
+        fails = rep_problems(rows, identity.target, identity.level) + evaluate_floors(identity.target, identity.level, identity.cache_state, medians)
         status = "PASS" if not fails else "FAIL"
         if fails:
             all_pass = False
@@ -421,9 +516,45 @@ def cmd_pr_head(args):
     rows = load_results_csv(repo_root / "bench" / "results.csv")
     valid_rows = [r for r in rows if is_valid_row(r.get("commit"), args.head, repo_root)]
     labels = read_labels(args.labels)
-    baselines = load_baselines(repo_root / "bench" / "baselines.json")
     allow_reset = bool(args.allow_baseline_reset) or ("baseline-reset" in labels)  # label or flag (Codex review, PR #15)
+    # The approved baselines are the base revision's: a PR that edits bench/baselines.json alongside
+    # its rows must not grade itself against its own numbers. Only `baseline-reset` may replace them
+    # (Codex merge-gate review, PR #15).
+    baselines = load_baselines_at(repo_root, args.base) if args.base else load_baselines(repo_root / "bench" / "baselines.json")
     exit_code, lines, updates = pr_head_logic(valid_rows, baselines, labels, allow_reset, args.head)
+    if MALFORMED_ROWS:
+        exit_code, updates = 1, []
+        lines.append(f"FAIL | results.csv | {len(MALFORMED_ROWS)} malformed row(s) at line(s) {MALFORMED_ROWS[:10]}")
+    # Only a `baseline-reset` PR may change the approved baselines (Codex merge-gate review, PR #15).
+    if args.base and not allow_reset:
+        existed = subprocess.run(["git", "-C", str(repo_root), "cat-file", "-e", f"{args.base}:bench/baselines.json"],
+                                 capture_output=True).returncode == 0  # creating the file (bootstrap) is allowed
+        changed = existed and subprocess.run(["git", "-C", str(repo_root), "diff", "--quiet", args.base, args.head, "--", "bench/baselines.json"]).returncode != 0
+        if changed:
+            exit_code, updates = 1, []
+            lines.append("FAIL | bench/baselines.json | changed without the baseline-reset label")
+    # A baseline-reset PR must commit the baselines its rows produce: compare every replaced
+    # identity against bench/baselines.json at the PR head (Codex merge-gate review, PR #15).
+    if allow_reset and args.head:
+        head_baselines = load_baselines_at(repo_root, args.head)
+        base_baselines = load_baselines_at(repo_root, args.base)
+        replaced = {identity for identity, _ in (updates or [])}
+        # Every identity the rows did not re-measure must be untouched (Codex merge-gate review, PR #15).
+        def by_identity(doc):
+            return {identity_of(e): {k: v for k, v in e.items() if k not in ("date", "commit")} for e in doc.get("baselines", [])}
+        base_map, head_map = by_identity(base_baselines), by_identity(head_baselines)
+        for identity in set(base_map) | set(head_map):
+            if identity not in replaced and base_map.get(identity) != head_map.get(identity):
+                exit_code = 1
+                lines.append(f"FAIL | {identity_str(identity)} | baseline-reset: this identity changed but no rows re-measured it")
+        for identity, medians in (updates or []):
+            committed = find_baseline(head_baselines, identity)
+            if committed is None or any(
+                (committed.get(k) is None) != (v is None) or (v is not None and abs(float(committed.get(k)) - float(v)) > 1e-9)
+                for k, v in medians.items()
+            ):
+                exit_code = 1
+                lines.append(f"FAIL | {identity_str(identity)} | baseline-reset: bench/baselines.json at the PR head does not hold these medians; commit the regenerated file")
     print("\n".join(lines))
     if updates:
         save_baselines(repo_root / "bench" / "baselines.json", baselines)
@@ -436,6 +567,9 @@ def cmd_release(args):
     rows = load_results_csv(repo_root / "bench" / "results.csv")
     valid_rows = [r for r in rows if is_valid_row(r.get("commit"), commit, repo_root)]
     exit_code, lines = release_logic(valid_rows)
+    if MALFORMED_ROWS:
+        exit_code = 1
+        lines.append(f"FAIL | results.csv | {len(MALFORMED_ROWS)} malformed row(s) at line(s) {MALFORMED_ROWS[:10]}")
     print("\n".join(lines))
     return exit_code
 
@@ -514,7 +648,7 @@ def test_floor_breach():
     baseline = {**WEB_SHORT_IDENTITY._asdict(), **_good_medians(tok_s=10)}  # baseline itself is bad
     medians = _good_medians(tok_s=10)  # identical to baseline: no regression, but floor breach
     passed, reasons, _ = gate_identity(WEB_SHORT_IDENTITY, medians, baseline, allow_reset=False)
-    ok = (not passed) and any("tok_s" in r and "floor" in r for r in reasons)
+    ok = (not passed) and any("tok_s" in r and "floor" in r for r in reasons) and _worst_rep_check()
     # A row with every metric blank must fail too, not slide past every skip (Codex review, PR #15).
     blank = {k: None for k in _good_medians()}
     passed_blank, reasons_blank, _ = gate_identity(WEB_SHORT_IDENTITY, blank, baseline, allow_reset=False)
@@ -525,6 +659,11 @@ def test_floor_breach():
         {**WEB_SHORT_IDENTITY._asdict(), **_good_medians(facts_token_hit=0.95)}, allow_reset=False)
     ok = ok and (not passed_rt) and any("facts_token_hit dropped" in r for r in reasons_rt)
     return ok, f"passed={passed} blank={passed_blank} rounding={passed_rt} reasons={reasons}"
+
+
+def _worst_rep_check():
+    m = compute_medians([{**_good_medians(halluc_flags=0)}, {**_good_medians(halluc_flags=0)}, {**_good_medians(halluc_flags=1)}])
+    return m["halluc_flags"] == 1
 
 
 def test_nullable_readall_skips_llm_gates():
@@ -648,7 +787,7 @@ def build_arg_parser():
     mode.add_argument("--self-test", action="store_true")
     mode.add_argument("--pr-head", action="store_true")
     mode.add_argument("--release", action="store_true")
-    ap.add_argument("--base", help="--pr-head: base sha (accepted for CI symmetry; row validity only needs --head)")
+    ap.add_argument("--base", help="--pr-head: base sha (required: the approved baselines are read from it)")
     ap.add_argument("--head", help="--pr-head: head sha")
     ap.add_argument("--commit", help="--release: commit sha")
     ap.add_argument("--allow-baseline-reset", action="store_true")
@@ -662,6 +801,9 @@ def main():
     if args.self_test:
         sys.exit(run_self_tests())
 
+    if args.pr_head and not args.base:
+        print("bench-gate: --pr-head needs --base (the approved baselines are the base revision's)", file=sys.stderr)
+        sys.exit(2)
     if args.pr_head:
         if not args.head:
             print("--pr-head requires --head", file=sys.stderr)

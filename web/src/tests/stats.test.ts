@@ -68,6 +68,7 @@ const VALID_ENV: StatsEnv = {
 };
 
 const GEN_FIXTURE: GenStats = {
+  cache_cold: false,
   level: "short",
   level_used: "short",
   chunks: 2,
@@ -90,6 +91,7 @@ const GEN_FIXTURE: GenStats = {
 };
 
 const SHORT_VOICE_RUN: StreamMetrics = {
+  cache_state: "warm",
   ttfa_ms: 1200,
   rtf: 1.4,
   gap_ms: 90,
@@ -159,7 +161,7 @@ const READALL_STATS: OrchestratorStats = {
   notices_spoken: [],
   gen: null,
   voice: READALL_VOICE_ROW,
-  voice_run: { ttfa_ms: 300, rtf: 3.2, gap_ms: 20, seconds: 8.5, synth_ms: 2600, tts_overlimit: 0, device: "wasm", dtype: "q8" },
+  voice_run: { cache_state: "warm", ttfa_ms: 300, rtf: 3.2, gap_ms: 20, seconds: 8.5, synth_ms: 2600, tts_overlimit: 0, device: "wasm", dtype: "q8" },
 };
 
 // ---------------------------------------------------------------- schema validation
@@ -226,6 +228,28 @@ describe("buildRow", () => {
     expect(row.level).toBe("readall");
     expect(row.gen_ms).toBeNull();
     expect(row.coverage).toBe(1);
+  });
+
+  it("cache_state is cold only for the run that fetched a model over the network (Codex review, PR #27)", () => {
+    expect(buildRow(SHORT_STATS, VALID_ENV).cache_state).toBe("warm");
+    expect(buildRow({ ...SHORT_STATS, gen: { ...GEN_FIXTURE, cache_cold: true } }, VALID_ENV).cache_state).toBe("cold");
+    expect(buildRow({ ...SHORT_STATS, voice_run: { ...SHORT_VOICE_RUN, cache_state: "cold" } }, VALID_ENV).cache_state).toBe("cold");
+    expect(buildRow(READALL_STATS, VALID_ENV).cache_state).toBe("warm");
+    // a Read-all row ignores a stale summarizer flag
+    expect(buildRow({ ...READALL_STATS, gen: { ...GEN_FIXTURE, cache_cold: true } }, VALID_ENV).cache_state).toBe("warm");
+  });
+
+  it("a Read-all row from the WebGPU voice (q8f16) validates (Codex review, PR #22)", () => {
+    const row = buildRow({ ...READALL_STATS, voice_run: { ...READALL_STATS.voice_run!, device: "webgpu", dtype: "q8f16" } }, VALID_ENV);
+    expect(row.dtype).toBe("q8f16");
+    expect(validateRunStats(row).errors).toEqual([]);
+  });
+
+  it("a recorded row never carries another run's stop time; heap comes from record time (Codex review, PR #22)", () => {
+    const row = buildRow({ ...SHORT_STATS, stop_ms: 120 }, { ...VALID_ENV, heap_mb: 84.2 });
+    expect(row.stop_ms).toBeNull();
+    expect(row.heap_mb).toBe(84.2);
+    expect(buildRow(SHORT_STATS, VALID_ENV).heap_mb).toBeNull();
   });
 
   it("never copies an arbitrary field off the orchestrator stats object", () => {

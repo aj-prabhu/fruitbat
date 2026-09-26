@@ -24,6 +24,8 @@ export interface StatsEnv {
   commit: string;
   date: string;
   doc_id: string;
+  /** JS heap in MB sampled when the row is recorded (Chrome's performance.memory), else null. */
+  heap_mb?: number | null;
 }
 
 // ---------------------------------------------------------------- doc_id (bench injection point)
@@ -96,7 +98,9 @@ function buildCommit(): string {
  *  without calling `record()`; `buildRow` itself stays a pure function of its two arguments. */
 export function detectEnv(): StatsEnv {
   const ua = detectUA();
-  return { ...ua, machine_id: "web", commit: buildCommit(), date: new Date().toISOString(), doc_id: getDocId() };
+  const mem = typeof performance !== "undefined" ? (performance as Performance & { memory?: { usedJSHeapSize: number } }).memory : undefined;
+  const heap_mb = mem ? Math.round((mem.usedJSHeapSize / 1e6) * 10) / 10 : null;
+  return { ...ua, machine_id: "web", commit: buildCommit(), date: new Date().toISOString(), doc_id: getDocId(), heap_mb };
 }
 
 // ---------------------------------------------------------------- buildRow
@@ -106,9 +110,10 @@ export function detectEnv(): StatsEnv {
  *  anywhere on `stats` can never end up on the row (Non-negotiable 1). */
 export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
   const level = stats.last?.level ?? "short";
+  // The voice's last Read-all row speaks only for a Read-all run; a summary never borrows it.
+  const voiceRow = level === "readall" ? stats.voice : null;
   const gen = stats.gen;
   const voiceRun = stats.voice_run;
-  const voiceRow = stats.voice;
 
   let model_id: string;
   let model_rev: string;
@@ -120,8 +125,8 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
     const voice = pinnedModels().web.voice;
     model_id = voice.id;
     model_rev = voice.revision;
-    dtype = voiceRun?.dtype ?? voiceRow?.dtype ?? voice.dtype;
-    device = (voiceRun?.device ?? voiceRow?.device ?? voice.device) as StatsRow["device"];
+    dtype = voiceRun ? voiceRun.dtype : (voiceRow?.dtype ?? voice.dtype);
+    device = (voiceRun ? voiceRun.device : (voiceRow?.device ?? voice.device)) as StatsRow["device"];
   } else {
     // Short / Caveman / One line: the row's model identity is whichever summarizer tier actually
     // loaded (gen.model_id), matched back to its pinned revision/dtype/device; unknown or not-yet-
@@ -134,7 +139,11 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
     device = tier.device as StatsRow["device"];
   }
 
-  const cache_state: StatsRow["cache_state"] = voiceRow?.cache_state === "warm" ? "warm" : "cold";
+  // Cold only when this run fetched model bytes over the network: the voice (its stream or Read all
+  // metrics) or, for a summary, the summarizer (Codex review, PR #27).
+  const voiceCold = (voiceRun ? voiceRun.cache_state : voiceRow?.cache_state) === "cold";
+  const genCold = level !== "readall" && gen?.cache_cold === true;
+  const cache_state: StatsRow["cache_state"] = voiceCold || genCold ? "cold" : "warm";
 
   const bulletsTotal = gen?.bullets_total ?? null;
   const bulletsCut = gen?.bullets_cut ?? null;
@@ -160,9 +169,13 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
     ttfa_ms: stats.ttfa_ms,
     gen_ms: gen?.gen_ms ?? null,
     tok_s: gen?.tok_s ?? null,
-    rtf: voiceRun?.rtf ?? voiceRow?.rtf ?? null,
-    gap_ms: voiceRun?.gap_ms ?? voiceRow?.gap_ms ?? null,
-    stop_ms: stats.stop_ms,
+    // This run's own voice metrics, even when null (a summary with nothing spoken); the voice's
+    // last Read-all row is only a fallback when there is no run metric at all (Codex review, PR #22).
+    rtf: voiceRun ? voiceRun.rtf : (voiceRow?.rtf ?? null),
+    gap_ms: voiceRun ? voiceRun.gap_ms : (voiceRow?.gap_ms ?? null),
+    // A recorded run finished; stopped runs are never recorded. The orchestrator's stop_ms belongs
+    // to whichever run was stopped before this one, so it never goes on this row (Codex review, PR #22).
+    stop_ms: null,
     coverage: level === "readall" ? (voiceRow?.coverage ?? null) : null,
     bullets_total: bulletsTotal,
     bullets_cut: bulletsCut,
@@ -173,9 +186,11 @@ export function buildRow(stats: OrchestratorStats, env: StatsEnv): StatsRow {
     halluc_flags: null,
     forbidden_hits: null,
     oneline_keyword_hit: null,
-    tts_overlimit: voiceRun?.tts_overlimit ?? voiceRow?.tts_overlimit ?? 0,
+    tts_overlimit: voiceRun ? voiceRun.tts_overlimit : (voiceRow?.tts_overlimit ?? 0),
     peak_mb: null, // Mac only (bench/README.md gate table)
-    heap_mb: voiceRow?.heap_mb ?? null,
+    // Sampled when this row is recorded, for every level; the voice's own row is Read-all only
+    // (Codex review, PR #22).
+    heap_mb: env.heap_mb ?? null,
   };
 }
 

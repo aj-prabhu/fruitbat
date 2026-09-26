@@ -17,6 +17,7 @@ violation found, one per line, and exits 1. Exits 2 on a usage/IO error (missing
 or unreadable file) so a missing artifact never silently reads as "valid".
 """
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -28,7 +29,8 @@ TYPE_CHECKS = {
     "boolean": lambda v: isinstance(v, bool),
     "null": lambda v: v is None,
     # bool is a subclass of int in Python; exclude it from number/integer.
-    "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool),
+    # JSON has no NaN/Infinity; Python's loader accepts them, so reject them here (Codex merge-gate review, PR #15).
+    "number": lambda v: isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v),
     "integer": lambda v: isinstance(v, int) and not isinstance(v, bool),
 }
 
