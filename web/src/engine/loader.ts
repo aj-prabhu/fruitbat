@@ -50,6 +50,18 @@ export interface PretrainedOptions {
   progress_callback?: (p: LoadProgress) => void;
 }
 
+/** Factories still running, including ones whose load() already rejected on abort. */
+const inflight = new Set<Promise<unknown>>();
+
+/**
+ * Resolves once every factory started by load() has settled. A cancelled load() rejects at
+ * once so Stop feels instant, but its download or session init may still be winding down;
+ * callers that must not overlap it (the LLM worker's Stop confirmation) wait here.
+ */
+export function loadsSettled(): Promise<void> {
+  return Promise.allSettled([...inflight]).then(() => undefined);
+}
+
 /**
  * Load a pinned model through a Transformers.js factory.
  * - `factory` receives the pinned id and options (revision, dtype, device, progress callback).
@@ -89,7 +101,12 @@ export async function load<T>(
       if (onAbort) signal.removeEventListener("abort", onAbort);
     }
   };
-  void work.then(cleanup, cleanup);
+  inflight.add(work);
+  const settle = () => {
+    cleanup();
+    inflight.delete(work);
+  };
+  void work.then(settle, settle);
   if (!signal) return work;
   return Promise.race([work, aborted]);
 }

@@ -11,7 +11,7 @@ import {
   type PreTrainedModel,
   type PreTrainedTokenizer,
 } from "@huggingface/transformers";
-import { configureRuntime, load, type LoadProgress } from "../engine/loader";
+import { configureRuntime, load, loadsSettled, type LoadProgress } from "../engine/loader";
 import { summarizerTiers, type PinnedModel } from "../engine/pins";
 import type { Inject } from "../engine/capabilities";
 import type { MainToWorker, WorkerToMain } from "../engine/llmProtocol";
@@ -73,8 +73,11 @@ async function onLoad(msg: Extract<MainToWorker, { type: "load" }>): Promise<voi
   try {
     await onLoadInner(msg, t0);
   } finally {
+    // A Stop during the load is confirmed only once the factories underneath have settled:
+    // load() rejects at once on abort, but a download or session init may still be ending
+    // (Codex review, PR #16).
+    if (aborted.has(msg.runId)) await loadsSettled();
     loadingRun = null;
-    // A Stop during the load is confirmed only once the factories have returned (Codex review, PR #16).
     if (aborted.has(msg.runId)) post({ type: "aborted", runId: msg.runId });
   }
 }

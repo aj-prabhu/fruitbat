@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { env } from "@huggingface/transformers";
-import { configureRuntime, load, pinUrl, type PretrainedOptions } from "../engine/loader";
+import { configureRuntime, load, loadsSettled, pinUrl, type PretrainedOptions } from "../engine/loader";
 import { pinnedModels } from "../engine/pins";
 import { tokenizerReady } from "../core/tokens";
 
@@ -58,6 +58,22 @@ describe("loader", () => {
     ac.abort();
     await expect(p).rejects.toMatchObject({ name: "AbortError" });
     expect(sawSignal?.aborted).toBe(true);
+  });
+
+  it("an aborted load rejects at once, but loadsSettled() waits for the factory underneath", async () => {
+    const ac = new AbortController();
+    let finish!: () => void;
+    const factory = () => new Promise<object>((res) => (finish = () => res({})));
+    const p = load(summarizer, factory, undefined, ac.signal);
+    ac.abort();
+    await expect(p).rejects.toMatchObject({ name: "AbortError" });
+    let settled = false;
+    const s = loadsSettled().then(() => (settled = true));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(settled).toBe(false);
+    finish();
+    await s;
+    expect(settled).toBe(true);
   });
 
   it("rejects immediately when the signal is already aborted", async () => {
