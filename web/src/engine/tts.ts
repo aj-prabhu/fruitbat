@@ -303,7 +303,7 @@ export class VoiceEngine {
 
   /** Segment + TTS-safe split only; nothing is synthesized. */
   async plan(text: string): Promise<{ segments: PlannedSegment[]; maxPhonemes: number; splitMs: number }> {
-    const runId = -1 - ++this.messageSeq; // negative: never collides with a playback run
+    const runId = -++this.messageSeq; // negative, from the same counter as speak(): never collides (Codex review, PR #17)
     const p = this.wait(`planned:${runId}`);
     this.send({ type: "plan", runId, text, limits: LIMITS });
     const m = (await p) as Extract<FromWorker, { type: "planned" }>;
@@ -689,9 +689,13 @@ export class VoiceEngine {
         if (i >= 0) this.messageSources.splice(i, 1);
         resolve();
       };
-      // A context whose clock is not advancing (headless without an output) never fires onended;
-      // resolve after the message's own duration so callers are not stuck.
-      setTimeout(resolve, Math.ceil(buf.duration * 1000) + 500);
+      // A context whose clock never advances (headless without an output) never fires onended;
+      // resolve after the message's own duration so callers are not stuck. Only then: a clock that
+      // moved and was paused still ends the message through onended (Codex review, PR #17).
+      const t0 = ctx.currentTime;
+      setTimeout(() => {
+        if (ctx.currentTime === t0) resolve();
+      }, Math.ceil(buf.duration * 1000) + 500);
     });
     src.start();
     await played;
@@ -702,7 +706,7 @@ export class VoiceEngine {
    * without playing it. Used by the additivity and rate proofs (S1-04). */
   async measure(text: string, target: number, rate?: number): Promise<{ seconds: number; pieces: number; synthMs: number; maxPhonemes: number }> {
     await this.load();
-    const runId = -1 - ++this.messageSeq;
+    const runId = -++this.messageSeq; // same allocator as plan() and speak()
     const plannedP = this.wait(`planned:${runId}`);
     this.send({ type: "plan", runId, text, limits: { target, limit: LIMITS.limit }, firstPieceTarget: 0 });
     const planned = (await plannedP) as Extract<FromWorker, { type: "planned" }>;
