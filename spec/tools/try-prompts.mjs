@@ -38,7 +38,14 @@ const revision = args.revision ?? candidates.find((c) => c.id === model_id)?.rev
 const template = await readFile(path.join(specDir, lvl.prompt), "utf8");
 const words = (await readFile(args.doc, "utf8")).split(/\s+/).filter(Boolean);
 const text = words.slice(0, maxWords).join(" ");
-const prompt = template.replace("{{text}}", text);
+const prompt = template.replace("{{text}}", () => text); // no $&-style interpretation of the document (Codex merge-gate review, PR #8)
+
+// Transformers.js 4.3.0 probes tokenizer_config.json at `main` even when a revision is given;
+// rewrite that probe to the pinned revision, as the app's loader does (Codex merge-gate review, PR #8).
+if (revision !== "main") {
+  const base = globalThis.fetch;
+  env.fetch = (input, init) => base(String(input).replace(`/${model_id}/resolve/main/`, `/${model_id}/resolve/${revision}/`), init);
+}
 
 const t0 = Date.now();
 const tokenizer = await AutoTokenizer.from_pretrained(model_id, { revision });

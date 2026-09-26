@@ -1,0 +1,31 @@
+{
+  "id": "022",
+  "key_facts": [
+    "Remember, just six inches of moving water can knock you down, and one foot of moving water can sweep your vehicle away.",
+    "Eastern Pacific Hurricane Season: May 15-November 30.",
+    "Historically, storm surge is the leading cause of hurricane-related deaths in the United States.",
+    "Travel 20-30 miles per hour with waves 10-100 feet high.",
+    "There are 161 potentially active volcanoes in the United States.",
+    "During a volcanic eruption, lava and other debris can flow at speeds of up to 100 mph",
+    "not advancing more than three feet a year",
+    "One drop per second wastes 2,700 gallons of water a year.",
+    "The refrigerator will keep food cold for about four hours. A full freezer will keep the temperature for about 48 hours.",
+    "Throw out food if the temperature is 40 degrees or higher."
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "A single back flushing with a traditional pool filter uses 900 to 1,000 gallons of water.",
+      "distinctive_tokens": ["900", "1000"]
+    },
+    {
+      "claim": "It's perfectly safe to cross a bridge during a landslide if you drive swiftly.",
+      "distinctive_tokens": ["perfectly", "swiftly"]
+    },
+    {
+      "claim": "There are more than 400 active volcanoes in the United States, mostly in California.",
+      "distinctive_tokens": ["400", "mostly"]
+    }
+  ],
+  "expected_oneline_keywords": ["disaster preparedness", "emergency", "evacuation", "safety"],
+  "notes": "Nine FEMA/ready.gov guides concatenated; numbers repeat across sections (20 feet, six inches, 100 mph) in different contexts, a good stress test for grounding."
+}

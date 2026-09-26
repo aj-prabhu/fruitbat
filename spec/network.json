@@ -7,12 +7,12 @@
       "paths_observed": [
         "/",
         "/index.html",
-        "/skeleton.html",
         "/coi-serviceworker.js",
         "/assets/*",
         "/ort/ort-wasm-simd-threaded.asyncify.mjs",
         "/ort/ort-wasm-simd-threaded.asyncify.wasm",
         "/models/kokoro-voices/af_heart.bin",
+        "/skeleton.html",
         "/sample.txt",
         "/fonts/AtkinsonHyperlegible-Regular.woff2",
         "/fonts/AtkinsonHyperlegible-Bold.woff2",
@@ -24,10 +24,10 @@
         "/ort/",
         "/models/",
         "/demo/",
-        "/fonts/",
         "/coi-serviceworker.js",
         "/",
         "/index.html",
+        "/fonts/",
         "/skeleton.html",
         "/sample.txt"
       ]
