@@ -19,7 +19,6 @@ const models = JSON.parse(readFileSync(specDir + "models.json", "utf8")) as {
 const stringsFile = JSON.parse(readFileSync(specDir + "strings/en.json", "utf8")) as { strings: Record<string, string> };
 const STRINGS = stringsFile.strings;
 const SUMMARIZER_SIZE_MB = Math.round(models.web.summarizer.files.reduce((n, f) => n + f.bytes, 0) / 1e6);
-const SUMMARIZER_ID_FRAGMENT = models.web.summarizer.id.split("/")[1]; // e.g. "Qwen3.5-0.8B-Text-ONNX"
 
 /** Every request to the Hub gets a small fixed delay before continuing ("route-throttled"): real
  *  enough to prove ordering, small enough that the real ~90 MB voice model still loads in a CI
@@ -38,14 +37,13 @@ async function throttleHub(page: Page): Promise<{ urls: string[] }> {
 }
 
 test.describe("loading UX (?llm=fake, route-throttled)", () => {
-  test("summarizer size shown before download; no summarizer request before the click; progress bars reach 100 %; cache detection", async ({ page }) => {
-    const { urls } = await throttleHub(page);
+  // Download gating itself ("nothing downloads before the first summary request") is proven with
+  // real requests in summarize.spec.ts on webgpu-local. Here ?llm=fake never requests the
+  // summarizer at all, so a request check would pass whatever the page did (Codex review, PR #20).
+  test("summarizer size shown before the click; progress bars reach 100 %; cache detection", async ({ page }) => {
+    await throttleHub(page);
     await gotoIsolated(page, "/?llm=fake");
     await page.waitForSelector('[data-testid="loading"]');
-
-    // Voice loads automatically (rule 11); the summarizer must not have been requested yet.
-    await page.waitForTimeout(300);
-    expect(urls.some((u) => u.includes(SUMMARIZER_ID_FRAGMENT))).toBe(false);
 
     // Size shown first: the button and the size line exist before any click, with the real MB
     // number from spec/models.json (never a hard-coded UI literal).
@@ -56,7 +54,6 @@ test.describe("loading UX (?llm=fake, route-throttled)", () => {
     await expect(sizeLine).toHaveText(new RegExp(`${SUMMARIZER_SIZE_MB} MB`));
 
     await button.click();
-    expect(urls.some((u) => u.includes(SUMMARIZER_ID_FRAGMENT)), "?llm=fake never fetches the real summarizer").toBe(false);
 
     // The summarizer's own bar reaches 100 % (fake mode "downloads" instantly; real mode would
     // reach it once the last byte arrives -- same bar, same assertion).

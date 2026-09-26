@@ -51,7 +51,7 @@ window.addEventListener("fruitbat:stop", () => o.stop());
 // download the user started from the Loading panel alone (Codex review, PR #20).
 window.addEventListener("fruitbat:demo", () => {
   const s = o.snapshot();
-  if (isActive(s.gen, s.play)) o.stop();
+  if (isActive(s.gen, s.play)) o.stop({ quiet: true });
 });
 // The dial (app.tsx) writes state/level; a move mid-run regenerates from the current chunk.
 subscribeLevel((level) => void o.setLevel(level));
