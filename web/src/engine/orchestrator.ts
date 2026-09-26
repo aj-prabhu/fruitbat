@@ -223,15 +223,6 @@ export class Orchestrator {
    *  from an earlier trigger (the dial move) to the first spoken sample. */
   private pendingNotices: string[] = [];
 
-  /** The voice is usable from here on (warm-up on load, or the on-demand load on mobile / data
-   *  saver): flush the notices that waited for it (Codex review, PRs #20/#21). */
-  private markVoiceReady(): void {
-    if (this.voiceReady) return;
-    this.voiceReady = true;
-    this.emit();
-    for (const key of this.pendingNotices.splice(0)) this.notice(key);
-  }
-
   private notice(key: string, sinceMs?: number): void {
     this.notices.push(key);
     this.lastNotice = key;
