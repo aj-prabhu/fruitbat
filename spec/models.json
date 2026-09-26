@@ -142,7 +142,8 @@
             "bytes": 483003582
           }
         ],
-        "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}"
+        "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}",
+        "status": "OUT (S1-05 bake-off 2026-09-24: degenerate output at q4f16 on WebGPU, Chrome 153 / ORT 1.31 dev; see docs/adr/0001-web-model.md)"
       },
       {
         "role": "fallback-b",
@@ -174,7 +175,8 @@
             "bytes": 569789750
           }
         ],
-        "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}"
+        "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}",
+        "status": "untested (S1-14 browser matrix)"
       },
       {
         "role": "low-end",
@@ -206,7 +208,8 @@
             "bytes": 272737275
           }
         ],
-        "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}"
+        "url_template": "https://huggingface.co/{id}/resolve/{revision}/{path}",
+        "status": "works (S1-05: retried on memory failure; 10 kept / 0 cut on 011 Caveman)"
       }
     ],
     "cold_budget_mb": 700

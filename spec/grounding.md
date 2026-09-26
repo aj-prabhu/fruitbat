@@ -18,7 +18,7 @@ A bullet passes when both hold against **its own chunk's source text**:
    the same normalization), as a whole token.
 
 A bullet that fails either is cut: never shown, never spoken, counted (`cut_bullets`). If every
-bullet of a chunk is cut, the panel shows and speaks `notice.all_cut` and offers "Read this part"
+bullet of a chunk is cut, or the model gave no bullet for it, the panel shows and speaks `notice.all_cut` and offers "Read this part"
 as one key (rule 2). It never auto-plays a chunk the user did not ask for.
 
 For One line, the per-chunk lines are grounded against their chunks, and the reduced line is
@@ -28,7 +28,7 @@ grounded against the surviving one-liners (see `spec/chunking.md`, One-line poli
 
 | Step | Example | Result |
 |---|---|---|
-| Strip thousands separators | `1,400` / `1 400` / `1.400` (only when the group is exactly 3 digits and no other dot) | `1400` |
+| Strip thousands separators | `1,400`, `12,000,000` (a comma followed by exactly 3 digits, inside one number) | `1400` |
 | Strip currency symbols and codes glued to a number | `$5`, `€5`, `5 USD`, `USD 5` | `5` |
 | Strip percent | `50%`, `50 percent`, `50 per cent` | `50` |
 | Spelled-out numbers ≤ 100 → digits | `five`, `twenty-one`, `twenty one`, `a hundred` | `5`, `21`, `21`, `100` |
@@ -36,11 +36,15 @@ grounded against the surviving one-liners (see `spec/chunking.md`, One-line poli
 | Decimal and range punctuation kept | `3.5`, `2006–2010` | `3.5`, `2006`, `2010` |
 | Case | `1,000 INSECTS` | `1000` |
 
-A "number" is any maximal run matching `\d[\d,.\s]*\d|\d` after the spelled-out conversion, then
-split on `–`, `-`, `/`, `:` into its parts; each part must appear in the source's normalized
-number set. Years, dates, times, and counts are all just numbers. `1,000` in the source and
-`1000` in the bullet match; `five percent` in the source and `5%` in the bullet match; `$5` in
-the bullet and `5 dollars` in the source match; `1000` in the bullet and `100` in the source do not.
+A "number" is any match of `\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?` after the spelled-out
+conversion: a comma counts as a thousands separator only when exactly three digits follow it, and
+a space never joins two numbers. So `May 3, 2026` is two numbers (`3`, `2026`), `1,400` is one
+(`1400`), and `2, 4 and 6` is three. Ranges and times are split on `–`, `-`, `/`, `:` into their
+parts; each part must appear in the source's normalized number set. Years, dates, times, and counts
+are all just numbers. `1,000` in the source and `1000` in the bullet match; `five percent` in the
+source and `5%` in the bullet match; `$5` in the bullet and `5 dollars` in the source match; `1000`
+in the bullet and `100` in the source do not. (Earlier drafts used `\d[\d,.\s]*\d|\d`, which glued
+`3, 2026` into one number and cut faithful bullets; Codex merge-gate review, PR #8.)
 
 ## Name candidates
 

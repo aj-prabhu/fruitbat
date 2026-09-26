@@ -16,9 +16,17 @@ export interface PinnedModel {
 export interface PinnedModels {
   web: {
     summarizer: PinnedModel;
+    /** fallback-a, fallback-b, low-end (spec/models.json, S0-03). */
+    summarizer_fallbacks?: (PinnedModel & { role: string })[];
     voice: PinnedModel & { voices_vendored: { path: string; files: string[] } };
     libraries: Record<string, string>;
   };
+}
+
+/** Every summarizer tier the web target may load: the default first, then the fallbacks. */
+export function summarizerTiers(): (PinnedModel & { role: string })[] {
+  const { summarizer, summarizer_fallbacks } = pinnedModels().web;
+  return [{ ...summarizer, role: "default" }, ...(summarizer_fallbacks ?? [])];
 }
 
 export function pinnedModels(): PinnedModels {
@@ -32,6 +40,8 @@ export function pinnedFileUrl(model: PinnedModel, path: string): string {
 
 /** Every exact remote file URL the web target may fetch, from models.json. */
 export function pinnedFileUrls(): string[] {
-  const { summarizer, voice } = pinnedModels().web;
-  return [...summarizer.files.map((f) => pinnedFileUrl(summarizer, f.path)), ...voice.files.map((f) => pinnedFileUrl(voice, f.path))];
+  // The fallback tiers are pinned too (S1-05): the allowlist covers every tier the loader may pick.
+  const { voice } = pinnedModels().web;
+  const models: PinnedModel[] = [...summarizerTiers(), voice];
+  return models.flatMap((m) => m.files.map((f) => pinnedFileUrl(m, f.path)));
 }

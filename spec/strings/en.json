@@ -113,7 +113,7 @@
     "mac.onboarding.try_it": "Copy any text, then press Control Option V.",
     "mac.onboarding.first_success": "Worked. Now try it on anything you highlight.",
     "mac.onboarding.offer_accessibility": "Want to skip the copy step? Give Fruitbat the Accessibility permission and it reads what you highlight.",
-    "mac.onboarding.updates_disclosure": "Fruitbat checks for updates once a day. That is the only time it calls home, and you can turn it off in Settings.",
+    "mac.onboarding.updates_disclosure": "Fruitbat checks for updates once a day. You can turn that off in Settings.",
     "mac.onboarding.done": "You're set. Fruitbat lives in the menu bar.",
     "mac.permission.accessibility": "Fruitbat needs the Accessibility permission to read what you highlight. Without it, copy the text first and press Control Option V.",
     "mac.permission.accessibility_denied": "No Accessibility permission. Copy the text and press Control Option V instead.",
@@ -135,6 +135,7 @@
     "mac.license.licensed": "Licensed. Thank you.",
     "mac.license.nag": "Couldn't check the license in a while. Fruitbat keeps working.",
     "mac.license.sign_out": "Sign out of this Mac",
-    "mac.license.invalid": "That key didn't work. Check it and try again."
+    "mac.license.invalid": "That key didn't work. Check it and try again.",
+    "intake.read_button": "Read this"
   }
 }
