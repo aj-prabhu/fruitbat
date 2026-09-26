@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../engine/events";
 import type { RunStats as GenStats } from "../engine/llm";
 import type { OrchestratorStats } from "../engine/orchestrator";
-import { buildCopyText, buildIssueUrl, buildReport, validateBugReport } from "../report/build";
+import { buildCopyText, buildIssueUrl, buildReport, osString, validateBugReport } from "../report/build";
 import type { StatsRow } from "../stats/store";
 
 const BENCH_EXAMPLE_ROW = new URL("../../../bench/example-row.json", import.meta.url);
@@ -71,6 +71,13 @@ const SHORT_STATS: OrchestratorStats = {
 };
 
 // ---------------------------------------------------------------- buildReport
+describe("osString", () => {
+  it("reads iOS before macOS: iPhone and iPad user agents say 'like Mac OS X' (Codex review, PR #23)", () => {
+    expect(osString("Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) AppleWebKit/605.1.15")).toBe("ios 18");
+    expect(osString("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36")).toBe("macos 10");
+  });
+});
+
 describe("buildReport", () => {
   it("assembles an envelope that validates against bug-report.schema.json", async () => {
     const report = await buildReport({

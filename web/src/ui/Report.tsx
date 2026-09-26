@@ -6,7 +6,7 @@
 // component just calls it and renders the result. Every label comes from spec/strings/en.json
 // (CONTRIBUTING.md "Strings"); the structured preview itself is rendered from the report object,
 // not from translated copy, the same way ui/Stats.tsx renders its raw column names.
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { events } from "../engine/events";
 import { orchestrator } from "../engine/orchestrator";
 import { buildCopyText, buildIssueUrl, buildReport, type BugReport } from "../report/build";
@@ -37,8 +37,16 @@ export function Report({ onClose }: { onClose: () => void }) {
 
   const report: BugReport | null = base ? { ...base, user_description: description.slice(0, 2000) } : null;
 
+  const viewRef = useRef<HTMLDivElement>(null);
+  // Opened from the header above a long article: bring it to the reader and move focus into it
+  // (Codex review, PR #23).
+  useEffect(() => {
+    viewRef.current?.scrollIntoView({ block: "start" });
+    viewRef.current?.focus();
+  }, []);
+
   return (
-    <div class="report-view" role="dialog" aria-label={t("report.title")}>
+    <div class="report-view" role="dialog" aria-label={t("report.title")} ref={viewRef} tabIndex={-1}>
       <div class="report-view-header">
         <h2>{t("report.title")}</h2>
         <button type="button" class="report-close" onClick={onClose}>
