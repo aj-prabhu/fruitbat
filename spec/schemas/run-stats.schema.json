@@ -49,7 +49,7 @@
     "cache_state": { "type": "string", "enum": ["cold", "warm"] },
     "model_id": { "$ref": "#/$defs/model_id" },
     "model_rev": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
-    "dtype": { "type": "string", "enum": ["q4f16", "q8", "q4", "fp32", "bf16", "fp16", "4bit", "8bit"] },
+    "dtype": { "type": "string", "enum": ["q4f16", "q8", "q8f16", "q4", "fp32", "bf16", "fp16", "4bit", "8bit"], "$comment": "q8f16: the WebGPU voice variant (?tts=webgpu, spec/models.json)." },
     "doc_id": { "type": "string", "pattern": "^([0-9]{3}|paste)$", "$comment": "S1-10: bench rows use the 3-digit eval corpus id; every other row (real usage, not the corpus) is 'paste' unless window.__fruitbat.setDocId(id) overrides it." },
     "commit": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" },
     "date": {

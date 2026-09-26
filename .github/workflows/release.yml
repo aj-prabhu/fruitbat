@@ -1,0 +1,93 @@
+name: Release
+
+# A release is a tag, and web and Mac have separate tag namespaces (docs/PLAN.md rule 10, C13).
+# web-v* publishes the public Space 2shay/fruitbat. mac-v* hands off to scripts/release.sh
+# (S2-12), not built yet, so it fails loudly instead of silently doing nothing.
+#
+# Any tag containing `-test` is a dry run: it stops right after release-check.sh and only prints
+# what it would have deployed. This is how the plan's proof tag web-v0.0.1-test gets exercised
+# without ever touching a Space (docs/PLAN.md S1-15 Proof).
+#
+# workflow_dispatch lets a human run release-check.sh by hand against a hypothetical tag, without
+# pushing one. A manual run is ALWAYS a dry run: only a real tag push can deploy.
+on:
+  push:
+    tags:
+      - "web-v*"
+      - "mac-v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to dry-run release-check against (e.g. web-v0.0.1-test)"
+        required: true
+
+concurrency: release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      # Tag values reach the shell only through env vars, never pasted into the script, so a tag
+      # or manual input holding $(...) or quotes is data, not code (Codex review, PR #6).
+      - name: Resolve tag
+        id: tag
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then tag="$INPUT_TAG"; else tag="$REF_NAME"; fi
+          case "$tag" in
+            *[!A-Za-z0-9._-]*|"") echo "release: refusing tag with unexpected characters: $tag" >&2; exit 1 ;;
+          esac
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install release-check tools
+        run: |
+          pip install -U "huggingface_hub[cli]"
+          (cd web && npm ci --no-fund --no-audit && npx playwright install --with-deps chromium)
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+
+      - name: release-check
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          # Cut-list fallback (docs/PLAN.md): a hand-filled gate committed as
+          # bench/release-gate-<tag>.md stands in for bench rows on that release (Codex review, PR #6).
+          if [ -s "bench/release-gate-$TAG.md" ]; then export RELEASE_GATE_FILE="bench/release-gate-$TAG.md"; fi
+          scripts/release-check.sh "$GITHUB_SHA"
+
+      - name: Dry run (manual run, or tag contains -test)
+        if: github.event_name != 'push' || contains(steps.tag.outputs.tag, '-test')
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          echo "### DRY RUN: manual run or '-test' tag — nothing is deployed. ###"
+          case "$TAG" in
+            web-v*) echo "would run: scripts/deploy-space.sh 2shay/fruitbat --allow-public" ;;
+            mac-v*) echo "would hand off to scripts/release.sh (S2-12, not built yet)" ;;
+            *) echo "tag matches neither web-v* nor mac-v*" ;;
+          esac
+
+      - name: Deploy web release
+        if: github.event_name == 'push' && startsWith(steps.tag.outputs.tag, 'web-v') && !contains(steps.tag.outputs.tag, '-test')
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: scripts/deploy-space.sh 2shay/fruitbat --allow-public
+
+      - name: Mac release hand-off
+        if: github.event_name == 'push' && startsWith(steps.tag.outputs.tag, 'mac-v') && !contains(steps.tag.outputs.tag, '-test')
+        run: |
+          echo "mac release: hand-off to scripts/release.sh (S2-12, not built yet)"
+          exit 1

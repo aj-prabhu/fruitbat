@@ -541,6 +541,7 @@ export class VoiceEngine {
 
   private handleStart(e: QueueEvent): void {
     if (e.runId !== this.runId) return;
+    if (e.seq < 0) return; // a notice in the stream: not a segment, not first audio
     if (this.runTtfa === null) this.runTtfa = performance.now() - this.runT0;
     this.current = { seq: e.seq, start: e.start, end: e.end, at: e.at, seconds: e.seconds, tag: e.tag };
     this.next = this.runSegments[e.seq + 1] ?? null;
@@ -549,6 +550,7 @@ export class VoiceEngine {
 
   private handleEnd(e: QueueEvent): void {
     if (e.runId !== this.runId) return;
+    if (e.seq < 0) return;
     this.userOnEnd?.({ seq: e.seq, start: e.start, end: e.end, at: e.at, seconds: e.seconds, tag: e.tag });
     if (this.current?.seq === e.seq) this.current = null;
   }
@@ -652,8 +654,8 @@ export class VoiceEngine {
   // ---------------------------------------------------------------- streaming (S1-06)
   private streamChain: Promise<void> = Promise.resolve();
   private streamSeq = 0;
-  private streamVoice: string = "af_heart";
-  private streamRate = 1;
+  /** A bullet stream is open: notices raised now join it in order (see speak()). */
+  private streaming = false;
 
   /**
    * Start a run that is fed text piece by piece (the orchestrator pushes each bullet as the
@@ -676,8 +678,7 @@ export class VoiceEngine {
     this.userOnEnd = opts.onEnd ?? null;
     this.streamSeq = 0;
     this.streamChain = Promise.resolve();
-    this.streamVoice = this.voice;
-    this.streamRate = this.rate;
+    this.streaming = true;
     this.runCold = false;
     this.takeCold(); // the voice may already have loaded (page-load warm-up) during this stream's setup
     this.pendingDone = null;
@@ -715,13 +716,16 @@ export class VoiceEngine {
       for (const seg of planned.segments) {
         // Same back-pressure as Read all: the segment's estimated seconds count against the 30 s
         // cap, and stay reserved until its audio is scheduled (Codex review, PR #18).
-        const est = (seg.text.length * this.secPerChar) / Math.max(this.streamRate, 0.1);
+        // Current voice and rate per request, like Read all: moving the rate mid-summary changes the
+        // bullets not yet synthesized (Codex review, PRs #18/#25).
+        const rate = this.rate;
+        const est = (seg.text.length * this.secPerChar) / Math.max(rate, 0.1);
         while (runId === this.runId && !queue.canAccept(est)) await new Promise((r) => setTimeout(r, 50));
         if (runId !== this.runId) return;
         const seq = this.streamSeq++;
         const ticket = queue.requestSent(est);
         try {
-          await this.synthOne(runId, { seq, text: seg.text, start, end, phonemes: seg.phonemes }, this.streamVoice, this.streamRate, queue, tag);
+          await this.synthOne(runId, { seq, text: seg.text, start, end, phonemes: seg.phonemes }, this.voice, rate, queue, tag);
         } finally {
           queue.requestSettled(ticket);
         }
@@ -753,7 +757,13 @@ export class VoiceEngine {
    * or at once if the run was stopped or a piece failed (finished: false).
    */
   async endStream(runId: number): Promise<{ finished: boolean; metrics: StreamMetrics }> {
-    await this.streamChain; // never rejects (see pushText)
+    // Settle everything chained so far, including notices chained while waiting (never rejects).
+    let chain: Promise<void>;
+    do {
+      chain = this.streamChain;
+      await chain;
+    } while (chain !== this.streamChain);
+    if (runId === this.runId) this.streaming = false;
     const queue = this.queue!;
     if (runId !== this.runId || this.phase === "failed") return { finished: false, metrics: this.metrics(queue.totalSeconds) };
     if (queue.enqueued === 0) {
@@ -821,6 +831,7 @@ export class VoiceEngine {
   stop(): number {
     this.releasePause(); // waiting messages wake, see the new epoch, and return
     this.noticeNextStart = 0; // stopped notices no longer hold the next one back (Codex review, PR #27)
+    this.streaming = false;
     const t0 = performance.now();
     const stale = this.runId;
     this.runId++;
@@ -899,6 +910,21 @@ export class VoiceEngine {
       // the shared context and the paused read with it (Codex review, PR #17).
       await new Promise<void>((r) => this.resumeWaiters.push(r));
       if (epoch !== this.messageEpoch) return { seconds: 0 }; // stopped while waiting
+    }
+    const q = this.queue;
+    if (this.streaming && q && q.currentRunId === this.runId) {
+      // During a summary a notice joins the ordered stream: it plays after the bullets already
+      // pushed instead of over them, and later bullets wait for it (Codex review, PRs #17/#18).
+      const runId = this.runId;
+      const { pcm, sampleRate } = entry;
+      let queued = false;
+      this.streamChain = this.streamChain.then(() => {
+        if (runId === this.runId && this.streaming) queued = q.enqueue({ runId, seq: -1, pcm, sampleRate, start: -1, end: -1 });
+      });
+      await this.streamChain;
+      if (queued) return { seconds: pcm.length / sampleRate };
+      if (epoch !== this.messageEpoch) return { seconds: 0 }; // stopped meanwhile
+      // The stream closed before this notice's turn: play it on its own rather than lose it.
     }
     const buf = ctx.createBuffer(1, entry.pcm.length, entry.sampleRate);
     buf.copyToChannel(entry.pcm as Float32Array<ArrayBuffer>, 0);
