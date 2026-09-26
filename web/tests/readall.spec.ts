@@ -1,5 +1,6 @@
 import { test, expect, installModelCacheRoute } from "./model-cache";
 import type { Page, Browser } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,6 +18,11 @@ const PARAGRAPHS_011 = DOC011.split(/\n{2,}/).map((p) => p.trim()).filter(Boolea
 // punctuation, so the segmenter sees one long sentence (~600 phonemes) that the TTS-safe rule
 // must split; at target 300 it becomes ~3 pieces, at target 500 ~2 pieces.
 const EXCERPT_020 = DOC020.split(/\s+/).slice(0, 120).join(" ");
+// CI checks additivity on the excerpt (about 2.7 min on wasm-ci). FRUITBAT_FULL_ADDITIVITY=1 runs
+// the whole long-input fixture instead (about 10x longer), which is how the S1-04 proof on the
+// dev machine is recorded (Codex review, PR #17).
+const FULL_ADDITIVITY = process.env.FRUITBAT_FULL_ADDITIVITY === "1";
+const ADDITIVITY_TEXT = FULL_ADDITIVITY ? DOC020 : EXCERPT_020;
 const SENTENCE = "Bats are the only mammals that can truly fly, and more than 1,400 species live on every continent except Antarctica.";
 
 type Tts = {
@@ -26,6 +32,8 @@ type Tts = {
   readAll(text: string, opts?: { rate?: number }): Promise<{ runId: number; segments: number; coverage: number; ttsOverlimit: number; seconds: number; finished: boolean }>;
   speak(key: string): Promise<{ seconds: number }>;
   stop(): number;
+  pause(): void;
+  resume(): void;
   state(): { phase: string; error: string | null; playing: unknown; aheadSeconds: number; inFlight: number; enqueued: number; ended: number; ctxState: string };
   stats(): Record<string, unknown> | null;
 };
@@ -33,18 +41,6 @@ declare global {
   interface Window {
     __tts: Tts;
   }
-}
-
-async function waitIsolated(page: Page) {
-  for (let attempt = 0; attempt < 3; attempt++) {
-    try {
-      await page.waitForFunction(() => crossOriginIsolated === true, null, { timeout: 15_000 });
-      return;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
-  throw new Error("crossOriginIsolated never became true");
 }
 
 test.describe.configure({ mode: "serial" });
@@ -60,8 +56,7 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
   // and only context-level routing (not page-level) reaches a Worker's own fetches.
   await installModelCacheRoute(page.context());
   // TTS_DEVICE=webgpu loads the q8f16 voice on WebGPU instead of q8 on WASM (S1-06 measurement).
-  await page.goto(`/readall.html${process.env.TTS_DEVICE === "webgpu" ? "?tts=webgpu" : ""}`);
-  await waitIsolated(page);
+  await gotoIsolated(page, `/readall.html${process.env.TTS_DEVICE === "webgpu" ? "?tts=webgpu" : ""}`);
   await page.waitForFunction(() => typeof window.__tts !== "undefined", null, { timeout: 20_000 });
   const loaded = await page.evaluate(() => window.__tts.load());
   expect(loaded.maxTokens).toBe(512);
@@ -99,11 +94,12 @@ test("coverage: TTS-safe segments tile doc 020 and none exceeds the limit", asyn
   console.log(`READALL_COVERAGE segments=${plan.segments.length} maxPhonemes=${plan.maxPhonemes} splitMs=${Math.round(plan.splitMs)}`);
 });
 
-test("additivity: segment durations on a 020 excerpt match larger pieces within 10 %", async () => {
+test(`additivity: segment durations on ${FULL_ADDITIVITY ? "all of" : "a 120-word excerpt of"} 020 match larger pieces within 10 %`, async () => {
+  if (FULL_ADDITIVITY) test.setTimeout(90 * 60 * 1000);
   // Definition: the same text synthesized as TTS-safe segments (target 300 phonemes) and as
   // larger pieces (target 500, still under the 510 limit); total audio seconds must agree within 10 %.
-  const small = await page.evaluate((t) => window.__tts.measure(t, 300), EXCERPT_020);
-  const large = await page.evaluate((t) => window.__tts.measure(t, 500), EXCERPT_020);
+  const small = await page.evaluate((t) => window.__tts.measure(t, 300), ADDITIVITY_TEXT);
+  const large = await page.evaluate((t) => window.__tts.measure(t, 500), ADDITIVITY_TEXT);
   expect(small.pieces).toBeGreaterThan(large.pieces);
   expect(small.seconds).toBeGreaterThan(20);
   const rel = Math.abs(small.seconds - large.seconds) / large.seconds;
@@ -136,6 +132,11 @@ test("stop within 200 ms while reading", async () => {
     clockAdvances,
     { timeout: 120_000 },
   );
+  if (clockAdvances) {
+    // `next` follows playback: it is the segment after the one playing (Codex review, PR #17).
+    const s = await page.evaluate(() => window.__tts.state() as unknown as { current: { seq: number } | null; next: { seq: number } | null });
+    if (s.current && s.next) expect(s.next.seq).toBe(s.current.seq + 1);
+  }
   const r = await page.evaluate(() => {
     const ms = window.__tts.stop();
     const s = window.__tts.state();
@@ -146,6 +147,47 @@ test("stop within 200 ms while reading", async () => {
   expect(r.phase).toBe("stopped");
   expect(r.playing).toBeNull();
   expect(r.ahead).toBe(0);
+});
+
+test("a second Read all replaces the first and settles it (Codex review, PR #17)", async () => {
+  const text = PARAGRAPHS_011.slice(0, 2).join("\n\n");
+  await page.evaluate((t) => {
+    (window as unknown as { __first: Promise<{ finished: boolean }> }).__first = window.__tts.readAll(t);
+  }, text);
+  await page.waitForFunction(() => window.__tts.state().enqueued > 0, null, { timeout: 120_000 });
+  const first = await page.evaluate(async (t) => {
+    void window.__tts.readAll(t);
+    const r = await Promise.race([
+      (window as unknown as { __first: Promise<{ finished: boolean }> }).__first,
+      new Promise<null>((res) => setTimeout(() => res(null), 5_000)),
+    ]);
+    window.__tts.stop();
+    return r;
+  }, PARAGRAPHS_011[0]);
+  expect(first).not.toBeNull();
+  expect(first!.finished).toBe(false);
+});
+
+test("a notice spoken while paused waits for resume and does not un-pause the read (Codex review, PR #17)", async () => {
+  test.skip(!clockAdvances, "needs an advancing audio clock to tell paused from playing");
+  const text = PARAGRAPHS_011.slice(0, 2).join("\n\n");
+  await page.evaluate((t) => void window.__tts.readAll(t), text);
+  await page.waitForFunction(() => window.__tts.state().playing !== null, null, { timeout: 120_000 });
+  const r = await page.evaluate(async () => {
+    window.__tts.pause();
+    await new Promise((res) => setTimeout(res, 300));
+    let spoke = false;
+    const said = window.__tts.speak("notice.stopped").then(() => (spoke = true));
+    await new Promise((res) => setTimeout(res, 3000)); // long enough to synthesize and play if it were going to
+    const whilePaused = { ctx: window.__tts.state().ctxState, spoke };
+    window.__tts.resume();
+    await said;
+    window.__tts.stop();
+    return { whilePaused, spokeAfter: spoke };
+  });
+  expect(r.whilePaused.ctx).toBe("suspended");
+  expect(r.whilePaused.spoke).toBe(false);
+  expect(r.spokeAfter).toBe(true);
 });
 
 test("stop during planning settles readAll; stop cancels a pending spoken message (Codex review, PR #17)", async () => {
@@ -178,18 +220,22 @@ test("stop during planning settles readAll; stop cancels a pending spoken messag
 });
 
 test("read all to the end writes a RunStats row", async ({}, testInfo) => {
-  const text = PARAGRAPHS_011[0];
+  // With a frozen clock (headless, no audio output) the 30 s cap would stop synthesis partway
+  // through a long paragraph, so the fallback reads a shorter text that fits under it, and must
+  // see every planned segment synthesized (Codex review, PR #17).
+  const text = clockAdvances ? PARAGRAPHS_011[0] : PARAGRAPHS_011[0].split(/\s+/).slice(0, 40).join(" ");
   const result = await page.evaluate(
     async ({ t, adv }) => {
+      const planned = (await window.__tts.plan(t)).segments.length;
       const p = window.__tts.readAll(t);
       if (adv) return await p;
       // Headless without an output: the clock does not advance, so playback never "ends".
-      // Wait for every segment to be synthesized and scheduled instead (the directive's fallback).
+      // Wait for every planned segment to be synthesized and scheduled instead.
       const start = Date.now();
       for (;;) {
         const s = window.__tts.state();
         if (s.phase === "failed") throw new Error(s.error ?? "failed");
-        if (s.enqueued > 0 && s.inFlight === 0 && s.phase === "reading" && Date.now() - start > 2000) break;
+        if (s.phase === "reading" && s.inFlight === 0 && s.enqueued >= planned) break;
         if (Date.now() - start > 240_000) throw new Error("timeout");
         await new Promise((r) => setTimeout(r, 200));
       }

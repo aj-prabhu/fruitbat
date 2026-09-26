@@ -116,7 +116,22 @@ function ensureLoaded(device: "wasm" | "webgpu" = "wasm"): Promise<KokoroTTS> {
   return loading;
 }
 
-async function synthesizePhonemes(model: KokoroTTS, phonemes: string, voice: string, speed: number, limit: number) {
+type Synth = { pcm: Float32Array; sampleRate: number; synthMs: number };
+let inferChain: Promise<unknown> = Promise.resolve();
+
+/**
+ * Kokoro runs one inference at a time. Requests queue here rather than inside Transformers.js,
+ * so a request whose run was cancelled is dropped before it starts (null), and synthMs counts
+ * only its own inference, not the wait behind other requests (Codex review, PR #17).
+ */
+function synthesizePhonemes(model: KokoroTTS, phonemes: string, voice: string, speed: number, limit: number, runId?: number): Promise<Synth | null> {
+  const run = () => (runId !== undefined && cancelled.has(runId) ? Promise.resolve(null) : synthesizeNow(model, phonemes, voice, speed, limit));
+  const p = inferChain.then(run, run);
+  inferChain = p.catch(() => undefined);
+  return p;
+}
+
+async function synthesizeNow(model: KokoroTTS, phonemes: string, voice: string, speed: number, limit: number): Promise<Synth> {
   assertFits(phonemes.length, limit);
   const t0 = performance.now();
   const audio = await model.generate_from_phonemes(phonemes, { voice, speed });
@@ -199,8 +214,9 @@ scope.onmessage = async (e: MessageEvent<ToWorker>) => {
     if (m.type === "synth") {
       const model = await ensureLoaded();
       if (cancelled.has(m.runId)) return;
-      const { pcm, sampleRate, synthMs } = await synthesizePhonemes(model, m.phonemes, m.voice, m.speed, m.limit);
-      if (cancelled.has(m.runId)) return;
+      const r = await synthesizePhonemes(model, m.phonemes, m.voice, m.speed, m.limit, m.runId);
+      if (!r || cancelled.has(m.runId)) return;
+      const { pcm, sampleRate, synthMs } = r;
       post({ type: "pcm", runId: m.runId, seq: m.seq, start: m.start, end: m.end, sampleRate, pcm, phonemes: m.phonemes.length, synthMs, tag: m.tag }, [pcm.buffer as ArrayBuffer]);
       return;
     }
@@ -220,7 +236,8 @@ scope.onmessage = async (e: MessageEvent<ToWorker>) => {
       let sampleRate = 24000;
       let synthMs = 0;
       for (const p of parts) {
-        const r = await synthesizePhonemes(model, p, m.voice, m.speed, m.limits.limit);
+        const r = await synthesizePhonemes(model, p, m.voice, m.speed, m.limits.limit, m.runId);
+        if (!r) return; // stopped before this part started
         chunks.push(r.pcm);
         sampleRate = r.sampleRate;
         synthMs += r.synthMs;

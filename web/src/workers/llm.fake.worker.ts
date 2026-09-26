@@ -10,6 +10,7 @@ type Entry = Partial<Record<Level, string[] | null>>;
 const ENTRIES = (fixture as { entries: Record<string, Entry> }).entries;
 const post = (m: WorkerToMain) => self.postMessage(m);
 const aborted = new Set<number>();
+let generating: number | null = null;
 
 const CAP: Record<Level, number> = { short: 4, caveman: 3, oneline: 1 };
 
@@ -45,20 +46,25 @@ async function onGenerate(msg: Extract<MainToWorker, { type: "generate" }>): Pro
   const tokens = `${lines.join("\n")}\n`.split(/(?<=\s)/);
   const t0 = performance.now();
   let n = 0;
-  for (const tok of tokens) {
+  generating = msg.runId;
+  try {
+    for (const tok of tokens) {
+      if (aborted.has(msg.runId)) {
+        post({ type: "aborted", runId: msg.runId });
+        return;
+      }
+      post({ type: "token", runId: msg.runId, chunkIndex: msg.chunkIndex, text: tok });
+      n++;
+      if (hint.delay_ms > 0) await sleep(hint.delay_ms);
+    }
     if (aborted.has(msg.runId)) {
       post({ type: "aborted", runId: msg.runId });
       return;
     }
-    post({ type: "token", runId: msg.runId, chunkIndex: msg.chunkIndex, text: tok });
-    n++;
-    if (hint.delay_ms > 0) await sleep(hint.delay_ms);
+    post({ type: "chunk_done", runId: msg.runId, chunkIndex: msg.chunkIndex, tokens: n, ms: Math.round(performance.now() - t0) });
+  } finally {
+    if (generating === msg.runId) generating = null;
   }
-  if (aborted.has(msg.runId)) {
-    post({ type: "aborted", runId: msg.runId });
-    return;
-  }
-  post({ type: "chunk_done", runId: msg.runId, chunkIndex: msg.chunkIndex, tokens: n, ms: Math.round(performance.now() - t0) });
 }
 
 self.onmessage = (e: MessageEvent<MainToWorker>) => {
@@ -74,7 +80,9 @@ self.onmessage = (e: MessageEvent<MainToWorker>) => {
       void onGenerate(msg);
       break;
     case "abort":
+      // Same contract as llm.worker.ts: an idle worker confirms at once, a busy one when it stops.
       aborted.add(msg.runId);
+      if (generating !== msg.runId) post({ type: "aborted", runId: msg.runId });
       break;
   }
 };

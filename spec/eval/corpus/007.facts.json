@@ -1,0 +1,29 @@
+{
+  "id": "007",
+  "key_facts": [
+    "PRIMA (PRobe far-Infrared Mission for Astrophysics), is advancing to the next phase of development",
+    "This space telescope is the first in a new class of NASA astrophysics missions, called Probe Explorers",
+    "NASA selected PRIMA to move into Phase B, the stage of development that advances the preliminary design",
+    "If confirmed, PRIMA’s project cost is capped at $1.2 billion, not including launch and other non-project costs",
+    "The observatory will be targeted to launch in 2033, for a planned five-year mission",
+    "With a 5.9-foot telescope, PRIMA will conduct deep, sensitive surveys of the universe in far-infrared light",
+    "NASA’s Jet Propulsion Laboratory in Southern California will manage the PRIMA mission",
+    "The National Academies of Sciences, Engineering, and Medicine’s 2020 Decadal Survey"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "PRIMA's total project cost is capped at $2.4 billion, double original estimates.",
+      "distinctive_tokens": ["24", "double"]
+    },
+    {
+      "claim": "Goddard Space Flight Center, not JPL, will lead and exclusively manage the PRIMA mission.",
+      "distinctive_tokens": ["lead", "exclusively"]
+    },
+    {
+      "claim": "PRIMA is targeted to launch in 2028 for a ten-year mission.",
+      "distinctive_tokens": ["2028", "ten"]
+    }
+  ],
+  "expected_oneline_keywords": ["nasa", "prima", "telescope", "mission"],
+  "notes": "Cost cap, launch year, and mission lead are all specific and swappable for a plausible-sounding wrong number/entity."
+}

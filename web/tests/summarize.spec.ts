@@ -1,5 +1,6 @@
 import { test, expect } from "./model-cache";
 import type { Page } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,15 +19,7 @@ const DOC025 = corpus("025");
 type Result = { bullets: { text: string; chunkIndex: number }[]; notices: { key: string }[]; raw: string; stats: Record<string, unknown> & { chunks: number; per_chunk_kept: number[]; level_used: string; reduce_calls: number }; state: string; error: string | null; aborted: boolean };
 
 async function open(page: Page, query: string) {
-  await page.goto(`/summarize.html${query}`);
-  for (let i = 0; i < 3; i++) {
-    try {
-      await page.waitForFunction(() => (window as unknown as { crossOriginIsolated: boolean }).crossOriginIsolated === true, null, { timeout: 15_000 });
-      break;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
+  await gotoIsolated(page, `/summarize.html${query}`);
   await page.waitForFunction(() => (window as unknown as { __llm?: { state(): { ready: boolean } } }).__llm?.state().ready === true, null, { timeout: 20_000 });
 }
 const summarize = (page: Page, text: string, level: string) =>
@@ -103,6 +96,8 @@ test.describe("fake summarizer (wasm-ci, ?llm=fake)", () => {
     expect(o.bullets[0].chunkIndex).toBe(-1);
     expect(o.stats.reduce_calls).toBeGreaterThanOrEqual(1);
     expect(o.stats.level_used).toBe("oneline");
+    // Every chunk line and every reduce line counts toward bullets_total (the fake always answers).
+    expect(o.stats.bullets_total).toBe(o.stats.chunks + o.stats.reduce_calls);
   });
 
   test("abort mid-stream is honored: no bullets after abort, worker acknowledges", async ({ page }) => {
@@ -124,6 +119,32 @@ test.describe("fake summarizer (wasm-ci, ?llm=fake)", () => {
     await page.waitForTimeout(500);
     const after = await page.evaluate(() => (window as unknown as { __llm: { bullets(): unknown[] } }).__llm.bullets().length);
     expect(after).toBe(atAbort);
+  });
+
+  test("Stop then an immediate new summary: the next run waits for the worker, then runs clean", async ({ page }) => {
+    await open(page, "?llm=fake&delay=40");
+    const r = await page.evaluate(async () => {
+      type Api = { summarize(t: string, l: string): Promise<Result>; bullets(): { text: string }[]; abort(): void };
+      const w = window as unknown as { __llm: Api };
+      const long = Array.from({ length: 40 }, (_, i) => `Sentence number ${i + 1} says that the bat colony counted ${i + 100} animals tonight.`).join(" ");
+      const first = w.__llm.summarize(long, "short");
+      await new Promise<void>((res) => {
+        const t = setInterval(() => {
+          if (w.__llm.bullets().length >= 1) {
+            clearInterval(t);
+            res();
+          }
+        }, 10);
+      });
+      w.__llm.abort();
+      const a = await first;
+      const b = await w.__llm.summarize("The fruit bat colony roosts in the old fig tree. It leaves at dusk to feed on ripe figs.", "short");
+      return { a: a.state, b };
+    });
+    expect(r.a).toBe("stopped");
+    expect(r.b.state).toBe("done");
+    expect(r.b.bullets.length).toBeGreaterThanOrEqual(1);
+    expect(r.b.bullets.every((x) => !/Sentence number/.test(x.text))).toBe(true);
   });
 
   test("One line falls back to Short when more than half the chunks are cut", async ({ page }) => {

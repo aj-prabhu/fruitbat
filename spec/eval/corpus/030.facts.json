@@ -1,0 +1,31 @@
+{
+  "id": "030",
+  "key_facts": [
+    "For the Independent Journal. Saturday, October 27, 1787",
+    "AFTER an unequivocal experience of the inefficacy of the subsisting federal government",
+    "For the Independent Journal. Wednesday, October 31, 1787",
+    "America has already formed treaties with no less than six foreign nations, and all of them, except Prussia, are maritime",
+    "In the year 1685, the state of Genoa having offended Louis XIV.",
+    "QUEEN ANNE, in her letter of the 1st July, 1706, to the Scotch Parliament",
+    "If Shays had not been a DESPERATE DEBTOR, it is much to be doubted whether Massachusetts would have been plunged into a civil war.",
+    "The celebrated Pericles, in compliance with the resentment of a prostitute",
+    "The ambitious cardinal, who was prime minister to Henry VIII.",
+    "PUBLIUS"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "America had already formed treaties with over a dozen foreign nations, all of them landlocked.",
+      "distinctive_tokens": ["dozen", "landlocked"]
+    },
+    {
+      "claim": "Massachusetts's civil war is what pushed Shays into crushing debt.",
+      "distinctive_tokens": ["pushed", "crushing"]
+    },
+    {
+      "claim": "King George urged the Scotch Parliament to accept union with England.",
+      "distinctive_tokens": ["george", "urged"]
+    }
+  ],
+  "expected_oneline_keywords": ["federalist papers", "union", "hamilton", "constitution"],
+  "notes": "Six numbered essays by two authors (Hamilton, Jay) concatenated; Shays was the debtor who triggered the near civil war, not the other way around -- a causal-reversal trap."
+}

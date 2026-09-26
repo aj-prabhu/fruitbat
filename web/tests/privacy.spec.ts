@@ -1,4 +1,5 @@
 import { test, expect, type Page, type Request as PwRequest } from "@playwright/test";
+import { gotoIsolated } from "./isolated";
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -172,7 +173,15 @@ function validateRedirectTarget(u: URL, allow: Allowlist): { ok: boolean; reason
   const matchedPath = new URL(matched).pathname; // the huggingface.co small-file redirect (Form A)
   // carries this PATHNAME, not the full URL, as a query param NAME (S1-00b observed it; net.ts's
   // redirectAllowed() compares against pathnames for the same reason).
-  const allowedParams = new Set(allow.redirectParams[u.host] ?? []);
+  // A host under a recorded pattern (another CDN region, e.g. eu.aws.cdn.hf.co) inherits the
+  // parameter names recorded for every host under the same pattern, as net.ts does
+  // (Codex review, PR #21).
+  const patternOf = (host: string) => allow.redirectPatterns.find((pat) => pat.startsWith("*.") && host.endsWith(pat.slice(1)) && host.length > pat.length - 1) ?? null;
+  const allowedParams = new Set<string>(allow.redirectParams[u.host] ?? []);
+  if (allowedParams.size === 0) {
+    const pat = patternOf(u.host);
+    if (pat) for (const [h, names] of Object.entries(allow.redirectParams)) if (patternOf(h) === pat) names.forEach((n) => allowedParams.add(n));
+  }
   for (const key of u.searchParams.keys()) {
     if (allowedParams.has(key)) continue;
     if (decodeURIComponent(key) === matchedPath) continue; // the pinned path travels as a param NAME
@@ -329,14 +338,6 @@ interface Snapshot {
 type FruitbatWindow = { __fruitbat: { run(t: string, l: Level): void; state(): Snapshot } };
 
 async function waitReady(page: Page, prewarmTimeoutMs = 300_000): Promise<void> {
-  for (let i = 0; i < 3; i++) {
-    try {
-      await page.waitForFunction(() => crossOriginIsolated === true, null, { timeout: 15_000 });
-      break;
-    } catch {
-      await page.waitForLoadState("load");
-    }
-  }
   await page.waitForFunction(() => typeof (window as unknown as Partial<FruitbatWindow>).__fruitbat?.state === "function", null, {
     timeout: 20_000,
   });
@@ -353,6 +354,16 @@ async function runLevel(page: Page, level: Level, timeoutMs: number): Promise<Sn
     () => {
       const g = (window as unknown as FruitbatWindow).__fruitbat.state().gen;
       return g === "done" || g === "failed";
+    },
+    null,
+    { timeout: timeoutMs },
+  );
+  // gen turns "done" before the summary's speech has been synthesized and played; wait for the
+  // voice to drain so every request the run makes is in the log (Codex review, PR #21).
+  await page.waitForFunction(
+    () => {
+      const s = (window as unknown as FruitbatWindow).__fruitbat.state() as unknown as { play: string; voice: { inFlight: number; enqueued: number; ended: number } };
+      return s.play !== "playing" && s.play !== "paused" && s.voice.inFlight === 0 && s.voice.enqueued <= s.voice.ended;
     },
     null,
     { timeout: timeoutMs },
@@ -431,7 +442,7 @@ test.describe("privacy: full sweep on the real app", () => {
     await installStubs(page);
     const { records, canaryHits, pageErrors } = await attachRecorder(page);
 
-    await page.goto("/?llm=fake");
+    await gotoIsolated(page, "/?llm=fake");
     await waitReady(page);
 
     for (const level of ["readall", "short", "caveman", "oneline"] as const) {
@@ -463,7 +474,7 @@ test.describe("privacy: full sweep on the real app", () => {
     await installStubs(page);
     const { records, canaryHits, pageErrors } = await attachRecorder(page);
 
-    await page.goto("/"); // no ?llm=fake: the real summarizer path, with WebGPU disabled by the project
+    await gotoIsolated(page, "/"); // no ?llm=fake: the real summarizer path, with WebGPU disabled by the project
     await waitReady(page);
 
     const snap = await runLevel(page, "short", 30_000);
@@ -497,7 +508,9 @@ test.describe("privacy: full sweep on the real app", () => {
     // and passing on wasm-ci (below): same allowlist/redirect/canary code path, real Kokoro
     // download, just a smaller one. Re-run this test alone, uncontended, to get it green and
     // produce docs/qa/privacy-requests-<commit>.json; then remove this fixme.
-    test.fixme(true, "not completed in this session: sandbox bandwidth contention from other agents' worktrees, see comment above");
+    // The real-model sweep runs whenever this project is selected; it needs one uncontended
+    // network (about 560 MB of pinned downloads) and writes docs/qa/privacy-requests-<commit>.json.
+    test.setTimeout(45 * 60 * 1000);
     test.setTimeout(50 * 60 * 1000);
 
     const network = readJson<NetworkJson>("spec/network.json");
@@ -506,7 +519,7 @@ test.describe("privacy: full sweep on the real app", () => {
     await installStubs(page);
     const { records, canaryHits, pageErrors } = await attachRecorder(page);
 
-    await page.goto("/"); // no ?llm=fake: real summarizer + real Kokoro
+    await gotoIsolated(page, "/"); // no ?llm=fake: real summarizer + real Kokoro
     await waitReady(page, 15 * 60_000); // Kokoro (~92 MB) under contended sandbox bandwidth
 
     for (const level of ["readall", "short", "caveman", "oneline"] as const) {
