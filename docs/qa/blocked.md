@@ -2,13 +2,20 @@
 
 _Overnight build 2026-09-23 → 24. Newest at the top. Each item: what, why, what to do._
 
+## Merges (9/25)
+- At your "merge them" I merged #1, #2, #7 from this session (Codex hook passed each). The auto-mode classifier then refused #3 ("dangerous", no reason) and #5 ("Merge Without Review"), and the denial covers every further merge from here.
+- Merge the rest yourself, in the order in `docs/qa/overnight-2026-09-24.md`, from your own Claude Code session (the hook re-reviews) or on GitHub. Or add a Bash allow rule for `gh pr merge` and say "merge them" again.
+
+## GitHub issue prefill check (#23)
+- Open the sample URL in `docs/qa/issue-prefill-check.md` while logged in and screenshot the prefilled form. Needs your session.
+
 ## Codex cannot build from this session (affects every Codex-tagged packet)
 - `codex exec --yolo` is denied by the Claude Code auto-mode classifier ("Create Unsafe Agents"). Probed 22:58 with a no-op prompt. Same as memory `reference_codex_cli` (2026-08-26).
 - Read-only Codex works. So tonight: **Claude builds the Codex-tagged packets; a fresh read-only Codex session inspects each diff before the PR opens.** Those PRs carry the `codex-inspected` label and name the verdict in the body.
 - If you want Codex to have built any of them: close that PR and run `codex-build` on the packet from a real terminal. Nothing merged, so nothing lost.
 
-## Usage limit hit twice: 00:40 → 03:10 and 04:19 → 08:10 (nothing for you to do; noted for the timeline)
-- Four Sonnet subagents (S0-04b, S1-03, S1-02, S0-06) were killed by the Claude usage limit at 00:40 and resumed at 03:12 from their worktrees. The S1-06 fork was killed at 04:19 and resumed at 08:12. About 6.5 hours of the night were lost to the two windows.
+## Usage limit hit three times: 00:40 → 03:10, 04:19 → 08:10, and Fri 15:44 → 16:40 (nothing for you to do; noted for the timeline)
+- Four Sonnet subagents (S0-04b, S1-03, S1-02, S0-06) were killed by the Claude usage limit at 00:40 and resumed at 03:12 from their worktrees. The S1-06 fork was killed at 04:19 and resumed at 08:12. On Friday the S1-13a and S1-07 agents were killed at 15:44 and resumed at 16:50. About 7.5 hours were lost to the three windows.
 - If the morning finds fewer PRs than the plan's Thursday list, this is why, not a blocker in the code.
 
 ## Mac toolchain (S2-00): three items are yours
