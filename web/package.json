@@ -1,0 +1,31 @@
+{
+  "name": "fruitbat-web",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Fruitbat Stage 1: static web app, all inference in the browser",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "prebuild": "node scripts/copy-ort.mjs && node scripts/copy-sample.mjs",
+    "dev": "node scripts/copy-ort.mjs && node scripts/copy-sample.mjs && vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "test:e2e": "playwright test",
+    "measure:tts": "node scripts/measure-tts-limit.mjs",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "4.3.0",
+    "phonemizer": "1.2.1",
+    "preact": "10.29.8"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@preact/preset-vite": "2.10.6",
+    "@webgpu/types": "0.1.74",
+    "happy-dom": "20.14.5",
+    "typescript": "5.9.3",
+    "vite": "8.3.0",
+    "vitest": "5.0.1"
+  }
+}

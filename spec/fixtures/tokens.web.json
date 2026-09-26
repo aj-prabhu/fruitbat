@@ -1,0 +1,28 @@
+{
+  "model": "onnx-community/Qwen3.5-0.8B-Text-ONNX",
+  "revision": "1e45daba048899e7f771657ada617ec49350aa91",
+  "library": "@huggingface/transformers@4.3.0",
+  "add_special_tokens": false,
+  "entries": [
+    {
+      "text": "",
+      "tokens": 0
+    },
+    {
+      "text": "Bats are the only mammals that can truly fly.",
+      "tokens": 11
+    },
+    {
+      "text": "More than 1,400 species live on every continent except Antarctica, and about 47 of them live in the United States.",
+      "tokens": 29
+    },
+    {
+      "text": "Since 2006 a fungal disease called white-nose syndrome has killed millions of bats in North America, cutting some colonies by 90 percent.\n\nBats are slow to recover because most females raise only one pup a year.",
+      "tokens": 49
+    },
+    {
+      "text": "The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog. The quick brown fox jumps over the lazy dog.",
+      "tokens": 200
+    }
+  ]
+}

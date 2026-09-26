@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "bug-report.schema.json",
+  "title": "BugReport",
+  "$comment": "The envelope behind the bug button (docs/PLAN.md C11, S1-11). Never persisted; the user previews it and submits it themselves as a GitHub issue via field params. `user_description` is the one free-text field in the whole schema set, capped at 2,000 chars.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["app", "version", "env", "models", "run_stats", "events", "user_description"],
+  "properties": {
+    "app": { "type": "string", "enum": ["web", "mac"] },
+    "version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "env": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ua", "gpu", "os", "chip", "ram_bucket"],
+      "properties": {
+        "ua": { "type": "string", "maxLength": 300 },
+        "gpu": { "type": "string", "maxLength": 200 },
+        "os": { "type": "string", "maxLength": 100 },
+        "chip": { "type": "string", "maxLength": 50 },
+        "ram_bucket": {
+          "type": "string",
+          "enum": ["under_8gb", "8gb", "16gb", "32gb", "64gb_plus", "unknown"]
+        }
+      }
+    },
+    "models": {
+      "type": "array",
+      "maxItems": 10,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "rev"],
+        "properties": {
+          "id": { "$ref": "run-stats.schema.json#/$defs/model_id" },
+          "rev": { "type": "string", "pattern": "^[0-9a-f]{7,40}$" }
+        }
+      }
+    },
+    "run_stats": {
+      "type": "array",
+      "maxItems": 5,
+      "items": { "$ref": "run-stats.schema.json" }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 50,
+      "items": { "$ref": "event.schema.json" }
+    },
+    "user_description": { "type": "string", "maxLength": 2000 }
+  }
+}

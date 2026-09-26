@@ -14,7 +14,8 @@ mac/.build/
 mac/**/xcuserdata/
 mac/**/DerivedData/
 
-bench/last-run/
+bench/last-run/*
+!bench/last-run/short-011.txt
 
 .venv/
 __pycache__/
@@ -25,3 +26,7 @@ __pycache__/
 !.vscode/extensions.json
 
 Thumbs.db
+
+.cache/
+web/public/ort/
+web/public/sample.txt

@@ -1,0 +1,29 @@
+{
+  "id": "001",
+  "key_facts": [
+    "she had peeped into the book her sister was reading",
+    "a White Rabbit with pink eyes ran close by her",
+    "the Rabbit actually took a watch out of its waistcoat-pocket",
+    "she ran across the field after it",
+    "to see it pop down a large rabbit-hole under the hedge",
+    "The rabbit-hole went straight on like a tunnel for some way",
+    "noticed that they were filled with cupboards and book-shelves",
+    "it was labelled “ORANGE MARMALADE”, but to her great disappointment it was empty"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "The White Rabbit peeked into Alice's storybook before hurrying past her.",
+      "distinctive_tokens": ["peeked", "storybook"]
+    },
+    {
+      "claim": "The jar Alice found on the shelf was full of orange juice.",
+      "distinctive_tokens": ["full", "juice"]
+    },
+    {
+      "claim": "Alice waited three days before following the Rabbit into the hole.",
+      "distinctive_tokens": ["three", "days"]
+    }
+  ],
+  "expected_oneline_keywords": ["alice", "rabbit", "hole", "falling"],
+  "notes": "Curly quotes around the marmalade label; a named White Rabbit vs. Alice's unnamed sister tests name-candidate grounding."
+}
