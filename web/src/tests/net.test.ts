@@ -71,7 +71,11 @@ describe("guardedFetch", () => {
   });
   it("reads the final URL from the service worker's header when res.url is empty", async () => {
     const off = "https://evil.example/x";
-    const fake = vi.fn(async () => new Response("", { status: 200, headers: { "x-fruitbat-final-url": off } }));
+    const fake = vi.fn(async () => {
+      const r = new Response("", { status: 200, headers: { "x-fruitbat-final-url": off } });
+      Object.defineProperty(r, "url", { value: url }); // the browser fills url with the original request
+      return r;
+    });
     vi.stubGlobal("fetch", fake);
     const url = [...exactUrls()][0];
     await expect(guardedFetch(url)).rejects.toThrow(/redirected off-list/);

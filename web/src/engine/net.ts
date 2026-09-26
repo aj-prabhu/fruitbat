@@ -160,7 +160,10 @@ export async function guardedFetch(input: string | URL, init?: RequestInit): Pro
   // When the COI service worker controls the page it hands back a constructed Response whose
   // `url` is empty; it carries the fetched response's final URL in a header instead (see
   // public/coi-serviceworker.js). Either way the final URL must be on the list.
-  const finalUrl = res.url || res.headers.get("x-fruitbat-final-url") || "";
+  // Prefer the header: for a constructed Response the browser fills `url` with the original
+  // request URL, so `res.url` is never empty and would hide the real redirect target
+  // (Codex review, PR #4 merge gate).
+  const finalUrl = res.headers.get("x-fruitbat-final-url") || res.url || "";
   if (finalUrl && finalUrl !== d.url.href) {
     const final = allowedUrl(finalUrl);
     if (!final.ok || (final.kind !== "redirect" && final.kind !== "same-origin" && final.kind !== "exact")) {
