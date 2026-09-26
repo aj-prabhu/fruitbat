@@ -518,18 +518,19 @@ async function main() {
   let appendedCount = 0;
 
   const cleanupFns = [() => preview.kill()];
-  const cleanup = () => {
+  // Awaited, so Chromium has actually closed (and a cold rep's temp profile is released) before the
+  // runner exits, on success, on a failure, or on Ctrl-C (Codex review, PR #27).
+  const cleanup = async () => {
     for (const fn of cleanupFns.splice(0).reverse()) {
       try {
-        fn();
+        await fn();
       } catch {
         // best-effort
       }
     }
   };
   process.on("SIGINT", () => {
-    cleanup();
-    process.exit(130);
+    void cleanup().finally(() => process.exit(130));
   });
 
   try {
@@ -635,7 +636,7 @@ async function main() {
     printSummaryTable(summaries);
     console.log(`\nbench/web/run.mjs: appended ${appendedCount} rows to bench/results.csv`);
   } finally {
-    cleanup();
+    await cleanup();
   }
 }
 
