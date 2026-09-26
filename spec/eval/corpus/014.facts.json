@@ -1,0 +1,29 @@
+{
+  "id": "014",
+  "key_facts": [
+    "On 26 April 1986, reactor 4 of the Chernobyl Nuclear Power Plant, located near Pripyat, Ukraine, exploded.",
+    "the other being the 2011 Fukushima nuclear accident, which happened in Japan",
+    "The response involved more than 500,000 personnel and cost an estimated 18 billion rubles (about $85 billion in 2026)",
+    "Of the 237 workers hospitalized, 134 showed symptoms of acute radiation syndrome (ARS); 28 of them died within three months",
+    "Long-term death estimates range from up to 4,000 in Ukraine, Belarus, and Russia (per the United Nations) to 16,000 in total across Europe",
+    "Reactor no.4 had 1,661 individual fuel channels, requiring over 45 million litres of coolant per hour",
+    "Anatoly Dyatlov, deputy chief-engineer of the Chernobyl Nuclear Power Plant (ChNPP), was present to direct the test",
+    "Most reports attribute the power drop to Toptunov's error, but Dyatlov reported that it was due to a fault in the AR-2 system"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "The Chernobyl accident killed more than 50,000 people immediately.",
+      "distinctive_tokens": ["50000", "immediately"]
+    },
+    {
+      "claim": "Dyatlov's own report blamed Toptunov's error, while most investigators pointed to the AR-2 fault.",
+      "distinctive_tokens": ["investigators", "blamed"]
+    },
+    {
+      "claim": "The test needed mandatory, preapproved sign-off from the national safety regulator.",
+      "distinctive_tokens": ["mandatory", "preapproved"]
+    }
+  ],
+  "expected_oneline_keywords": ["chernobyl", "nuclear", "disaster", "reactor"],
+  "notes": "Doc explicitly reverses who blamed whom (Dyatlov vs. \"most reports\") and explicitly says no regulator approval was required -- both are reversal/negation traps. Non-overlapping with doc 029, which continues after this excerpt."
+}

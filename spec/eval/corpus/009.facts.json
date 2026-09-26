@@ -1,0 +1,29 @@
+{
+  "id": "009",
+  "key_facts": [
+    "Copyright protection subsists, in accordance with this title, in original works of authorship fixed in any tangible medium of expression",
+    "(6) motion pictures and other audiovisual works;",
+    "In no case does copyright protection for an original work of authorship extend to any idea, procedure, process, system, method of operation, concept, principle, or discovery",
+    "(8) architectural works.",
+    "Subject to sections 107 through 122, the owner of copyright under this title has the exclusive rights",
+    "(2) to prepare derivative works based upon the copyrighted work;",
+    "to distribute copies or phonorecords of the copyrighted work to the public by sale or other transfer of ownership, or by rental, lease, or lending",
+    "in the case of sound recordings, to perform the copyrighted work publicly by means of a digital audio transmission"
+  ],
+  "forbidden_claims": [
+    {
+      "claim": "Section 102 names twelve types of protected works.",
+      "distinctive_tokens": ["twelve", "protected"]
+    },
+    {
+      "claim": "Copyright protection extends to the ideas and procedures a work describes, not just their expression.",
+      "distinctive_tokens": ["procedures", "extends"]
+    },
+    {
+      "claim": "17 U.S.C. §106 grants copyright owners the exclusive right to charge admission fees for public exhibits.",
+      "distinctive_tokens": ["admission", "exhibits"]
+    }
+  ],
+  "expected_oneline_keywords": ["copyright", "exclusive rights", "works", "protection"],
+  "notes": "Statute text: the idea/expression negation in §102(b) and the enumerated lists are the traps."
+}
