@@ -27,6 +27,7 @@ let oomFired = false;
 let stopper: InterruptableStoppingCriteria | null = null;
 let generating: number | null = null; // runId of the generation in flight
 let probing: number | null = null; // runId of the 1-token probe in flight
+let loadingRun: number | null = null; // runId of the model load in flight
 const aborted = new Set<number>();
 
 function isMemoryError(e: unknown): boolean {
@@ -68,13 +69,26 @@ async function loadTier(spec: PinnedModel & { role: string }, runId: number): Pr
 async function onLoad(msg: Extract<MainToWorker, { type: "load" }>): Promise<void> {
   inject = msg.inject;
   const t0 = performance.now();
+  loadingRun = msg.runId;
+  try {
+    await onLoadInner(msg, t0);
+  } finally {
+    loadingRun = null;
+    // A Stop during the load is confirmed only once the factories have returned (Codex review, PR #16).
+    if (aborted.has(msg.runId)) post({ type: "aborted", runId: msg.runId });
+  }
+}
+
+async function onLoadInner(msg: Extract<MainToWorker, { type: "load" }>, t0: number): Promise<void> {
   try {
     await loadTier(msg.model, msg.runId);
+    if (aborted.has(msg.runId)) return;
     post({ type: "loaded", runId: msg.runId, modelId: msg.model.id, role: loadedRole, downgraded: false, ms: Math.round(performance.now() - t0) });
   } catch (e) {
     if (aborted.has(msg.runId) || (e instanceof Error && e.name === "AbortError")) {
-      // Stop during the download: in-flight requests cancelled by the loader's signal (Codex review, PR #16)
-      post({ type: "aborted", runId: msg.runId });
+      // Stop during the download: in-flight requests cancelled by the loader's signal (Codex review, PR #16).
+      // onLoad's finally posts "aborted" for a Stop; a bare AbortError without one is posted here.
+      if (!aborted.has(msg.runId)) post({ type: "aborted", runId: msg.runId });
       return;
     }
     if (!isMemoryError(e)) {
@@ -90,8 +104,10 @@ async function onLoad(msg: Extract<MainToWorker, { type: "load" }>): Promise<voi
       tokenizer = null;
       model = null;
       await loadTier(low, msg.runId);
+      if (aborted.has(msg.runId)) return;
       post({ type: "loaded", runId: msg.runId, modelId: low.id, role: low.role, downgraded: true, ms: Math.round(performance.now() - t0) });
     } catch (e2) {
+      if (aborted.has(msg.runId)) return;
       post({ type: "error", runId: msg.runId, name: e2 instanceof Error ? e2.name : "Error", message: e2 instanceof Error ? e2.message : String(e2) });
     }
   }
@@ -188,7 +204,7 @@ self.onmessage = (e: MessageEvent<MainToWorker>) => {
       aborted.add(msg.runId);
       loadAbort?.abort();
       if (generating === msg.runId && stopper) stopper.interrupt();
-      else if (probing !== msg.runId) post({ type: "aborted", runId: msg.runId }); // else onProbe confirms when done
+      else if (probing !== msg.runId && loadingRun !== msg.runId) post({ type: "aborted", runId: msg.runId }); // else onProbe/onLoad confirm when done
       break;
   }
 };

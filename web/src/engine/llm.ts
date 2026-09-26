@@ -399,8 +399,9 @@ export class Summarizer {
 
   /**
    * Stop resolves the UI at once, but the worker may still be finishing an interrupted
-   * generate. The next run waits for the worker's "aborted" (capped, so a lost message
-   * cannot wedge the app) before it posts anything (Codex review, PR #16).
+   * generate. The next run waits for the worker's "aborted" before it posts anything. If
+   * that takes longer than ABORT_DRAIN_MS the worker is replaced, so a stuck GPU job can
+   * never run under the next summary (Codex review, PR #16).
    */
   private armDrain(runId: number): void {
     const key = `aborted:${runId}`;
@@ -412,6 +413,7 @@ export class Summarizer {
     const capped = new Promise<void>((r) => {
       timer = setTimeout(() => {
         this.waiters.delete(key);
+        this.resetWorker();
         r();
       }, ABORT_DRAIN_MS);
     });
@@ -420,6 +422,15 @@ export class Summarizer {
       if (this.drain === d) this.drain = null;
     });
     this.drain = d;
+  }
+
+  /** Drop a worker that never confirmed a Stop; the next run starts a fresh one and reloads from cache. */
+  private resetWorker(): void {
+    this.worker?.terminate();
+    this.worker = null;
+    this.loaded = false;
+    this.pending = null;
+    this.waiters.clear();
   }
 
   private inFlight: Promise<RunStats> | null = null;
