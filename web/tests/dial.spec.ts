@@ -189,6 +189,8 @@ test.describe("all-cut chunk (?llm=fake&fake=cutshort)", () => {
     expect((await stats(page)).notices_spoken).toContain("notice.all_cut");
     expect(s.bullets.length).toBe(0);
     expect(s.voice.enqueued, "nothing auto-played").toBe(0);
+    await page.waitForTimeout(1000); // the stream has ended; "Done" must not replace the explanation (Codex review, PR #18)
+    expect((await snap(page)).notices).not.toContain("notice.done");
     expect(s.play).toBe("idle");
     const button = page.locator("button.read-part[data-chunk='0']");
     await expect(button).toBeVisible();

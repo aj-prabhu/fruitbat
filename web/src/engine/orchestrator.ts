@@ -128,12 +128,19 @@ export class Orchestrator {
     if (typeof Worker !== "undefined" && !saveData() && !isMobile()) void this.warmVoice();
   }
 
+  /** The voice has loaded, by page-load warm-up or on demand: notices held until now are spoken.
+   *  On mobile / data saver there is no warm-up, so the first run's load does this (Codex review, PR #18). */
+  private markVoiceReady(): void {
+    if (this.voiceReady) return;
+    this.voiceReady = true;
+    this.emit();
+    for (const key of this.pendingNotices.splice(0)) this.notice(key);
+  }
+
   private async warmVoice(): Promise<void> {
     try {
       await this.voice.load();
-      this.voiceReady = true;
-      this.emit();
-      for (const key of this.pendingNotices.splice(0)) this.notice(key);
+      this.markVoiceReady();
       await this.voice.prewarm(PREWARM_KEYS);
     } catch (e) {
       this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
@@ -308,7 +315,11 @@ export class Orchestrator {
     // tokenizer, and a Stop in that window must win (Codex review, PR #18).
     const id = this.newRun();
     this.notice(shorter ? "notice.dial_shorter" : "notice.dial_longer", t0);
+    // Until the chunk lookup returns, the regeneration is pending: a second dial move in that
+    // window replaces it instead of just arming the level (Codex review, PR #18).
+    this.regenPending = id;
     const chunkIndex = await this.currentChunkIndex();
+    if (this.regenPending === id) this.regenPending = null;
     if (id !== this.runId) return;
     const c = this.chunks?.[chunkIndex];
     await this.begin(id, level, { fromChunk: chunkIndex, base: c?.start ?? 0, end: this.text.length });
@@ -316,7 +327,10 @@ export class Orchestrator {
 
   /** Active generation or playback, or speech still being synthesized for this run (a finished
    *  generation whose first bullet's audio is not out yet is still a run; Codex review, PR #18). */
+  private regenPending: number | null = null;
+
   private busy(): boolean {
+    if (this.regenPending === this.runId) return true;
     if (isActive(this.gen, this.play)) return true;
     if (this.play === "stopped") return false; // Esc'd audio is not a run to regenerate (Codex review, PR #20)
     const v = this.voice.state();
@@ -396,7 +410,7 @@ export class Orchestrator {
     let planned: PlannedSegment[] = [];
     await this.voice.load();
     if (id !== this.runId) return;
-    this.voiceReady = true;
+    this.markVoiceReady();
     this.gen = reduceGen(this.gen, "loaded");
     this.emit();
     const r = await this.voice.readAll(slice, {
@@ -427,6 +441,11 @@ export class Orchestrator {
   }
 
   private async summarize(id: number, level: Exclude<Level, "readall">, fromChunk: number): Promise<void> {
+    // On demand where there was no page-load warm-up (mobile / data saver): the summary is the demand.
+    void this.voice.load().then(
+      () => this.markVoiceReady(),
+      () => undefined, // a failed voice load surfaces through the stream's own end
+    );
     const streamId = this.voice.beginStream({
       onStart: (e) => {
         if (id !== this.runId) return;
@@ -441,7 +460,9 @@ export class Orchestrator {
     if (!ok) {
       this.gen = reduceGen(this.gen, "fail");
       this.error = this.llm.error;
-      this.voice.stop();
+      // End the empty stream rather than voice.stop(), which would also cancel the failure notice
+      // the summarizer just raised (Codex review, PR #18).
+      void this.voice.endStream(streamId);
       this.play = reducePlay(this.play, "reset");
       return;
     }
@@ -479,7 +500,9 @@ export class Orchestrator {
     if (finished) {
       this.play = reducePlay(this.play, "drain");
       this.current = null;
-      if (this.gen === "done") this.notice("notice.done");
+      // "Done" only when something was said; an all-cut summary keeps "Couldn't make a summary I
+      // trust for this part" and its Read this part key (Codex review, PR #18).
+      if (this.gen === "done" && this.bullets.length > 0) this.notice("notice.done");
     }
   }
 }
