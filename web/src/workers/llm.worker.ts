@@ -11,7 +11,7 @@ import {
   type PreTrainedModel,
   type PreTrainedTokenizer,
 } from "@huggingface/transformers";
-import { configureRuntime, load, loadsSettled, type LoadProgress } from "../engine/loader";
+import { configureRuntime, load, loadsSettled, networkBytes, type LoadProgress } from "../engine/loader";
 import { summarizerTiers, type PinnedModel } from "../engine/pins";
 import type { Inject } from "../engine/capabilities";
 import type { MainToWorker, WorkerToMain } from "../engine/llmProtocol";
@@ -72,6 +72,16 @@ async function loadTier(spec: PinnedModel & { role: string }, runId: number): Pr
   loadedRole = spec.role;
 }
 
+/** networkBytes() is cumulative for the worker; each "loaded" reports only this load's bytes, so a
+ *  reload that came from the cache is never marked cold by an earlier download (Codex review, PR #22). */
+let reportedNetBytes = 0;
+function netSinceLastReport(): number {
+  const now = networkBytes();
+  const delta = now - reportedNetBytes;
+  reportedNetBytes = now;
+  return delta;
+}
+
 async function onLoad(msg: Extract<MainToWorker, { type: "load" }>): Promise<void> {
   inject = msg.inject;
   const t0 = performance.now();
@@ -92,7 +102,7 @@ async function onLoadInner(msg: Extract<MainToWorker, { type: "load" }>, t0: num
   try {
     await loadTier(msg.model, msg.runId);
     if (aborted.has(msg.runId)) return;
-    post({ type: "loaded", runId: msg.runId, modelId: msg.model.id, role: loadedRole, downgraded: false, ms: Math.round(performance.now() - t0) });
+    post({ type: "loaded", runId: msg.runId, modelId: msg.model.id, role: loadedRole, downgraded: false, netBytes: netSinceLastReport(), ms: Math.round(performance.now() - t0) });
   } catch (e) {
     if (aborted.has(msg.runId) || (e instanceof Error && e.name === "AbortError")) {
       // Stop during the download: in-flight requests cancelled by the loader's signal (Codex review, PR #16).
@@ -114,7 +124,7 @@ async function onLoadInner(msg: Extract<MainToWorker, { type: "load" }>, t0: num
       model = null;
       await loadTier(low, msg.runId);
       if (aborted.has(msg.runId)) return;
-      post({ type: "loaded", runId: msg.runId, modelId: low.id, role: low.role, downgraded: true, ms: Math.round(performance.now() - t0) });
+      post({ type: "loaded", runId: msg.runId, modelId: low.id, role: low.role, downgraded: true, netBytes: netSinceLastReport(), ms: Math.round(performance.now() - t0) });
     } catch (e2) {
       if (aborted.has(msg.runId)) return;
       post({ type: "error", runId: msg.runId, name: e2 instanceof Error ? e2.name : "Error", message: e2 instanceof Error ? e2.message : String(e2) });
