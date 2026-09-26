@@ -152,9 +152,16 @@ def load_results_csv(path, strict=True):
         errs = _row_problems(row)
         if errs:
             print(f"bench-gate: results.csv line {i} rejected: {'; '.join(errs[:3])}", file=sys.stderr)
+            MALFORMED_ROWS.append(i)
         else:
             kept.append(row)
     return kept
+
+
+# Line numbers of rows load_results_csv() rejected. Any entry fails --pr-head and --release: the
+# runner validates before appending, so a malformed row is a bug or an edit, never noise
+# (Codex merge-gate review, PR #15).
+MALFORMED_ROWS = []
 
 
 def load_baselines(path):
@@ -209,6 +216,8 @@ def group_rows_by_identity(rows):
 # Zero-tolerance counters: one bad rep is a failure, so they aggregate by the worst rep, not the
 # median (Codex merge-gate review, PR #15: [0, 0, 1] halluc_flags must not pass as 0).
 WORST_REP_FIELDS = {"halluc_flags", "forbidden_hits", "tts_overlimit"}
+# Coverage must be 100 % on every rep: its worst rep is the minimum (Codex merge-gate review, PR #15).
+WORST_REP_MIN_FIELDS = {"coverage"}
 
 
 def compute_medians(rows):
@@ -219,6 +228,8 @@ def compute_medians(rows):
             out[field] = None
         elif field in WORST_REP_FIELDS:
             out[field] = max(values)
+        elif field in WORST_REP_MIN_FIELDS:
+            out[field] = min(values)
         else:
             out[field] = statistics.median(values)
     return out
@@ -500,6 +511,9 @@ def cmd_pr_head(args):
     # (Codex merge-gate review, PR #15).
     baselines = load_baselines_at(repo_root, args.base) if args.base else load_baselines(repo_root / "bench" / "baselines.json")
     exit_code, lines, updates = pr_head_logic(valid_rows, baselines, labels, allow_reset, args.head)
+    if MALFORMED_ROWS:
+        exit_code, updates = 1, []
+        lines.append(f"FAIL | results.csv | {len(MALFORMED_ROWS)} malformed row(s) at line(s) {MALFORMED_ROWS[:10]}")
     print("\n".join(lines))
     if updates:
         save_baselines(repo_root / "bench" / "baselines.json", baselines)
@@ -512,6 +526,9 @@ def cmd_release(args):
     rows = load_results_csv(repo_root / "bench" / "results.csv")
     valid_rows = [r for r in rows if is_valid_row(r.get("commit"), commit, repo_root)]
     exit_code, lines = release_logic(valid_rows)
+    if MALFORMED_ROWS:
+        exit_code = 1
+        lines.append(f"FAIL | results.csv | {len(MALFORMED_ROWS)} malformed row(s) at line(s) {MALFORMED_ROWS[:10]}")
     print("\n".join(lines))
     return exit_code
 
