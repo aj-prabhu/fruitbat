@@ -47,5 +47,7 @@ declare global {
   interface WindowEventMap {
     "fruitbat:run": CustomEvent<FruitbatRunEventDetail>;
     "fruitbat:stop": CustomEvent<undefined>;
+    /** the demo recording is about to play (main.tsx stops a live run, never a model download) */
+    "fruitbat:demo": CustomEvent<undefined>;
   }
 }

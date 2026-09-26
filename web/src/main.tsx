@@ -6,6 +6,7 @@
 import { render } from "preact";
 import { App } from "./app";
 import { orchestrator } from "./engine/orchestrator";
+import { isActive } from "./engine/state";
 import { subscribeLevel } from "./state/level";
 import type { FruitbatAPI, FruitbatStats, Level } from "./types";
 import "./styles/global.css";
@@ -46,6 +47,12 @@ const fruitbat: FruitbatAPI = {
 window.__fruitbat = fruitbat;
 window.addEventListener("fruitbat:run", (e) => void o.run(e.detail.text, e.detail.level));
 window.addEventListener("fruitbat:stop", () => o.stop());
+// The demo recording is about to play: silence a live read or summary, but leave a summarizer
+// download the user started from the Loading panel alone (Codex review, PR #20).
+window.addEventListener("fruitbat:demo", () => {
+  const s = o.snapshot();
+  if (isActive(s.gen, s.play)) o.stop();
+});
 // The dial (app.tsx) writes state/level; a move mid-run regenerates from the current chunk.
 subscribeLevel((level) => void o.setLevel(level));
 // Esc is handled on the main thread and never waits on a worker (Architecture, Concurrency).

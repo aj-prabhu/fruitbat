@@ -111,9 +111,10 @@ export function Demo() {
   const onTryItNow = () => {
     const el = audioRef.current;
     if (!el) return;
-    // A live read or summary never plays under the recording: stop it first, through the same
-    // event Esc uses (this component does not import the engine) (Codex review, PR #20).
-    window.dispatchEvent(new CustomEvent("fruitbat:stop"));
+    // A live read or summary never plays under the recording: main.tsx stops it on this event,
+    // and only it; a background model download keeps going (this component does not import the
+    // engine) (Codex review, PR #20).
+    window.dispatchEvent(new CustomEvent("fruitbat:demo"));
     void el.play().catch(() => setPlaying(false));
   };
 

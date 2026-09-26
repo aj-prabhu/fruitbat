@@ -75,7 +75,8 @@ function SummarizerSection({ s }: { s: Snapshot }) {
   const isLoaded = llm.isLoaded();
   const failed = !isLoaded && (phase === "failed" || llm.state === "failed" || llm.state === "stopped");
   const started = isLoaded || (!failed && (phase !== "idle" || s.progress !== null || llm.state === "loading"));
-  const done = phase === "ready" || (s.progress !== null && llm.state !== "loading" && llm.state !== "failed" && !llm.error);
+  // Ready is the summarizer's own state, however it was loaded (this button or a summary request).
+  const done = isLoaded || phase === "ready";
   const loaded = mb(s.progress?.loaded);
   const total = mb(s.progress?.total) || (started ? llm.sizeMb() : 0);
 
