@@ -247,6 +247,8 @@ export class Orchestrator {
 
   private newRun(): number {
     const id = ++this.runId;
+    // Notices held for a voice still loading belong to the run being replaced (Codex review, PR #18).
+    this.pendingNotices = [];
     this.runAbort?.abort();
     this.runAbort = new AbortController();
     this.llm.abort();
@@ -464,7 +466,10 @@ export class Orchestrator {
         this.emit();
       },
     });
-    const ok = await this.llm.ensureLoaded();
+    let ok = await this.llm.ensureLoaded();
+    // A newer run's newRun() aborts the load an older run started; if this run joined that load,
+    // start it again rather than failing (Codex review, PR #18).
+    if (!ok && id === this.runId && this.llm.error === "aborted") ok = await this.llm.ensureLoaded();
     if (id !== this.runId) return;
     if (!ok) {
       this.gen = reduceGen(this.gen, "fail");

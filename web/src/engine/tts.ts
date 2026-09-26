@@ -674,7 +674,7 @@ export class VoiceEngine {
       if (runId !== this.runId) return;
       await this.load();
       if (runId !== this.runId) return;
-      const planId = -1 - ++this.messageSeq; // planning is per push; the run id is the queue's
+      const planId = -++this.messageSeq; // per push, same allocator as plan()/speak() (Codex review, PR #17)
       const plannedP = this.wait(`planned:${planId}`);
       this.send({ type: "plan", runId: planId, text, limits: LIMITS, firstPieceTarget: 0 });
       let planned: Extract<FromWorker, { type: "planned" }>;
@@ -701,6 +701,14 @@ export class VoiceEngine {
       if (runId === this.runId) {
         this.phase = "failed";
         this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+        // A failed stream goes quiet and settles, like a failed Read all (Codex review, PR #18).
+        this.queue?.stop();
+        this.send({ type: "cancel", runId });
+        this.settleWaiters(runId, "failed");
+        this.current = null;
+        this.next = null;
+        this.pendingDone?.resolve(false);
+        this.pendingDone = null;
       }
     });
     return work;
