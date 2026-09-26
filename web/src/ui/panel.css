@@ -110,6 +110,10 @@
   gap: var(--panel-gap);
   overflow-y: auto;
   max-height: 40vh;
+  /* Never squeezed to nothing by the header and controls on a short phone: the sheet itself
+     scrolls instead (Codex review, PR #25). */
+  min-height: min(8em, 30vh);
+  flex-shrink: 0;
 }
 .panel-body:focus-visible {
   outline: 2px solid var(--color-focus-ring);

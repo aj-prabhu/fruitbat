@@ -6,7 +6,7 @@
 // two fixed decorative glyphs (Pip, the text-size/spacing icons) carry no letters so there is
 // nothing to translate. Text size and spacing are MUST-light per the packet: three steps each,
 // persisted, applied as data-* on the panel itself so panel.css only has to read them once.
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { orchestrator, type Cursor, type Snapshot } from "../engine/orchestrator";
 import { RATE_MAX, RATE_MIN, VOICES, type VoiceId } from "../engine/tts";
 import { t } from "../strings";
@@ -134,8 +134,14 @@ function BulletList({ s }: { s: Snapshot }) {
 }
 
 function ReadAllView({ cur }: { cur: Extract<Cursor, { kind: "sentence" }> }) {
+  const ref = useRef(null) as { current: HTMLDivElement | null };
+  // "Read this part" from far down a long summary inserts this view above the scroll position:
+  // bring the sentence being read into view (Codex review, PR #25).
+  useEffect(() => {
+    ref.current?.scrollIntoView({ block: "nearest" });
+  }, [cur.start]);
   return (
-    <div class="now-reading">
+    <div class="now-reading" ref={ref}>
       <p class="now-label">{t("panel.now_reading")}</p>
       <p class="now-text" data-testid="now-text">
         {cur.text}
