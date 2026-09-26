@@ -157,9 +157,21 @@ function startPreview(port) {
   });
 }
 
-async function waitForServer(url, timeoutMs = 30000) {
+async function assertPortFree(url) {
+  // --strictPort makes our own preview exit if the port is taken, and the readiness poll below would
+  // then happily measure whatever else answers there (Codex review, PR #27).
+  try {
+    await fetch(url);
+  } catch {
+    return; // nothing listening: good
+  }
+  fail(`${url} already has a server on it; stop it or pass --port`);
+}
+
+async function waitForServer(url, preview, timeoutMs = 30000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
+    if (preview.exitCode !== null) fail(`vite preview exited (code ${preview.exitCode}) before serving ${url}`);
     try {
       const res = await fetch(url);
       if (res.status) return;
@@ -177,6 +189,23 @@ function loadPlaywright() {
   // walks up from this file's directory, a sibling of web/, and would never find it).
   const require = createRequire(path.join(WEB_DIR, "package.json"));
   return require("@playwright/test");
+}
+
+/** Load the app and wait for cross-origin isolation through coi-serviceworker's one-time reload
+ *  (a fresh profile gets it on every cold rep), reloading once more if it has not arrived, like
+ *  web/tests/isolated.ts (Codex review, PR #27). */
+async function gotoIsolated(page, url) {
+  await page.goto(url);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      await page.waitForFunction(() => crossOriginIsolated === true, null, { timeout: 15_000 });
+      await page.waitForLoadState("load");
+      return;
+    } catch {
+      await page.reload();
+    }
+  }
+  fail(`crossOriginIsolated never became true at ${url}`);
 }
 
 // --------------------------------------------------------------------------------------
@@ -435,8 +464,9 @@ async function main() {
   );
 
   buildApp();
-  const preview = startPreview(port);
   const baseURL = `http://localhost:${port}`;
+  await assertPortFree(baseURL);
+  const preview = startPreview(port);
   const summaries = [];
   let appendedCount = 0;
 
@@ -456,7 +486,7 @@ async function main() {
   });
 
   try {
-    await waitForServer(baseURL);
+    await waitForServer(baseURL, preview);
     const { chromium } = loadPlaywright();
 
     async function measureMatrix(page, cdp, profileDir) {
@@ -493,7 +523,7 @@ async function main() {
       cleanupFns.push(() => context.close());
       await primeRate(context);
       const page = context.pages()[0] ?? (await context.newPage());
-      await page.goto(baseURL);
+      await gotoIsolated(page, baseURL);
       await page.waitForFunction(() => !!window.__fruitbat, null, { timeout: 30_000 });
       const cdp = await context.newCDPSession(page);
       await cdp.send("Performance.enable");
@@ -525,7 +555,7 @@ async function main() {
             try {
               await primeRate(context);
               const page = context.pages()[0] ?? (await context.newPage());
-              await page.goto(baseURL);
+              await gotoIsolated(page, baseURL);
               await page.waitForFunction(() => !!window.__fruitbat, null, { timeout: 30_000 });
               const cdp = await context.newCDPSession(page);
               await cdp.send("Performance.enable");

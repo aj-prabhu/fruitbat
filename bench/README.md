@@ -174,6 +174,14 @@ dispatches to `bench/web/run.mjs` (`--target mac` prints `S2-13` and exits 2 -- 
 `readall` rows skip `score.py` entirely (`facts_token_hit` etc. stay `null` -- it's verbatim
 playback, not a summary; see `bench/score.py`'s own docstring).
 
+### The runner's proof run (not bench evidence)
+
+`bench/proof/2026-09-25-runner-proof-13c7dc0.csv` holds the 36 rows the runner produced when S1-13
+was built (docs 005, 011, 025 x 4 levels x 3 reps, warm, speech at 1.5x, on a shared machine). They
+prove the runner end to end. They are **not** in `results.csv`: they were measured at `13c7dc0`, and
+the pipeline has changed since, so under rule 3 they are not valid evidence for any later commit.
+The first real rows come from a fresh `bench/run.sh --target web` run on a quiet machine.
+
 ## Keeping `model_id`'s enum in sync
 
 `spec/schemas/run-stats.schema.json#/$defs/model_id` is a closed enum, not a free string, because
