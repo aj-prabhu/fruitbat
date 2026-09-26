@@ -55,13 +55,9 @@ window.addEventListener("fruitbat:stop", () => o.stop());
 // (e.g. a spoken "notice.done" that fires after gen is already "done").
 let lastRecordedRunId = 0;
 o.subscribe((snap) => {
-  // gen turns terminal before the summary's speech has played; record once the voice has drained
-  // too, so the row carries the voice metrics (Codex review, PR #22).
-  // Speech still loading or phonemizing (voice.pending) is part of the run: recording before it
-  // plays would store a row without its audio metrics (Codex review, PR #27).
-  const voiceIdle =
-    snap.play !== "playing" && snap.play !== "paused" && snap.voice.pending === 0 && snap.voice.inFlight === 0 && snap.voice.enqueued <= snap.voice.ended;
-  if ((snap.gen === "done" || snap.gen === "failed") && voiceIdle && snap.runId !== lastRecordedRunId) {
+  // Record on the orchestrator's explicit settlement, not on queue counters: generation and speech
+  // are both over and the run's metrics are final (Codex review, PRs #22/#27).
+  if ((snap.gen === "done" || snap.gen === "failed") && snap.settledRunId === snap.runId && snap.runId !== lastRecordedRunId) {
     lastRecordedRunId = snap.runId;
     stats.record(o.stats());
   }

@@ -43,6 +43,8 @@ export interface Snapshot {
   play: PlayState;
   level: Level;
   runId: number;
+  /** The last run whose pipeline fully settled (generation and speech, metrics final); stats record on this. */
+  settledRunId: number;
   bullets: BulletOut[];
   current: Cursor | null;
   /** chunk indexes whose bullets were all cut (rule 2: "Read this part" is offered) */
@@ -169,6 +171,7 @@ export class Orchestrator {
       play: this.play,
       level: this.level,
       runId: this.runId,
+      settledRunId: this.settledRunId,
       bullets: [...this.bullets],
       current: this.current,
       allCut: [...this.allCut],
@@ -436,8 +439,13 @@ export class Orchestrator {
       this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
       this.notice("error.generation");
     }
+    // Everything this run does is over and its metrics are final (voiceRun is set after the stream
+    // or read has drained). A stopped or replaced run never settles (Codex review, PR #22).
+    if (id === this.runId) this.settledRunId = id;
     this.emit();
   }
+
+  private settledRunId = 0;
 
   private markAudio(): void {
     if (this.ttfa === null) this.ttfa = performance.now() - this.runT0;
