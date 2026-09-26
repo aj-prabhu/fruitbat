@@ -102,6 +102,8 @@ test.describe("fake summarizer (wasm-ci, ?llm=fake)", () => {
     expect(o.bullets[0].chunkIndex).toBe(-1);
     expect(o.stats.reduce_calls).toBeGreaterThanOrEqual(1);
     expect(o.stats.level_used).toBe("oneline");
+    // Every chunk line and every reduce line counts toward bullets_total (the fake always answers).
+    expect(o.stats.bullets_total).toBe(o.stats.chunks + o.stats.reduce_calls);
   });
 
   test("abort mid-stream is honored: no bullets after abort, worker acknowledges", async ({ page }) => {

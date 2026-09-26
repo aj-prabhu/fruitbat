@@ -633,9 +633,12 @@ export class Summarizer {
         for (const b of parser.flush()) out.push(b.text);
         this.runStats.tokens += r.tokens;
         this.runStats.gen_ms += r.ms;
+        // Same accounting as the per-chunk lines above: a reduce output counts toward the total,
+        // and only a line that was produced and then failed grounding counts as cut (Codex review, PR #16).
+        this.runStats.bullets_total += out.length;
         const line = out[0];
         if (line && ground(line, source, COMMON_WORDS).ok) next.push(line);
-        else this.runStats.bullets_cut++;
+        else if (line) this.runStats.bullets_cut++;
       }
       if (next.length === 0) return fallback();
       lines = next;
