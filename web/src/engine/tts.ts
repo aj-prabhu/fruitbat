@@ -691,14 +691,17 @@ export class VoiceEngine {
       }
       const queue = this.queue!;
       for (const seg of planned.segments) {
-        while (runId === this.runId && !queue.canAccept()) await new Promise((r) => setTimeout(r, 50));
+        // Same back-pressure as Read all: the segment's estimated seconds count against the 30 s
+        // cap, and stay reserved until its audio is scheduled (Codex review, PR #18).
+        const est = (seg.text.length * this.secPerChar) / Math.max(this.streamRate, 0.1);
+        while (runId === this.runId && !queue.canAccept(est)) await new Promise((r) => setTimeout(r, 50));
         if (runId !== this.runId) return;
         const seq = this.streamSeq++;
-        queue.requestSent();
+        const ticket = queue.requestSent(est);
         try {
           await this.synthOne(runId, { seq, text: seg.text, start, end, phonemes: seg.phonemes }, this.streamVoice, this.streamRate, queue, tag);
         } finally {
-          queue.requestSettled();
+          queue.requestSettled(ticket);
         }
       }
     });

@@ -348,10 +348,13 @@ export class Orchestrator {
 
   /** Rule 2: read an all-cut chunk aloud, on request only. */
   async readThisPart(chunkIndex: number): Promise<void> {
+    // The run is taken before the chunk lookup, so a Stop or a new run in that window wins
+    // (Codex review, PR #18).
+    const id = this.newRun();
     const chunks = await this.ensureChunks();
+    if (id !== this.runId) return;
     const c = chunks?.[chunkIndex];
     if (!c) return;
-    const id = this.newRun();
     // Reading one part keeps the summary and every other part's "Read this part" key (Codex review, PR #18).
     await this.begin(id, "readall", { fromChunk: chunkIndex, base: c.start, end: c.end, keep: true });
   }
