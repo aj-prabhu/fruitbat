@@ -73,7 +73,10 @@ for l in dial["levels"]:
         if key in l and not (SPEC / l[key]).is_file(): problems.append(f"{l['id']}: {l[key]} missing")
     if "reduce" in l and l["reduce"]["fallback_level"] not in ids: problems.append(f"{l['id']}: fallback_level not a level")
     if "prompt" in l:
-        words = len((SPEC / l["prompt"]).read_text().split())
+        text = (SPEC / l["prompt"]).read_text()
+        words = len(text.split())
+        if words == 0: problems.append(f"{l['prompt']}: empty prompt")  # Codex merge-gate review, PR #8
+        elif "{{text}}" not in text and "{{lines}}" not in text: problems.append(f"{l['prompt']}: no {{{{text}}}} or {{{{lines}}}} placeholder")
         if words > 120: problems.append(f"{l['prompt']}: {words} words > 120")
 if problems:
     print("\n".join(problems)); sys.exit(1)

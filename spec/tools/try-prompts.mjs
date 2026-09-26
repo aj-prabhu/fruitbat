@@ -38,7 +38,7 @@ const revision = args.revision ?? candidates.find((c) => c.id === model_id)?.rev
 const template = await readFile(path.join(specDir, lvl.prompt), "utf8");
 const words = (await readFile(args.doc, "utf8")).split(/\s+/).filter(Boolean);
 const text = words.slice(0, maxWords).join(" ");
-const prompt = template.replace("{{text}}", text);
+const prompt = template.replace("{{text}}", () => text); // no $&-style interpretation of the document (Codex merge-gate review, PR #8)
 
 const t0 = Date.now();
 const tokenizer = await AutoTokenizer.from_pretrained(model_id, { revision });
