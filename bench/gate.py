@@ -792,7 +792,7 @@ def main():
 
     if args.pr_head and not args.base:
         print("bench-gate: --pr-head needs --base (the approved baselines are the base revision's)", file=sys.stderr)
-        return 2
+        sys.exit(2)
     if args.pr_head:
         if not args.head:
             print("--pr-head requires --head", file=sys.stderr)
