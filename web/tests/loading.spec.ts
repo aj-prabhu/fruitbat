@@ -95,12 +95,29 @@ test.describe("loading UX (?llm=fake, route-throttled)", () => {
   });
 });
 
+test.describe("voice load failure", () => {
+  // Found on the dev Space 2026-09-26: the voice file was refused and the line said "Getting the
+  // voice ready" forever. A failed warm-up must say so.
+  test("a voice that cannot load says so instead of loading forever", async ({ page }) => {
+    // context.route: the COI service worker re-issues the worker's request, which page.route misses
+    await page.context().route("**/models/kokoro-voices/af_heart.bin", (route) => route.fulfill({ status: 404, body: "" }));
+    await gotoIsolated(page, "/?llm=fake");
+    const line = page.locator('[data-phase="voice_failed"]');
+    await expect(line).toHaveText(STRINGS["error.voice"], { timeout: 60_000 });
+    await expect(page.locator('[data-phase="ready"]')).toHaveCount(0);
+    await expect(page.locator('[data-phase="voice"]')).toHaveCount(0);
+  });
+});
+
 test.describe("canned demo (?llm=fake, ?inject=nogpu -- never touches the models)", () => {
   test('"Try it now" plays within 1 s; turning the dial switches the recording', async ({ page }) => {
     await gotoIsolated(page, "/?llm=fake&inject=nogpu");
     const demo = page.getByTestId("demo");
     await expect(demo).toBeVisible();
-    await expect(page.getByTestId("demo-audio")).toHaveAttribute("src", "/demo/short.wav", { timeout: 15_000 });
+    // The recording plays from memory (a blob: URL), never an <audio src> on the network: a Hugging
+    // Face Space serves the WAVs from its CDN, which the CSP's media-src refuses.
+    await expect(page.getByTestId("demo-audio")).toHaveAttribute("src", /^blob:/, { timeout: 15_000 });
+    const shortSrc = await page.getByTestId("demo-audio").getAttribute("src");
 
     const ms = await page.evaluate(async () => {
       const btn = document.querySelector<HTMLButtonElement>('[data-testid="demo-try"]')!;
@@ -126,7 +143,8 @@ test.describe("canned demo (?llm=fake, ?inject=nogpu -- never touches the models
 
     // Turning the dial (the header's, shared with the demo per state/level.ts) switches the file.
     await page.locator('input[type="radio"][name="level"][value="caveman"]').click();
-    await expect(page.getByTestId("demo-audio")).toHaveAttribute("src", "/demo/caveman.wav", { timeout: 15_000 });
+    await expect(page.getByTestId("demo-audio")).not.toHaveAttribute("src", shortSrc!, { timeout: 15_000 });
+    await expect(page.getByTestId("demo-audio")).toHaveAttribute("src", /^blob:/);
     const cavemanBullet = await page.locator('[data-testid="demo-bullets"] li').first().textContent();
     expect(cavemanBullet).not.toBe(firstBullet);
   });

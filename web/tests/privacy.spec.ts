@@ -310,6 +310,13 @@ function evaluateAllowlist(records: Rec[], allow: Allowlist, baseOrigin: string)
       violations.push(`unparseable request URL: ${rec.url}`);
       continue;
     }
+    // A blob: URL made by this page is memory, not network: the demo plays its recordings from
+    // blob: URLs (fetched through net.ts, which the checks here already saw). Only this page's
+    // own blobs are skipped.
+    if (u.protocol === "blob:") {
+      if (u.origin !== baseOrigin) violations.push(`blob: URL from another origin: ${rec.url}`);
+      continue;
+    }
 
     if (rec.redirectedFrom) {
       // The browser itself followed a redirect to get here (only ever visible before the

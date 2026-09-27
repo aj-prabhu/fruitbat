@@ -4,6 +4,8 @@
 // the header's dial (state/level.ts) rather than drawing a second one, so turning that dial
 // switches the recording. It never imports the engine (no orchestrator, no llm.ts, no tts.ts):
 // only static files under public/demo/, fetched same-origin through net.ts like any other asset.
+// That includes the audio: a Hugging Face Space serves the WAVs from the Hub's CDN, which the CSP's
+// `media-src 'self' blob:` refuses for an <audio src>, so each recording plays from a blob: URL.
 import { useEffect, useRef, useState } from "preact/hooks";
 import { guardedFetch } from "../engine/net";
 import { getLevel, subscribeLevel } from "../state/level";
@@ -67,23 +69,68 @@ function useTracks(): { track: DemoTrack | null; level: Level } {
   return { track: tracks[level] ?? null, level };
 }
 
+/** Each level's recording as a blob: URL, fetched once when that level is first shown and kept
+ *  until the demo unmounts, so a dial flip back is instant. At most four files of 4 MB or less. */
+function useRecordings(level: Level): Partial<Record<Level, string>> {
+  const [urls, setUrls] = useState<Partial<Record<Level, string>>>({});
+  const made = useRef<string[]>([]);
+
+  useEffect(() => {
+    if (urls[level]) return;
+    let cancelled = false;
+    void guardedFetch(`/demo/${level}.wav`)
+      .then((res) => {
+        if (!res.ok) throw new Error(`demo_http_${res.status}`);
+        return res.blob();
+      })
+      .then((blob) => {
+        if (cancelled) return;
+        const url = URL.createObjectURL(blob);
+        made.current.push(url);
+        setUrls((prev) => ({ ...prev, [level]: url }));
+      })
+      .catch(() => {
+        // a missing recording leaves "Try it now" disabled rather than throwing
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [level, urls]);
+
+  useEffect(() => () => made.current.forEach((u) => URL.revokeObjectURL(u)), []);
+
+  return urls;
+}
+
 export function Demo() {
   const { track, level } = useTracks();
+  const recordings = useRecordings(level);
+  const src = track ? recordings[track.level] : undefined;
   const [playing, setPlaying] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const audioRef = useRef<HTMLAudioElement>(null);
+  // Set when the dial moved during playback to a level whose recording is still downloading:
+  // playback resumes on the new recording once it lands.
+  const resumeRef = useRef(false);
 
   // A dial flip mid-playback switches the recording at once (docs/PLAN.md: "switching the dial
   // switches the recording"): reload the element for the new level and keep playing if it was.
   useEffect(() => {
     const el = audioRef.current;
     if (!el || !track) return;
-    const wasPlaying = playing;
-    el.load();
+    const wasPlaying = playing || resumeRef.current;
     setActiveIndex(-1);
+    if (!src) {
+      // this level's recording is still downloading: hold, and pick up again when it lands
+      resumeRef.current = wasPlaying;
+      if (!el.paused) el.pause();
+      return;
+    }
+    resumeRef.current = false;
+    el.load();
     if (wasPlaying) void el.play().catch(() => setPlaying(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [track?.level]);
+  }, [track?.level, src]);
 
   // Esc and fruitbat.stop() must silence the recording too, not only the engine's voice
   // (Codex review, PR #20). main.tsx dispatches fruitbat:stop for both.
@@ -92,7 +139,9 @@ export function Demo() {
       const el = audioRef.current;
       if (el && !el.paused) el.pause();
       // Also when no element is mounted (the next level's track is still loading): otherwise it
-      // would start by itself once it loads (Codex review, PR #20).
+      // would start by itself once it loads (Codex review, PR #20). Same for a recording still
+      // downloading after a dial flip.
+      resumeRef.current = false;
       setPlaying(false);
     };
     const onKey = (e: KeyboardEvent) => {
@@ -130,7 +179,7 @@ export function Demo() {
     <section class="demo" data-testid="demo" data-level={level}>
       <p class="demo-recording-label">{t("demo.recording_label")}</p>
       <p class="demo-excerpt-note">{t("demo.excerpt_note")}</p>
-      <button type="button" class="demo-try-it-now" data-testid="demo-try" onClick={onTryItNow} disabled={!track}>
+      <button type="button" class="demo-try-it-now" data-testid="demo-try" onClick={onTryItNow} disabled={!track || !src}>
         {t("demo.try_it_now")}
       </button>
       <p class="demo-switch-level">{t("demo.switch_level")}</p>
@@ -139,7 +188,7 @@ export function Demo() {
           ref={audioRef}
           data-testid="demo-audio"
           preload="auto"
-          src={`/demo/${track.level}.wav`}
+          src={src}
           onPlay={() => {
             setPlaying(true);
             window.dispatchEvent(new CustomEvent("fruitbat:demo-playing", { detail: true })); // the panel's Stop can reach it

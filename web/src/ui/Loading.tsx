@@ -121,6 +121,7 @@ function VoiceLine({ s }: { s: Snapshot }) {
   if (saveData()) return <p class="loading-line" data-phase="save_data">{t("loading.save_data")}</p>;
   if (isMobile()) return <p class="loading-line" data-phase="mobile">{t("loading.mobile")}</p>;
   if (s.voiceReady) return <p class="loading-line" data-phase="ready">{t("loading.ready")}</p>;
+  if (s.voiceFailed) return <p class="loading-line" data-phase="voice_failed">{t("error.voice")}</p>;
   if (s.voiceProgress) {
     const loaded = mb(s.voiceProgress.loaded);
     const total = Math.max(mb(s.voiceProgress.total), Math.round(voice.files.reduce((a, f) => a + f.bytes, 0) / 1e6));
