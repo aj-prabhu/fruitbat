@@ -88,10 +88,32 @@ function basename(path: string): string {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 
+/** The file name a CDN bridge URL serves, from response-content-disposition, or null when `url`
+ *  does not have the bridge's object shape (/xet-bridge-<region>/<hex>/<hex>), so a filename
+ *  parameter cannot authorize an arbitrary path on the CDN host (Codex merge-gate review, PR #4). */
+function bridgeFileName(url: URL): string | null {
+  const disposition = url.searchParams.get("response-content-disposition");
+  const bridgePath = /^\/xet-bridge-[a-z0-9-]+\/[0-9a-f]{8,64}\/[0-9a-f]{8,64}$/.test(url.pathname);
+  if (!disposition || !bridgePath) return null;
+  const fname = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1];
+  return fname ? decodeURIComponent(fname) : null;
+}
+
+/** Every query parameter on a redirect target is one recorded for its host. Form A also carries
+ *  the URL-encoded original path (`matched`) as a parameter *name*. */
+function paramsRecorded(url: URL, matched: string | null): boolean {
+  const allowedParams = paramsFor(url.host);
+  for (const key of url.searchParams.keys()) {
+    if (allowedParams.has(key)) continue;
+    if (matched !== null && decodeURIComponent(key) === matched) continue;
+    return false;
+  }
+  return true;
+}
+
 /** Does `url` look like the Hub's redirect target for one of our pinned files? */
 function redirectAllowed(url: URL): { ok: boolean; reason?: string } {
   if (!hostAllowed(url.host)) return { ok: false, reason: "host not in redirect_hosts" };
-  const allowedParams = paramsFor(url.host);
   const pinnedPaths = [...exactUrls()].map((u) => new URL(u).pathname); // /<id>/resolve/<sha>/<file>
   let matched: string | null = null;
   // Form A: same host as the Hub, cache path /api/resolve-cache/models/<id>/<sha>/<file>
@@ -101,26 +123,28 @@ function redirectAllowed(url: URL): { ok: boolean; reason?: string } {
     const cachePath = `/api/resolve-cache/models/${m[1]}/${m[2]}/${m[3]}`;
     if (url.pathname === cachePath) matched = p;
   }
-  // Form B: CDN bridge; the file name travels in response-content-disposition. The path must
-  // have the bridge's object shape (/xet-bridge-<region>/<hex>/<hex>), so a filename parameter
-  // cannot authorize an arbitrary path on the CDN host (Codex merge-gate review, PR #4).
-  const disposition = url.searchParams.get("response-content-disposition");
-  const bridgePath = /^\/xet-bridge-[a-z0-9-]+\/[0-9a-f]{8,64}\/[0-9a-f]{8,64}$/.test(url.pathname);
-  if (!matched && disposition && bridgePath) {
-    const fname = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition)?.[1];
-    if (fname) {
-      const hit = pinnedPaths.find((p) => basename(p) === decodeURIComponent(fname));
-      if (hit) matched = hit;
-    }
+  // Form B: CDN bridge; the file name travels in response-content-disposition.
+  const fname = matched ? null : bridgeFileName(url);
+  if (fname) {
+    const hit = pinnedPaths.find((p) => basename(p) === fname);
+    if (hit) matched = hit;
   }
   if (!matched) return { ok: false, reason: "redirect target is not a pinned file" };
-  for (const key of url.searchParams.keys()) {
-    if (allowedParams.has(key)) continue;
-    // Form A carries the URL-encoded original path as a parameter *name*.
-    if (decodeURIComponent(key) === matched) continue;
-    return { ok: false, reason: "redirect query parameter not recorded" };
-  }
+  if (!paramsRecorded(url, matched)) return { ok: false, reason: "redirect query parameter not recorded" };
   return { ok: true };
+}
+
+/**
+ * A shipped same-origin file that the static host itself serves from the Hub's CDN. A Hugging Face
+ * static Space keeps binary files (the voice styles, the ORT runtime, the demo recordings) in the
+ * Hub's file store and answers a request for one with a redirect to the same CDN bridge the models
+ * use. Allowed only for the file that was asked for: a recorded redirect host, the bridge's object
+ * shape, the same file name, and only recorded query parameters.
+ */
+function hostedAssetRedirectAllowed(final: URL, requested: URL): boolean {
+  if (!hostAllowed(final.host)) return false;
+  if (bridgeFileName(final) !== basename(requested.pathname)) return false;
+  return paramsRecorded(final, null);
 }
 
 /** Same-origin paths our code fetches: the sample article, vendored voices, the canned demo, the
@@ -184,7 +208,11 @@ export async function guardedFetch(input: string | URL, init?: RequestInit): Pro
   const finalUrl = res.headers.get("x-fruitbat-final-url") || res.url || "";
   if (finalUrl && finalUrl !== d.url.href) {
     const final = allowedUrl(finalUrl);
-    if (!final.ok || (final.kind !== "redirect" && final.kind !== "same-origin" && final.kind !== "exact")) {
+    const onList = final.ok && (final.kind === "redirect" || final.kind === "same-origin" || final.kind === "exact");
+    // A same-origin asset the host redirected to the Hub's CDN (a Hugging Face Space does this for
+    // every binary file); before this, the voice never loaded on the Space.
+    const hostedAsset = !onList && d.kind === "same-origin" && final.url !== null && hostedAssetRedirectAllowed(final.url, d.url);
+    if (!onList && !hostedAsset) {
       netStats.redirect_rejected++;
       throw new NetworkPolicyError(`redirected off-list: ${final.ok ? final.kind : final.reason}`, new URL(finalUrl).origin);
     }

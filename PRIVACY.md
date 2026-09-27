@@ -12,6 +12,8 @@ The web app makes network requests for exactly two things, and nothing else:
    visits. Every file it can ever request is listed in `spec/network.json`.
 2. **Following the Hub's own redirects** for those same files, to one of: us.aws.cdn.hf.co, huggingface.co, *.cdn.hf.co.
    These are Hugging Face's own file-serving infrastructure, not a third party we chose.
+   The web app is hosted on Hugging Face too so its own larger files like the voice and the demo
+   recording come from those same servers.
 
 That's it. Every request is a `GET`. No analytics, no crash reporting, no ping of any kind. The
 text you paste or select, the bullets it generates, and the audio it plays are never sent

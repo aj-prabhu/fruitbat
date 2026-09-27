@@ -100,7 +100,10 @@ test.describe("canned demo (?llm=fake, ?inject=nogpu -- never touches the models
     await gotoIsolated(page, "/?llm=fake&inject=nogpu");
     const demo = page.getByTestId("demo");
     await expect(demo).toBeVisible();
-    await expect(page.getByTestId("demo-audio")).toHaveAttribute("src", "/demo/short.wav", { timeout: 15_000 });
+    // The recording plays from memory (a blob: URL), never an <audio src> on the network: a Hugging
+    // Face Space serves the WAVs from its CDN, which the CSP's media-src refuses.
+    await expect(page.getByTestId("demo-audio")).toHaveAttribute("src", /^blob:/, { timeout: 15_000 });
+    const shortSrc = await page.getByTestId("demo-audio").getAttribute("src");
 
     const ms = await page.evaluate(async () => {
       const btn = document.querySelector<HTMLButtonElement>('[data-testid="demo-try"]')!;
@@ -126,7 +129,8 @@ test.describe("canned demo (?llm=fake, ?inject=nogpu -- never touches the models
 
     // Turning the dial (the header's, shared with the demo per state/level.ts) switches the file.
     await page.locator('input[type="radio"][name="level"][value="caveman"]').click();
-    await expect(page.getByTestId("demo-audio")).toHaveAttribute("src", "/demo/caveman.wav", { timeout: 15_000 });
+    await expect(page.getByTestId("demo-audio")).not.toHaveAttribute("src", shortSrc!, { timeout: 15_000 });
+    await expect(page.getByTestId("demo-audio")).toHaveAttribute("src", /^blob:/);
     const cavemanBullet = await page.locator('[data-testid="demo-bullets"] li').first().textContent();
     expect(cavemanBullet).not.toBe(firstBullet);
   });

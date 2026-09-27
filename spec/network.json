@@ -3,7 +3,7 @@
   "version": 1,
   "web": {
     "same_origin": {
-      "$comment": "The privacy test restricts same-origin requests to the Vite build manifest plus public/.",
+      "$comment": "The privacy test restricts same-origin requests to the Vite build manifest plus public/. On a Hugging Face static Space the host answers a request for one of its binary files (the voice styles under /models/, the ORT runtime under /ort/, the demo WAVs under /demo/) with a redirect to the Hub CDN bridge (curl -sI 2026-09-26). net.ts allows that redirect only for the same file name, on a redirect host, with recorded parameters.",
       "paths_observed": [
         "/",
         "/index.html",

@@ -96,6 +96,46 @@ describe("guardedFetch", () => {
     vi.unstubAllGlobals();
   });
 
+  // A Hugging Face static Space serves its own binary files (voice styles, ORT runtime, demo
+  // recordings) through the Hub's CDN bridge. Only the file that was asked for may come back.
+  describe("same-origin assets the host serves from the Hub's CDN", () => {
+    const ORIGIN = "https://fruitbat.static.hf.space";
+    const bridge = (file: string, extra = "") =>
+      `https://us.aws.cdn.hf.co/xet-bridge-us/6ab4c1ca2c57fc39acae6fa9/478bbd0d587a03135a4899153eac4a80a046d65a32d924b25ea059319b055df8?response-content-disposition=inline%3B+filename*%3DUTF-8%27%27${file}%3B+filename%3D%22${file}%22%3B&response-content-type=audio%2Fwave&X-Xet-Cas-Uid=public&user_id=public&xip=x&Expires=1&Policy=p&Signature=s&Key-Pair-Id=k&Hash-Algorithm=SHA256${extra}`;
+    const redirectTo = (final: string) =>
+      vi.fn(async () => {
+        const r = new Response("x", { status: 200 });
+        Object.defineProperty(r, "url", { value: final });
+        return r;
+      });
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it("allows the bridge serving the same file name", async () => {
+      vi.stubGlobal("location", { origin: ORIGIN });
+      vi.stubGlobal("fetch", redirectTo(bridge("af_heart.bin")));
+      await expect(guardedFetch("/models/kokoro-voices/af_heart.bin")).resolves.toBeInstanceOf(Response);
+      vi.stubGlobal("fetch", redirectTo(bridge("short.wav")));
+      await expect(guardedFetch("/demo/short.wav")).resolves.toBeInstanceOf(Response);
+    });
+    it("refuses a different file name, an unrecorded parameter, or a non-bridge path", async () => {
+      vi.stubGlobal("location", { origin: ORIGIN });
+      vi.stubGlobal("fetch", redirectTo(bridge("af_bella.bin")));
+      await expect(guardedFetch("/models/kokoro-voices/af_heart.bin")).rejects.toThrow(/redirected off-list/);
+      vi.stubGlobal("fetch", redirectTo(bridge("short.wav", "&text=CANARY-7f3a")));
+      await expect(guardedFetch("/demo/short.wav")).rejects.toThrow(/redirected off-list/);
+      vi.stubGlobal("fetch", redirectTo("https://us.aws.cdn.hf.co/anything?response-content-disposition=filename%3D%22short.wav%22"));
+      await expect(guardedFetch("/demo/short.wav")).rejects.toThrow(/redirected off-list/);
+      vi.stubGlobal("fetch", redirectTo(bridge("short.wav").replace("us.aws.cdn.hf.co", "evil.example")));
+      await expect(guardedFetch("/demo/short.wav")).rejects.toThrow(/redirected off-list/);
+    });
+    it("never lets a Hub model file use the same-origin rule", async () => {
+      vi.stubGlobal("location", { origin: ORIGIN });
+      vi.stubGlobal("fetch", redirectTo(bridge("model_q4f16.onnx_data".replace("model", "other"))));
+      await expect(guardedFetch(ONNX)).rejects.toThrow(/redirected off-list/);
+    });
+  });
+
   it("throws after the fact if the browser followed a redirect off the list", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
       const r = new Response("x", { status: 200 });
