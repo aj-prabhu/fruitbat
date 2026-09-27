@@ -95,6 +95,20 @@ test.describe("loading UX (?llm=fake, route-throttled)", () => {
   });
 });
 
+test.describe("voice load failure", () => {
+  // Found on the dev Space 2026-09-26: the voice file was refused and the line said "Getting the
+  // voice ready" forever. A failed warm-up must say so.
+  test("a voice that cannot load says so instead of loading forever", async ({ page }) => {
+    // context.route: the COI service worker re-issues the worker's request, which page.route misses
+    await page.context().route("**/models/kokoro-voices/af_heart.bin", (route) => route.fulfill({ status: 404, body: "" }));
+    await gotoIsolated(page, "/?llm=fake");
+    const line = page.locator('[data-phase="voice_failed"]');
+    await expect(line).toHaveText(STRINGS["error.voice"], { timeout: 60_000 });
+    await expect(page.locator('[data-phase="ready"]')).toHaveCount(0);
+    await expect(page.locator('[data-phase="voice"]')).toHaveCount(0);
+  });
+});
+
 test.describe("canned demo (?llm=fake, ?inject=nogpu -- never touches the models)", () => {
   test('"Try it now" plays within 1 s; turning the dial switches the recording', async ({ page }) => {
     await gotoIsolated(page, "/?llm=fake&inject=nogpu");

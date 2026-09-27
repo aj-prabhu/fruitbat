@@ -61,6 +61,9 @@ export interface Snapshot {
   progress: { file?: string; loaded?: number; total?: number } | null;
   /** Voice download progress (S1-09 Loading UX: per-file MB while the voice loads). */
   voiceProgress: { file?: string; loaded?: number; total?: number } | null;
+  /** The page-load voice warm-up failed and nothing has loaded it since: the loading line says so
+   *  instead of "Getting the voice ready" forever. */
+  voiceFailed: boolean;
   error: string | null;
   voice: { aheadSeconds: number; enqueued: number; inFlight: number; ended: number; pending: number; phase: string };
 }
@@ -107,6 +110,7 @@ export class Orchestrator {
   error: string | null = null;
   progress: Snapshot["progress"] = null;
   voiceProgress: Snapshot["voiceProgress"] = null;
+  voiceFailed = false;
   private runId = 0;
   private text = "";
   private chunks: Chunk[] | null = null;
@@ -161,6 +165,7 @@ export class Orchestrator {
   private markVoiceReady(): void {
     if (this.voiceReady) return;
     this.voiceReady = true;
+    this.voiceFailed = false;
     this.emit();
     for (const key of this.pendingNotices.splice(0)) this.notice(key);
   }
@@ -178,6 +183,7 @@ export class Orchestrator {
       await this.voice.prewarm(PREWARM_KEYS);
     } catch (e) {
       this.error = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+      if (!this.voiceReady) this.voiceFailed = true; // a failed prewarm after the load is not a failed voice
       this.notice("error.voice");
     }
     this.emit();
@@ -210,6 +216,7 @@ export class Orchestrator {
       speakMessages: this.speakMessages,
       progress: this.progress,
       voiceProgress: this.voiceProgress,
+      voiceFailed: this.voiceFailed,
       error: this.error,
       voice: { aheadSeconds: v.aheadSeconds, enqueued: v.enqueued, inFlight: v.inFlight, ended: v.ended, pending: v.pending, phase: v.phase },
     };
