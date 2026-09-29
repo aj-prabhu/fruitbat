@@ -21,9 +21,25 @@ export function partCount(tokens: number, sentences: number, caps: PartCaps): nu
 }
 
 /**
+ * A sentence that opens with one of these words leans on the sentence before it ("They are often
+ * called fruit bats", "Instead they rely on large eyes"). Cut off from its referent, the model
+ * guesses one: megabat Caveman said "Flying foxes have large eyes" when the part began "Instead
+ * they rely on large eyes" and the next sentence named flying foxes. So a part does not start on
+ * such a sentence unless there is no other way to fill every part.
+ */
+const LEANS_BACK = new Set(["they", "their", "them", "it", "its", "this", "these", "those", "he", "she", "his", "her", "him", "instead", "also", "however", "but", "and", "so", "such"]);
+
+function leansBack(seg: Segment | undefined): boolean {
+  if (!seg) return false;
+  const first = /\p{L}+/u.exec(seg.text)?.[0]?.toLowerCase();
+  return first !== undefined && LEANS_BACK.has(first);
+}
+
+/**
  * Split `segments` into exactly `min(n, segments.length)` contiguous, non-empty parts of roughly
  * equal character length (characters stand in for tokens here; the chunk's token budget is
- * already enforced by the chunker). Sentences are never split and never reordered.
+ * already enforced by the chunker). Sentences are never split and never reordered, and a part
+ * starts on a sentence that leans back (see LEANS_BACK) only when it must.
  */
 export function splitParts(segments: Segment[], n: number): Segment[][] {
   const k = Math.max(1, Math.min(n, segments.length));
@@ -36,7 +52,8 @@ export function splitParts(segments: Segment[], n: number): Segment[][] {
     acc += segments[i].text.length;
     const left = segments.length - i - 1;
     const need = k - parts.length - 1; // parts still to open after this one
-    if (parts.length < k - 1 && (acc >= (total * (parts.length + 1)) / k || left === need)) {
+    const due = acc >= (total * (parts.length + 1)) / k && !leansBack(segments[i + 1]);
+    if (parts.length < k - 1 && (due || left === need)) {
       parts.push(cur);
       cur = [];
     }

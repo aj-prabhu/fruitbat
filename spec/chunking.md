@@ -72,7 +72,11 @@ No prompt wording changed that. So a level with `part_tokens` summarizes each ch
 1. The chunk's sentences are split into `n` contiguous parts of about equal length, where
    `n = ceil(chunk_tokens / part_tokens)`, clamped to `[min_bullets_per_chunk,
    max_bullets_per_chunk]` and to the number of sentences. A sentence is never split; parts tile
-   the chunk (`web/src/core/parts.ts`, fixtures `spec/fixtures/parts.json`).
+   the chunk (`web/src/core/parts.ts`, fixtures `spec/fixtures/parts.json`). A part does not start
+   on a sentence whose first word leans on the one before it (`they`, `it`, `this`, `these`,
+   `he`, `she`, `instead`, `however`, … — the list is in `parts.ts`) unless that is the only way
+   to fill every part: cut off from its name, the model guesses one ("Flying foxes have large
+   eyes" from "Instead they rely on large eyes", megabat, 2026-09-29).
 2. Each part is one model call with the level's prompt (`{{text}}` = the part) and gives at most
    one line; extra lines are dropped by the parser and counted.
 3. Each line is grounded against its own part, the text the model was given (`spec/grounding.md`).

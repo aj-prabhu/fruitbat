@@ -203,10 +203,11 @@ describe("parts.ts fixtures (spec/fixtures/parts.json)", () => {
           break;
         }
         case "split": {
-          const { lengths, n } = c.input as { lengths: number[]; n: number };
+          const { lengths, n, starts } = c.input as { lengths: number[]; n: number; starts?: string[] };
           let at = 0;
-          const segs = lengths.map((len) => {
-            const s = { text: "x".repeat(len), start: at, end: at + len };
+          const segs = lengths.map((len, i) => {
+            const head = starts ? `${starts[i]} ` : "";
+            const s = { text: head + "x".repeat(Math.max(0, len - head.length)), start: at, end: at + len };
             at += len + 1;
             return s;
           });
