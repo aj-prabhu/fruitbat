@@ -17,6 +17,9 @@ export { BulletParser } from "./bullets";
 export type { GroundResult, GroundChunkResult } from "./ground";
 export { normalizeNumbers, nameCandidates, ground, groundChunk } from "./ground";
 
+export type { PartCaps } from "./parts";
+export { partCount, splitParts } from "./parts";
+
 export { COMMON_WORDS } from "./commonWords";
 
 // Also re-export the already-built tokenizer module (S1-03a) so callers of this packet's

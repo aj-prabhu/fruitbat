@@ -24,6 +24,19 @@ export interface BulletParserOptions {
 }
 
 const BULLET_PREFIX = /^(?:[-•*]|\d+[.)])\s+/;
+/** A line that ends a sentence: terminal punctuation, optionally followed by a closing quote or bracket. */
+const SENTENCE_END = /[.!?…]["'”’)\]]*$/;
+/** "The passage states that X" / "The text describes how X": framing words, not content (spec/chunking.md "Meta openers"). */
+const META_LEAD = /^(?:the|this) (?:text|passage)\s+(?:states|says|explains|describes|notes|mentions|shows)\s+(?:that|how)\s+(?=\S)/i;
+
+/** Drop a meta opener and capitalize what follows; any other line is returned unchanged. */
+export function stripMetaLead(text: string): string {
+  const m = META_LEAD.exec(text);
+  if (!m) return text;
+  const rest = text.slice(m[0].length);
+  return rest.charAt(0).toUpperCase() + rest.slice(1);
+}
+
 const THINK_OPEN = "<think>";
 const THINK_CLOSE = "</think>";
 
@@ -44,10 +57,18 @@ export class BulletParser {
     return this.drainCompleteLines();
   }
 
-  /** End of stream: the buffer's last (possibly newline-less) line, if it is itself a bullet. */
-  flush(): Bullet[] {
+  /**
+   * End of stream: the buffer's last (possibly newline-less) line, if it is itself a bullet.
+   * `cutOff` = generation stopped at max_new_tokens: a last line that does not end a sentence was
+   * cut mid-thought, so it is dropped (counted in `dropped`) instead of being shown and spoken.
+   */
+  flush(cutOff = false): Bullet[] {
     const remaining = this.buffer;
     this.buffer = "";
+    if (cutOff && BULLET_PREFIX.test(remaining.trim()) && !SENTENCE_END.test(remaining.trim())) {
+      this.dropped++;
+      return [];
+    }
     const bullet = this.consumeLine(remaining);
     return bullet ? [bullet] : [];
   }
@@ -89,7 +110,7 @@ export class BulletParser {
   private consumeLine(line: string): Bullet | null {
     const trimmed = line.trim();
     if (!BULLET_PREFIX.test(trimmed)) return null;
-    const text = trimmed.replace(BULLET_PREFIX, "").trim();
+    const text = stripMetaLead(trimmed.replace(BULLET_PREFIX, "").trim());
     if (text.length === 0) return null;
     if (this.count >= this.opts.max_bullets_per_chunk) {
       this.dropped++;

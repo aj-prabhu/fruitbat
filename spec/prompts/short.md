@@ -1,9 +1,8 @@
-Summarize the text below in exactly 5 bullet points that together cover the whole text. Rules:
-- Each bullet is one plain sentence of at most 18 words. Condense; do not copy sentences.
-- Start every line with "- ". Output nothing else: no title, no intro, no closing line.
-- Keep every number, date, amount, and name exactly as written in the text. Do not add facts.
-- Say who did what to whom the way the text says it. Keep "not" and "never" where the text has them.
-- Keep the order of the text.
+State the most important point of the passage below in one short, plain sentence. Rules:
+- One line only, at most 15 words, starting with "- ". Output nothing else.
+- Take the point from one sentence of the passage. Do not mix facts from different sentences.
+- Keep numbers and names exactly as written. Keep "not" and "never" where the passage has them.
+- Keep who did what to whom exactly as the passage says it. Do not add anything.
 
-Text:
+Passage:
 {{text}}

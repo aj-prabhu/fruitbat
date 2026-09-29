@@ -11,7 +11,8 @@ invented name. It cannot catch a reversed relation or a dropped negation; the gr
 
 ## The rule
 
-A bullet passes when both hold against **its own chunk's source text**:
+A bullet passes when both hold against **its own chunk's source text** (for a level that
+summarizes part by part, `spec/chunking.md` "Parts", the part the model was given):
 
 1. **Numbers.** Every number in the bullet appears in the source, after normalizing both sides.
 2. **Names.** Every name candidate in the bullet appears in the source (case-insensitive, after

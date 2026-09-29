@@ -31,7 +31,7 @@ import { fileURLToPath } from "node:url";
 import { AutoModelForCausalLM, AutoTokenizer, env } from "@huggingface/transformers";
 import { phonemize } from "../../src/vendor/kokoro/phonemize.js";
 import { KokoroTTS } from "../../src/vendor/kokoro/kokoro.js";
-import { segmentSentences, chunkSentences, splitTtsSafe, BulletParser, ground, COMMON_WORDS, countTokensWith } from "../../src/core/index.ts";
+import { segmentSentences, chunkSentences, splitTtsSafe, BulletParser, ground, COMMON_WORDS, countTokensWith, partCount, splitParts } from "../../src/core/index.ts";
 
 const here = (p) => fileURLToPath(new URL(p, import.meta.url));
 const specDir = here("../../../spec/");
@@ -162,25 +162,41 @@ async function generateLevel(tokenizer, model, excerptText, level) {
   const chunks = await chunkSentences(segmentSentences(excerptText), countTokens, BUDGET);
   if (chunks.length !== 1) throw new Error(`expected 1 chunk for the demo excerpt, got ${chunks.length}`);
   const chunk = chunks[0];
-  const prompt = promptTemplate.replace("{{text}}", chunk.text);
-  const messages = [{ role: "user", content: prompt }];
-  const inputs = tokenizer.apply_chat_template(messages, { add_generation_prompt: true, return_dict: true, enable_thinking: false });
-  const promptTokens = inputs.input_ids.dims.at(-1);
-  const t0 = Date.now();
-  const out = await model.generate({ ...inputs, max_new_tokens: cfg.max_new_tokens, do_sample: false });
-  const genMs = Date.now() - t0;
-  const newTokens = out.slice(null, [promptTokens, null]);
-  const raw = tokenizer.batch_decode(newTokens, { skip_special_tokens: true })[0].trim();
-  const parser = new BulletParser({ max_bullets_per_chunk: cfg.max_bullets_per_chunk, max_words_per_bullet: cfg.max_words_per_bullet });
-  const bullets = [...parser.push(raw), ...parser.flush()];
+  // spec/chunking.md "Parts": a level with part_tokens is summarized part by part, one line each,
+  // each line grounded against its part -- the same path engine/llm.ts's perChunk takes.
+  const parts = cfg.part_tokens
+    ? splitParts(chunk.segments, partCount(chunk.tokens, chunk.segments.length, { part_tokens: cfg.part_tokens, min_bullets_per_chunk: cfg.min_bullets_per_chunk ?? 1, max_bullets_per_chunk: cfg.max_bullets_per_chunk })).map((segs) => segs.map((x) => x.text).join(" "))
+    : [chunk.text];
+  const perCall = cfg.part_tokens ? 1 : cfg.max_bullets_per_chunk;
   const kept = [];
   const cut = [];
-  for (const b of bullets) {
-    const g = ground(b.text, chunk.text, COMMON_WORDS);
-    if (g.ok) kept.push(b.text);
-    else cut.push({ text: b.text, reasons: g.reasons });
+  const raws = [];
+  let dropped = 0;
+  let overlength = 0;
+  let genMs = 0;
+  for (const source of parts) {
+    const prompt = promptTemplate.replace("{{text}}", () => source);
+    const messages = [{ role: "user", content: prompt }];
+    const inputs = tokenizer.apply_chat_template(messages, { add_generation_prompt: true, return_dict: true, enable_thinking: false });
+    const promptTokens = inputs.input_ids.dims.at(-1);
+    const t0 = Date.now();
+    const out = await model.generate({ ...inputs, max_new_tokens: cfg.max_new_tokens, do_sample: false });
+    genMs += Date.now() - t0;
+    const newTokens = out.slice(null, [promptTokens, null]);
+    const raw = tokenizer.batch_decode(newTokens, { skip_special_tokens: true })[0].trim();
+    raws.push(raw);
+    const parser = new BulletParser({ max_bullets_per_chunk: perCall, max_words_per_bullet: cfg.max_words_per_bullet });
+    const bullets = [...parser.push(raw), ...parser.flush(newTokens.dims.at(-1) >= cfg.max_new_tokens)];
+    dropped += parser.dropped;
+    overlength += parser.overlength;
+    for (const b of bullets) {
+      const g = ground(b.text, source, COMMON_WORDS);
+      if (g.ok) kept.push(b.text);
+      else cut.push({ text: b.text, reasons: g.reasons });
+    }
   }
-  return { raw, kept, cut, dropped: parser.dropped, overlength: parser.overlength, genMs, chunk };
+  const raw = raws.join("\n");
+  return { raw, kept, cut, dropped, overlength, genMs, chunk };
 }
 
 async function writeLevel(name, labelKey, excerptStart, excerptEnd, items, pcm) {

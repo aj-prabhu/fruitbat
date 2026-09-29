@@ -12,6 +12,7 @@ import splitFixtures from "../../../spec/fixtures/split.json";
 import chunkFixtures from "../../../spec/fixtures/chunk.json";
 import bulletsFixtures from "../../../spec/fixtures/bullets.json";
 import groundFixtures from "../../../spec/fixtures/ground.json";
+import partsFixtures from "../../../spec/fixtures/parts.json";
 
 import { segmentSentences } from "../core/segment";
 import { splitTtsSafe, type Phonemize } from "../core/split";
@@ -19,6 +20,7 @@ import { chunkSentences, InputLimitError, type CountTokens } from "../core/chunk
 import { BulletParser } from "../core/bullets";
 import { ground, groundChunk, nameCandidates } from "../core/ground";
 import { COMMON_WORDS } from "../core/commonWords";
+import { partCount, splitParts } from "../core/parts";
 import { countTokensWith, tokenizerReady } from "../core/tokens";
 // eslint-disable-next-line import/no-unresolved -- vendored JS, no types
 import { phonemize as realPhonemize } from "../vendor/kokoro/phonemize.js";
@@ -137,7 +139,7 @@ describe("chunk.ts fixtures (spec/fixtures/chunk.json)", () => {
 describe("bullets.ts fixtures (spec/fixtures/bullets.json)", () => {
   for (const c of bulletsFixtures as Array<{
     name: string;
-    input: { max_bullets_per_chunk: number; max_words_per_bullet: number; pushes: string[]; flush: boolean };
+    input: { max_bullets_per_chunk: number; max_words_per_bullet: number; pushes: string[]; flush: boolean; cutOff?: boolean };
     expect: { pushResults: unknown[]; flushResult?: unknown; dropped: number; overlength: number };
     why: string;
   }>) {
@@ -149,7 +151,7 @@ describe("bullets.ts fixtures (spec/fixtures/bullets.json)", () => {
       const pushResults = c.input.pushes.map((text) => parser.push(text));
       expect(pushResults).toEqual(c.expect.pushResults);
       if (c.input.flush) {
-        expect(parser.flush()).toEqual(c.expect.flushResult);
+        expect(parser.flush(c.input.cutOff ?? false)).toEqual(c.expect.flushResult);
       }
       expect(parser.dropped).toBe(c.expect.dropped);
       expect(parser.overlength).toBe(c.expect.overlength);
@@ -188,6 +190,41 @@ describe("ground.ts fixtures (spec/fixtures/ground.json)", () => {
 });
 
 // ------------------------------------------------------------------------------------------
+// parts.ts (spec/chunking.md "Parts")
+// ------------------------------------------------------------------------------------------
+
+describe("parts.ts fixtures (spec/fixtures/parts.json)", () => {
+  for (const c of partsFixtures as Array<{ name: string; kind: string; input: Record<string, unknown>; expect: unknown; why: string }>) {
+    it(c.name, () => {
+      switch (c.kind) {
+        case "count": {
+          const i = c.input as { tokens: number; sentences: number; part_tokens: number; min_bullets_per_chunk: number; max_bullets_per_chunk: number };
+          expect(partCount(i.tokens, i.sentences, i)).toBe(c.expect);
+          break;
+        }
+        case "split": {
+          const { lengths, n, starts } = c.input as { lengths: number[]; n: number; starts?: string[] };
+          let at = 0;
+          const segs = lengths.map((len, i) => {
+            const head = starts ? `${starts[i]} ` : "";
+            const s = { text: head + "x".repeat(Math.max(0, len - head.length)), start: at, end: at + len };
+            at += len + 1;
+            return s;
+          });
+          const parts = splitParts(segs, n);
+          expect(parts.map((p) => p.map((s) => segs.indexOf(s)))).toEqual(c.expect);
+          // Parts tile the sentences: same order, nothing dropped, nothing repeated.
+          expect(parts.flat()).toEqual(segs);
+          break;
+        }
+        default:
+          throw new Error(`unknown parts fixture kind: ${c.kind}`);
+      }
+    });
+  }
+});
+
+// ------------------------------------------------------------------------------------------
 // Fixture shape (every file: >= 8 cases, each with name/input/expect/why)
 // ------------------------------------------------------------------------------------------
 
@@ -198,6 +235,7 @@ describe("fixture file shape", () => {
     "chunk.json": chunkFixtures,
     "bullets.json": bulletsFixtures,
     "ground.json": groundFixtures,
+    "parts.json": partsFixtures,
   };
 
   for (const [name, cases] of Object.entries(files)) {

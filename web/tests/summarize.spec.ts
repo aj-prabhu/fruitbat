@@ -162,7 +162,9 @@ test.describe("fake summarizer (wasm-ci, ?llm=fake)", () => {
     const r = await summarize(page, DOC011, "short");
     expect(r.state).toBe("done");
     expect(r.raw).toContain("<think>");
-    expect(r.bullets.map((b) => b.text)).toEqual(["The park hosts 17 different bat species.", "They fly about 1.5 miles before exiting the Natural Entrance."]);
+    // Short summarizes part by part (spec/chunking.md "Parts"): every part gets the fixture's lines,
+    // the parser keeps one line per part, and only the first part holds "17" (grounding cuts the rest).
+    expect(r.bullets.map((b) => b.text)).toEqual(["The park hosts 17 different bat species."]);
   });
 
   test("input limit: over 100 chunks refuses with the spoken notice", async ({ page }) => {
