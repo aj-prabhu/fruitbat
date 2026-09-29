@@ -54,12 +54,46 @@ Rules:
    tile the source: no gaps, no overlaps (the coverage test, S1-04).
 4. Per-chunk bullet caps come from `spec/dial.json` (`max_bullets_per_chunk`,
    `max_words_per_bullet`). The bullet parser enforces them: extra bullets are dropped, an
-   over-long bullet is kept but counted (`bullet_overlength`). The prompt asks; the parser
+   over-long bullet is kept but counted (`bullet_overlength`). With `part_tokens` (see "Parts"),
+   `max_bullets_per_chunk` caps the number of parts and each part gives one line. The prompt asks; the parser
    enforces. On doc `011` (CPU try-out, 2026-09-23) Caveman returned 7 bullets where the prompt
    asked for 2–5, so the parser cap is not optional.
 5. With the real pinned tokenizer (S1-03, 2026-09-24): docs `001–010` are one chunk, `011` is
    2 chunks (1,329 words ≈ 1,700 tokens), `025` is 10; `025` is the multi-chunk fixture for the
    graded set. Word counts only estimate tokens; the budget is always measured.
+
+## Parts (levels with `part_tokens` in `spec/dial.json`)
+
+A chunk is up to 1,600 tokens, and the pinned 0.8B summarizer does not summarize a text that
+long: asked for N bullets, it copies the chunk sentence by sentence, ignores N, and the parser cap
+then keeps only the chunk's opening sentences (2026-09-29, `docs/qa/short-quality-2026-09-29.md`).
+No prompt wording changed that. So a level with `part_tokens` summarizes each chunk part by part:
+
+1. The chunk's sentences are split into `n` contiguous parts of about equal length, where
+   `n = ceil(chunk_tokens / part_tokens)`, clamped to `[min_bullets_per_chunk,
+   max_bullets_per_chunk]` and to the number of sentences. A sentence is never split; parts tile
+   the chunk (`web/src/core/parts.ts`, fixtures `spec/fixtures/parts.json`).
+2. Each part is one model call with the level's prompt (`{{text}}` = the part) and gives at most
+   one line; extra lines are dropped by the parser and counted.
+3. Each line is grounded against its own part, the text the model was given (`spec/grounding.md`).
+4. `per_chunk_kept` and the all-cut notice still count per chunk.
+
+Every part of a chunk gets a line, so the end of a chunk is never dropped by the cap. Levels
+without `part_tokens` send the whole chunk in one call, as before.
+
+## Cut-off lines
+
+When a call stops at `max_new_tokens`, a last line that does not end a sentence (`.`, `!`, `?`,
+`…`, optionally followed by a closing quote or bracket) was cut mid-thought. The parser drops it
+and counts it in `parser_dropped`; it is never shown or spoken.
+
+## Meta openers
+
+The small model often opens a line with framing instead of content: "The passage states that
+bats are mammals…". A line that starts with `The|This` + `text|passage` + `states|says|explains|
+describes|notes|mentions|shows` + `that|how` has those words dropped and the next letter
+capitalized ("Bats are mammals…"). No other rewrite is made; a line of any other shape is kept as
+the model wrote it. Fixtures: `spec/fixtures/bullets.json`.
 
 ## One-line policy on more than one chunk
 

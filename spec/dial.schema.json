@@ -28,6 +28,7 @@
           "min_bullets_per_chunk": { "type": "integer", "minimum": 1 },
           "max_words_per_bullet": { "type": "integer", "minimum": 3, "maximum": 40 },
           "max_new_tokens": { "type": "integer", "minimum": 16, "maximum": 512 },
+          "part_tokens": { "type": "integer", "minimum": 32, "maximum": 1600 },
           "reduce": {
             "type": "object",
             "required": ["group_size", "max_depth", "fallback_level", "max_cut_fraction"],

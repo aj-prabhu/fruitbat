@@ -8,7 +8,7 @@ import shortPrompt from "../../../spec/prompts/short.md?raw";
 import cavemanPrompt from "../../../spec/prompts/caveman.md?raw";
 import onelinePrompt from "../../../spec/prompts/oneline.md?raw";
 import reducePrompt from "../../../spec/prompts/reduce-oneline.md?raw";
-import { BulletParser, COMMON_WORDS, InputLimitError, chunkSentences, countTokens, ground, segmentSentences, type Chunk } from "../core";
+import { BulletParser, COMMON_WORDS, InputLimitError, chunkSentences, countTokens, ground, partCount, segmentSentences, splitParts, type Chunk } from "../core";
 import { parseFlags, probeWebGpu, type Flags, type GpuProbe } from "./capabilities";
 import type { GenerateMsg, Level, MainToWorker, WorkerToMain } from "./llmProtocol";
 import { summarizerTiers, type PinnedModel } from "./pins";
@@ -29,6 +29,8 @@ interface DialLevel {
   min_bullets_per_chunk?: number;
   max_words_per_bullet?: number;
   max_new_tokens?: number;
+  /** spec/chunking.md "Parts": summarize the chunk part by part, one line per ~part_tokens. */
+  part_tokens?: number;
   reduce?: { group_size: number; max_depth: number; fallback_level: string; max_cut_fraction: number };
 }
 const LEVELS = new Map((dialSpec.levels as DialLevel[]).map((l) => [l.id, l]));
@@ -584,35 +586,54 @@ export class Summarizer {
     }
   }
 
-  /** Short / Caveman: every chunk gets its bullets; each bullet is grounded against its own chunk. */
+  /**
+   * Short / Caveman: every chunk gets its bullets; each bullet is grounded against the text the
+   * model was given for it. A level with `part_tokens` (spec/chunking.md "Parts") summarizes the
+   * chunk part by part, one line per part, so the end of a chunk is never dropped by the cap.
+   */
   private async perChunk(runId: number, chunks: Chunk[], level: Level, emit: (b: BulletOut) => void, opts: SummarizeOptions): Promise<boolean> {
     const cfg = this.levelCfg(level);
     const prompt = PROMPTS[cfg.prompt!];
     this.runStats.level_used = level;
     for (const chunk of chunks) {
       if (runId !== this.runId || this.state === "stopped") return false;
-      const parser = new BulletParser({ max_bullets_per_chunk: cfg.max_bullets_per_chunk, max_words_per_bullet: cfg.max_words_per_bullet });
+      const parts = cfg.part_tokens
+        ? splitParts(
+            chunk.segments,
+            partCount(chunk.tokens, chunk.segments.length, {
+              part_tokens: cfg.part_tokens,
+              min_bullets_per_chunk: cfg.min_bullets_per_chunk ?? 1,
+              max_bullets_per_chunk: cfg.max_bullets_per_chunk,
+            }),
+          ).map((segs) => segs.map((s) => s.text).join(" "))
+        : [chunk.text];
+      const perCall = cfg.part_tokens ? 1 : cfg.max_bullets_per_chunk;
       let kept = 0;
-      const handle = (b: { text: string; index: number }) => {
-        this.runStats.bullets_total++;
-        const g = ground(b.text, chunk.text, COMMON_WORDS);
-        if (g.ok) {
-          kept++;
-          emit({ text: b.text, chunkIndex: chunk.index, index: b.index, start: chunk.start, end: chunk.end });
-        } else {
-          this.runStats.bullets_cut++;
-        }
-      };
-      const r = await this.generate(runId, chunk.index, prompt.replace("{{text}}", () => chunk.text), level, chunk.text, cfg.max_new_tokens, (t) => {
-        opts.onToken?.(t);
-        for (const b of parser.push(t)) handle(b);
-      });
-      if (r.aborted) return false;
-      for (const b of parser.flush()) handle(b);
-      this.runStats.parser_dropped += parser.dropped;
-      this.runStats.parser_overlength += parser.overlength;
-      this.runStats.tokens += r.tokens;
-      this.runStats.gen_ms += r.ms;
+      for (let p = 0; p < parts.length; p++) {
+        if (runId !== this.runId || this.stopped()) return false;
+        const source = parts[p];
+        const parser = new BulletParser({ max_bullets_per_chunk: perCall, max_words_per_bullet: cfg.max_words_per_bullet });
+        const handle = (b: { text: string; index: number }) => {
+          this.runStats.bullets_total++;
+          const g = ground(b.text, source, COMMON_WORDS);
+          if (g.ok) {
+            kept++;
+            emit({ text: b.text, chunkIndex: chunk.index, index: cfg.part_tokens ? p : b.index, start: chunk.start, end: chunk.end });
+          } else {
+            this.runStats.bullets_cut++;
+          }
+        };
+        const r = await this.generate(runId, chunk.index, prompt.replace("{{text}}", () => source), level, source, cfg.max_new_tokens, (t) => {
+          opts.onToken?.(t);
+          for (const b of parser.push(t)) handle(b);
+        });
+        if (r.aborted) return false;
+        for (const b of parser.flush(r.tokens >= cfg.max_new_tokens)) handle(b);
+        this.runStats.parser_dropped += parser.dropped;
+        this.runStats.parser_overlength += parser.overlength;
+        this.runStats.tokens += r.tokens;
+        this.runStats.gen_ms += r.ms;
+      }
       this.runStats.per_chunk_kept.push(kept);
       // Nothing kept, whether every bullet was cut or the model gave none: say so (grounding.md).
       if (kept === 0) {
@@ -645,7 +666,7 @@ export class Summarizer {
         for (const b of parser.push(t)) lines.push(b.text);
       });
       if (r.aborted) return false;
-      for (const b of parser.flush()) lines.push(b.text);
+      for (const b of parser.flush(r.tokens >= cfg.max_new_tokens)) lines.push(b.text);
       this.runStats.parser_dropped += parser.dropped;
       this.runStats.parser_overlength += parser.overlength;
       this.runStats.tokens += r.tokens;
@@ -684,7 +705,7 @@ export class Summarizer {
           for (const b of parser.push(t)) out.push(b.text);
         });
         if (r.aborted) return false;
-        for (const b of parser.flush()) out.push(b.text);
+        for (const b of parser.flush(r.tokens >= cfg.max_new_tokens)) out.push(b.text);
         this.runStats.parser_dropped += parser.dropped;
         this.runStats.parser_overlength += parser.overlength;
         this.runStats.tokens += r.tokens;

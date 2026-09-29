@@ -154,5 +154,71 @@
       "overlength": 0
     },
     "why": "a bare hyphen glued to a word (a minus sign, a hyphenated word at line start) is not a bullet marker; the parser requires the marker to be followed by whitespace."
+    },
+  {
+    "name": "cut_off_last_line_dropped",
+    "input": {
+      "max_bullets_per_chunk": 3,
+      "max_words_per_bullet": 18,
+      "pushes": ["- Megabats live in Africa, Asia and Oceania.\n- They eat fruit and play a big role in spreading seeds and poll"],
+      "flush": true,
+      "cutOff": true
+    },
+    "expect": {
+      "pushResults": [[{ "text": "Megabats live in Africa, Asia and Oceania.", "index": 0 }]],
+      "flushResult": [],
+      "dropped": 1,
+      "overlength": 0
+    },
+    "why": "generation stopped at max_new_tokens mid-word: the unfinished last line is dropped and counted, never shown or spoken (docs/qa/short-quality-2026-09-29.md)."
+  },
+  {
+    "name": "cut_off_but_last_line_complete_is_kept",
+    "input": {
+      "max_bullets_per_chunk": 3,
+      "max_words_per_bullet": 18,
+      "pushes": ["- Megabats live in Africa, Asia and Oceania.\n- Some island species have gone extinct."],
+      "flush": true,
+      "cutOff": true
+    },
+    "expect": {
+      "pushResults": [[{ "text": "Megabats live in Africa, Asia and Oceania.", "index": 0 }]],
+      "flushResult": [{ "text": "Some island species have gone extinct.", "index": 1 }],
+      "dropped": 0,
+      "overlength": 0
+    },
+    "why": "hitting the token limit right after a finished sentence loses nothing: a last line that ends a sentence is kept."
+    },
+  {
+    "name": "meta_opener_stripped",
+    "input": {
+      "max_bullets_per_chunk": 3,
+      "max_words_per_bullet": 18,
+      "pushes": ["- The passage states that bats are mammals that give live birth.\n- The text describes how flying foxes find food at night.\n"],
+      "flush": true
+    },
+    "expect": {
+      "pushResults": [[{ "text": "Bats are mammals that give live birth.", "index": 0 }, { "text": "Flying foxes find food at night.", "index": 1 }]],
+      "flushResult": [],
+      "dropped": 0,
+      "overlength": 0
+    },
+    "why": "'The passage states that' / 'The text describes how' are framing words the small model adds, not content; they are dropped and the rest is capitalized (2026-09-29 short-quality run)."
+  },
+  {
+    "name": "meta_opener_without_that_or_how_kept",
+    "input": {
+      "max_bullets_per_chunk": 3,
+      "max_words_per_bullet": 18,
+      "pushes": ["- The text describes bats as mammals.\n- The passage is short.\n"],
+      "flush": true
+    },
+    "expect": {
+      "pushResults": [[{ "text": "The text describes bats as mammals.", "index": 0 }, { "text": "The passage is short.", "index": 1 }]],
+      "flushResult": [],
+      "dropped": 0,
+      "overlength": 0
+    },
+    "why": "Only 'that' or 'how' leaves a whole sentence behind; any other shape is left as the model wrote it rather than rewritten."
   }
 ]
