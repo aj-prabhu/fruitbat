@@ -153,9 +153,11 @@ export function App() {
       </header>
       <Loading />
       <main class="app-main">
+        {/* The paste box comes first: under the sample article it sat three screens down and
+            read as missing (Akshay, 2026-09-29). */}
+        <PasteBox />
         <Demo />
         <Article paragraphs={paragraphs} />
-        <PasteBox />
       </main>
       <Panel />
       <ReadChip />
