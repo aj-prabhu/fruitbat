@@ -133,6 +133,33 @@
   gap: var(--panel-gap);
 }
 
+/* Settings (speed, voice, messages, text size, spacing): always shown in the side dock. On a
+   phone they fold behind a "Settings" button, so the bottom sheet is the transport row plus
+   what's being read instead of two-thirds of the screen (found 2026-09-29). */
+.panel-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--panel-gap);
+}
+/* Two classes: .panel-transport (later in this file) also sets display. */
+.panel-transport.panel-settings-toggle {
+  display: none;
+}
+@media (max-width: 640px) {
+  .panel-transport.panel-settings-toggle {
+    display: inline-flex; /* the look comes from .panel-transport */
+    align-self: flex-start;
+  }
+  .panel-settings[data-open="false"] {
+    display: none;
+  }
+  /* Nothing to read yet: the paste box on the page already says what to do, so the sheet shows
+     only its title and the buttons until there is something to show. */
+  .panel[data-empty="true"] .panel-body {
+    display: none;
+  }
+}
+
 .panel-controls-row {
   display: flex;
   align-items: center;

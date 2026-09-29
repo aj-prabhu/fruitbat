@@ -231,6 +231,13 @@ body {
   resize: vertical;
 }
 
+/* On a phone the panel's bottom sheet starts about two-thirds down: a shorter box keeps
+   "Read this" above it on the first screen. */
+@media (max-width: 640px) {
+  .paste-textarea {
+    min-height: 5em;
+  }
+}
 .paste-textarea:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
