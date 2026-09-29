@@ -363,6 +363,9 @@ export function Panel() {
     writeStored(SPACING_KEY, v);
   };
 
+  // Phones only (panel.css): the settings fold away so the bottom sheet doesn't cover the page.
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   const cur = s.current;
   const empty = s.bullets.length === 0 && !cur && s.allCut.length === 0 && !s.lastNotice;
 
@@ -376,6 +379,7 @@ export function Panel() {
       data-play={s.play}
       data-font-size={fontSize}
       data-spacing={spacing}
+      data-empty={empty ? "true" : "false"}
     >
       <Pip />
       {/* One scroll container for everything but Pip: at any window size, whatever does not fit
@@ -400,12 +404,23 @@ export function Panel() {
         </div>
         <div class="panel-controls">
           <TransportRow s={s} />
-          <RateControl rate={rate} onChange={onRate} />
-          <VoiceControl voice={voice} onChange={onVoice} />
-          <SpeakToggle checked={s.speakMessages} onChange={(on) => orchestrator().setSpeakMessages(on)} />
-          <div class="panel-controls-row">
-            <TextSizeControl value={fontSize} onChange={onFontSize} />
-            <SpacingControl value={spacing} onChange={onSpacing} />
+          <button
+            type="button"
+            class="panel-transport panel-settings-toggle"
+            aria-expanded={settingsOpen}
+            aria-controls="panel-settings"
+            onClick={() => setSettingsOpen((o) => !o)}
+          >
+            {t("panel.settings")}
+          </button>
+          <div id="panel-settings" class="panel-settings" data-open={settingsOpen ? "true" : "false"}>
+            <RateControl rate={rate} onChange={onRate} />
+            <VoiceControl voice={voice} onChange={onVoice} />
+            <SpeakToggle checked={s.speakMessages} onChange={(on) => orchestrator().setSpeakMessages(on)} />
+            <div class="panel-controls-row">
+              <TextSizeControl value={fontSize} onChange={onFontSize} />
+              <SpacingControl value={spacing} onChange={onSpacing} />
+            </div>
           </div>
         </div>
       </div>
